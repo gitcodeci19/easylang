@@ -82,3 +82,10 @@ Connect a free key from **Groq**, **NVIDIA**, or **AMD**. Built-in steps show yo
 - Dataset credits: [ATTRIBUTIONS.md](ATTRIBUTIONS.md)
 
 </details>
+
+---
+
+## 👨‍💻 Contributors
+
+- **Idea & Product Direction:** **Orange Head** ([@gitcodeci19](https://github.com/gitcodeci19))
+- **Code & Development:** **Antigravity** *(Google DeepMind AI)*

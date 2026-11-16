@@ -82,3 +82,10 @@ Doğruluk oranını, seviyeni ve kişisel **AI Çalışma Koçu** önerilerini t
 - Veri kaynakları: [ATTRIBUTIONS.md](ATTRIBUTIONS.md)
 
 </details>
+
+---
+
+## 👨‍💻 Geliştiriciler
+
+- **Fikir & Ürün Yönetimi:** **Orange Head** ([@gitcodeci19](https://github.com/gitcodeci19))
+- **Kodlama & Geliştirme:** **Antigravity** *(Google DeepMind AI)*
