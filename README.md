@@ -1,113 +1,129 @@
+**Dil / Language:** 🇹🇷 **Türkçe** · [🇬🇧 English](README.en.md)
+
 # ⚡ EasyLang
 
-**Learn English effortlessly while browsing — zero burnout, smart spaced repetition, live webpage challenges, and optional free AI coaching.**
+**Tarayıcıda gezinirken ücretsiz yapay zeka desteğiyle İngilizce öğren — sadece ezber değil, hatanı anlayan ve seni adım adım geliştiren akıllı öğrenme.**
 
-**EasyLang** is a privacy-first Manifest V3 browser extension for Chrome, Edge, and Brave. Instead of forcing you into a separate flashcard app, it weaves active recall directly into your daily browsing with a guided CEFR learning path, live webpage translation challenges, audio dictation, and semantic AI feedback.
+EasyLang; Chrome, Edge ve Brave tarayıcılarında çalışan, **yapay zeka destekli gelişim** odaklı bir dil öğrenme eklentisidir. Ek bir uygulamaya girmeden, günlük internette gezinirken karşına çıkan sorularla seviyeni adım adım yukarı taşır.
 
 <p align="center">
-  <img src="docs/screenshots/01-popup-roadmap.png" alt="EasyLang Popup & Learning Path" width="440" />
+  <img src="docs/screenshots/01-popup-roadmap.png" alt="EasyLang Ana Menü ve Öğrenme Yolu" width="440" />
 </p>
 
 ---
 
-## ✨ Visual Tour
+## 🤖 Neden Yapay Zeka Destekli Gelişim?
 
-### 1. Guided Learning Path & Quick Modes
-Open EasyLang from the toolbar to continue thematic CEFR units (`Animals`, `Sports`, `Cinema`, daily foundations) broken into **3 progressive steps per lesson**, or launch **Quick Quiz**, **Challenge**, and **Listen & Type** right from the bottom bar.
+Klasik kelime kartları sadece "doğru" ya da "yanlış" der ve aynı cevabı ezberlemeni bekler. EasyLang'de ise yapay zeka seni gerçek bir öğretmen gibi takip eder:
 
-- **Two Independent Systems:** Unit **XP** tracks your structured curriculum path, while **Elo (`600–2000`)** measures live recall & challenge accuracy—keeping them separate prevents easy lesson XP from inflating your true CEFR estimate.
-- **First-Run Guardrail:** Beginners choosing `A1` or `A2` start safely capped at `A1–A2` prompts until reaching `1100+ Elo`, when EasyLang asks whether you feel ready to unlock `B1`.
+- **Kelimeyi değil, anlamı ölçer:** Farklı ama doğru bir kelime kullandığında cevabını reddetmez, kabul eder ve neden doğru olduğunu sade bir dille açıklar.
+- **Zayıf noktalarını otomatik yakalar:** Cümle içindeki küçük zaman veya anlam hatalarını fark eder, o konuyu çalışma listene ekler ve birkaç soru sonra tekrar sorarak hatanı kalıcı olarak düzeltir.
+- **Sana özel AI Çalışma Koçu:** Şimdiye kadarki tüm doğrularını ve zorlandığın konuları inceleyip neye çalışman gerektiğini söyler.
+- **Kotayı boşa harcamaz:** Birebir doğru yazdığın cevapları internet veya API kullanmadan cihazında anında onaylar; yapay zekayı yalnızca gerçekten gerektiğinde devreye sokar.
 
 ---
 
-### 2. Live Webpage `Challenge` Mode (`Alt+Shift+P`)
-Turn any article, forum thread, or blog post you are reading into an instant translation exercise:
+## 👀 Nasıl Çalışır?
 
-1. Click **Challenge** in the popup (or press `Alt+Shift+P`).
-2. EasyLang scans the page locally (**0 AI tokens spent scanning**), selects a natural English or Turkish sentence, highlights it brightly in yellow, and points a dynamic SVG arrow between the text and your answer box.
+### 1. Öğrenme Yolu ve Günlük Pratik
+Eklenti simgesine tıklayıp konulara bölünmüş derslerden devam edebilir veya alttaki butonlarla **Şimdi Sor**, **Challenge** ve **Dinle & Yaz** modlarını hemen açabilirsin.
+
+- Başlangıç seviyesindeysen (`A1–A2`), önce temeli sağlamlaştırman için zorluk otomatik dengelenir; seviyen yükseldikçe bir üst aşamaya geçmek isteyip istemediğin sana sorulur.
+
+---
+
+### 2. Gezdiğin Sayfada Canlı Çeviri (`Challenge`)
+Okuduğun bir haber, forum veya blog sayfasını tek tıkla alıştırmaya dönüştür:
+
+1. Menüden **Challenge** butonuna tıkla *(veya `Alt+Shift+P`)*.
+2. Eklenti sayfadan doğal bir cümle seçip sarıyla işaretler; ok işaretiyle seni doğrudan cevap kutusuna yönlendirir.
+3. Çevirini yaz, yapay zeka anında değerlendirsin.
 
 <p align="center">
-  <img src="docs/screenshots/02-challenge-mode.png" alt="Challenge Mode Highlight and Arrow" width="760" />
+  <img src="docs/screenshots/02-challenge-mode.png" alt="Web Sayfasında Challenge Modu" width="760" />
 </p>
 
 ---
 
-### 3. Zero-Token Local Grading + Smart AI Semantic Feedback
-EasyLang never wastes your API quota when a standard match already works—and shines whenever your wording differs from the textbook answer:
+### 3. Akıllı Geri Bildirim ve Otomatik Hata Takibi
+EasyLang hem hızı hem de derin öğrenmeyi bir arada sunar:
 
-| Exact Local Match *(0 AI Tokens)* | Semantic Paraphrase Grading *(AI)* | Grammar Nuance & Focus Tracker *(+2 → +4 → +10)* |
+| Anında Kontrol *(API Harcamaz)* | Anlama Göre AI Onayı | AI Dilbilgisi ve Odak Takibi |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/03-offline-exact-match.png" alt="Offline exact match saves API calls" width="270" /> | <img src="docs/screenshots/04-ai-semantic-feedback.png" alt="AI accepts valid synonyms with clear color-coded feedback" width="270" /> | <img src="docs/screenshots/05-ai-grammar-focus.png" alt="AI detects subtle grammar gap and adds it to focus reviews" width="270" /> |
-| Instant offline verification with Turkish diacritic normalization & typo tolerance. | Accepts natural synonyms (*e.g., "reyon" vs "peron"*) and highlights feedback in color-coded bubbles. | Catches subtle tense/structure slips (*e.g., `be + to + verb`*) and schedules targeted follow-ups (`+2 → +4 → +10`). |
+| <img src="docs/screenshots/03-offline-exact-match.png" alt="Cihaz içi hızlı doğru kontrolü" width="270" /> | <img src="docs/screenshots/04-ai-semantic-feedback.png" alt="Yapay zekanın eş anlamlı cevabı kabul etmesi" width="270" /> | <img src="docs/screenshots/05-ai-grammar-focus.png" alt="Yapay zekanın hatayı yakalayıp odak listesine eklemesi" width="270" /> |
+| Doğru bildiğin standart cevapları kotan hiç eksilmeden anında onaylar. | Sözlükten farklı ama doğru bir ifade yazdığında *(ör. "peron" yerine "reyon")* cevabını kabul eder. | İnce anlam farkını yakalar, nedenini açıklar ve o kuralı birkaç soru sonra tekrar test eder. |
 
 ---
 
-### 4. Progress & Elo Analytics (`My Progress`)
-Track your rating trajectory curve, CEFR band mastery (`A1–C1`), part-of-speech accuracy, semantic topic strengths (`Emotions`, `Business`, `Tech`, `Travel`, etc.), tricky cards, and an on-demand **AI Study Coach**.
+### 4. Gelişim Paneli ve AI Çalışma Koçu (`Gelişimim`)
+Hangi seviyede olduğunu, doğruluk oranını, hangi konu ve kelime türlerinde güçlü veya zayıf olduğunu tek ekranda gör. Alttaki **AI Çalışma Koçu** ile tek tıkla kişisel gelişim tavsiyesi al.
 
 <p align="center">
-  <img src="docs/screenshots/06-progress-analytics.png" alt="EasyLang Progress & Analytics Dashboard" width="760" />
+  <img src="docs/screenshots/06-progress-analytics.png" alt="Gelişimim ve AI Çalışma Koçu" width="760" />
 </p>
 
 ---
 
-### 5. Built-in Free AI Guide & Failover (`AI - API Keys`)
-Includes a curated recommendation drawer with step-by-step free API setup instructions and top picks (**≤ 7 curated models per provider**) for:
-- **Groq** — *⭐ Recommended (Ultra-Fast & Smart)*
-- **NVIDIA NIM** — *🧠 Slower but Deeper Reasoning*
-- **AMD TokenLab** — *⚖️ Slower / Solid Free Backup*
+### 5. Ücretsiz Yapay Zeka Kurulumu (`AI - API Ayarları`)
+Kendi ücretsiz yapay zeka anahtarını eklemek 1 dakikanı alır. Arayüz içindeki rehber sana sırasıyla hangi siteye girip anahtar alacağını tek tek anlatır:
 
-Configure a **Primary API** plus optional **Backup APIs (`AI2` & `AI3`)** for automatic failover on timeouts or rate limits (`429`).
+- **Groq** — *⭐ Önerilen (Çok Hızlı & Zeki)*
+- **NVIDIA NIM** — *🧠 Yavaş ama Daha Akıllı*
+- **AMD TokenLab** — *⚖️ Yavaş / İyi Yedek*
+
+İstersen **Ana API** yanına **Yedek API** de ekleyebilirsin; biri limitine takılırsa eklenti kesintisiz şekilde diğerine geçer.
 
 <p align="center">
-  <img src="docs/screenshots/07-ai-api-setup.png" alt="AI Settings & Free API Recommendations" width="760" />
+  <img src="docs/screenshots/07-ai-api-setup.png" alt="Ücretsiz AI API Ayarları" width="760" />
 </p>
 
 ---
 
-## 🚀 Key Features Summary
+## ✨ Diğer Kolaylıklar
 
-- **Listen & Type (`Alt+Shift+L`):** Direct `1.0x` / `0.75x` voice dictation (and optional live blurred YouTube caption practice) with word-by-word diff grading.
-- **20-Minute Priority Retry + Spaced Repetition (SRS):** Missed cards return in 20 minutes; mastered cards expand (`1d → 3d → 7d → ... → 90d`).
-- **Site Exclusion (Anti-Ban):** Exclude banking, exam, or work domains with zero `content.js` injection (`chrome.scripting`), or toggle any site in 1 click from the popup.
-- **12 UI & Explanation Languages:** `Auto`, `Türkçe`, `English`, `Français`, `Español`, `Deutsch`, `日本語`, `Português`, `Русский`, `Italiano`, `한국어`, `中文`, and `العربية`.
-- **Custom Decks & Safe Backups:** Add words/sentences right inside Settings, bulk import/export TSV/CSV/JSON, and download full `.json` progress backups (**API keys are strictly excluded from backup files**).
+- **Dinle & Yaz (`Alt+Shift+L`):** İngilizce cümleyi normal veya yavaş hızda dinleyip yazarak kulak ve yazım pratiği yap.
+- **Unuttuklarını Tam Zamanında Hatırlatır:** Yanlış yaptığın kartlar 20 dakika sonra tekrar gelir; öğrendikçe aralığı uzar.
+- **Site Engelleme:** Banka, sınav veya iş sitelerinde eklentiyi tek tıkla kapatabilirsin.
+- **12 Dil Desteği:** İlk kurulumda tarayıcı dilini otomatik tanır; arayüz ve AI açıklamaları Türkçe dahil 12 dilde çalışır.
+- **Kendi Kelimelerini Ekle & Yedekle:** Ayarlar bölümünden kendi kelime ve cümlelerini ekleyebilir, ilerlemeni tek dosyayla yedekleyebilirsin *(API anahtarların güvenlik için yedeğe dahil edilmez)*.
 
 ---
 
-## 📦 Installation (Chrome / Edge / Brave)
+## 📦 Kurulum (Chrome / Edge / Brave)
 
-1. Clone this repository, install dependencies, and build into `dist/`:
+1. Projeyi bilgisayarına indir, kur ve derle:
    ```bash
    npm install
    npm run build
    ```
-2. Open `chrome://extensions` (or `edge://extensions`).
-3. Enable **Developer mode** in the top-right corner.
-4. Click **Load unpacked** and select the generated `dist/` folder.
+2. Tarayıcıda `chrome://extensions` *(veya Edge için `edge://extensions`)* adresini aç.
+3. Sağ üstten **Geliştirici modu**nu aç.
+4. **Paketlenmemiş öğe yükle** butonuna bas ve oluşan `dist` klasörünü seç.
 
 ---
 
-## 🔒 Privacy & Security
+## 🔒 Gizlilik
 
-- **Zero Hardcoded Keys or Telemetry:** No personal data, analytics trackers, or API keys exist anywhere in this repository.
-- **100% Local Storage:** API keys, card history, and custom decks stay exclusively inside your browser's `chrome.storage.local` and are sent only to the AI endpoint you explicitly configure.
+- Bu depoda hiçbir kişisel bilgi, takip aracı veya gömülü API anahtarı bulunmaz.
+- API anahtarların ve tüm ilerlemen yalnızca kendi tarayıcında saklanır; sadece senin tanımladığın AI servisiyle paylaşılır.
 
----
-
-## 🛠 Development
+<details>
+<summary>🛠 Geliştirici Komutları & Veri Kaynakları</summary>
 
 ```bash
-npm run typecheck   # Run TypeScript type checks
-npm test            # Run unit tests (42 passing via Node native runner)
-npm run build       # Bundle extension into dist/
-npm run watch       # Rebuild automatically on file changes
+npm run typecheck   # TypeScript kontrolü
+npm test            # Birim testleri (42 test)
+npm run build       # dist/ klasörünü oluştur
+npm run watch       # Değişikliklerde otomatik derle
 ```
 
-*(Optional)* Regenerate `public/data/cards.json` from upstream open datasets:
+*(İsteğe bağlı)* Kart veri setini yeniden oluşturmak için:
+
 ```bash
 npm run build:data
 npm run build
 ```
 
-See [ATTRIBUTIONS.md](ATTRIBUTIONS.md) for dataset licenses and credits.
+Açık kaynak kelime ve cümle kaynakları için [ATTRIBUTIONS.md](ATTRIBUTIONS.md) dosyasına bakabilirsin.
+
+</details>
