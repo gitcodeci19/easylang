@@ -67,16 +67,17 @@ Connect a free key from **Groq**, **NVIDIA**, or **AMD**. Built-in steps show yo
 
 ## 📦 Install (Chrome / Edge / Brave)
 
-1. Download this repo and run:
-   ```bash
-   npm install
-   npm run build
-   ```
+1. Download `EasyLang-v1.0.0.zip` from **[Releases](https://github.com/gitcodeci19/easylang/releases/latest)** and unzip it.
 2. Open `chrome://extensions` and turn on **Developer mode** (top right).
-3. Click **Load unpacked** and select the `dist` folder.
+3. Click **Load unpacked** and select the unzipped folder.
 
 <details>
-<summary>Info: Privacy & Credits</summary>
+<summary>Build from Source & Privacy</summary>
+
+```bash
+npm install
+npm run build
+```
 
 - Your progress and API keys stay strictly inside your browser.
 - Dataset credits: [ATTRIBUTIONS.md](ATTRIBUTIONS.md)

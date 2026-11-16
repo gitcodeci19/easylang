@@ -67,16 +67,17 @@ Doğruluk oranını, seviyeni ve kişisel **AI Çalışma Koçu** önerilerini t
 
 ## 📦 Nasıl Kurulur? (Chrome / Edge / Brave)
 
-1. Projeyi indir ve şu 2 komutu çalıştır:
-   ```bash
-   npm install
-   npm run build
-   ```
+1. **[Releases](https://github.com/gitcodeci19/easylang/releases/latest)** sayfasından hazır `EasyLang-v1.0.0.zip` dosyasını indir ve bir klasöre çıkart.
 2. Tarayıcıda `chrome://extensions` aç, sağ üstten **Geliştirici modu**nu aç.
-3. **Paketlenmemiş öğe yükle** de ve oluşan `dist` klasörünü seç.
+3. **Paketlenmemiş öğe yükle** de ve çıkarttığın klasörü seç.
 
 <details>
-<summary>Bilgi: Gizlilik ve Kaynaklar</summary>
+<summary>Kaynak Koddan Derleme & Gizlilik</summary>
+
+```bash
+npm install
+npm run build
+```
 
 - Tüm bilgilerin ve API anahtarın sadece kendi tarayıcında kalır.
 - Veri kaynakları: [ATTRIBUTIONS.md](ATTRIBUTIONS.md)
