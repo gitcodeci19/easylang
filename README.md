@@ -1,6 +1,6 @@
 **Dil / Language:** 🇹🇷 **Türkçe** · [🇬🇧 English](README.en.md)
 
-# ⚡ EasyLang - Yapay Zeka Destekli
+# EasyLang - Yapay Zeka Destekli
 
 **Başka uygulamalara para vermeye gerek yok.**
 **İngilizce öğrenmek için sürekli bir siteye girmek zorunda değilsiniz.**
