@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EasyLang</title>
+    <link rel="icon" type="image/png" href="icons/icon48.png" />
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <div class="brand-row">
+            <img src="icons/icon48.png" class="brand-icon" alt="EasyLang" />
+            <h1 data-i18n="brandTitle">EasyLang</h1>
+          </div>
+          <p class="summary-line" id="summary-line">...</p>
+        </div>
+        <div class="topbar-actions">
+          <select id="topbar-lang-select" class="lang-select" title="Dil / Language">
+            <option value="auto">AUTO</option>
+            <option value="tr">TR</option>
+            <option value="en">EN</option>
+            <option value="de">DE</option>
+            <option value="fr">FR</option>
+            <option value="es">ES</option>
+            <option value="it">IT</option>
+            <option value="pt">PT</option>
+            <option value="ru">RU</option>
+            <option value="ja">JA</option>
+            <option value="ko">KO</option>
+            <option value="zh">ZH</option>
+            <option value="ar">AR</option>
+          </select>
+          <button id="test-prompt-btn" class="btn btn-primary" type="button" data-i18n="askNow">
+            Şimdi Soru Sor
+          </button>
+          <button
+            id="reset-progress-btn"
+            class="btn btn-danger-outline"
+            type="button"
+            data-i18n="resetProgress"
+          >
+            İlerlemeyi Sıfırla
+          </button>
+        </div>
+      </header>
+
+      <!-- Persistent B1 Promotion Readiness Notification -->
+      <section id="b1-ready-banner-dash" class="dash-banner dash-banner-b1" hidden>
+        <div class="dash-banner-main">
+          <span class="dash-banner-badge">B1</span>
+          <div class="dash-banner-text">
+            <strong id="dash-b1-title">Elo puanın B1 seviyesine ulaştı!</strong>
+            <p id="dash-b1-desc">Kendini B1 seviyesindeki kelimeleri ve cümleleri öğrenmek için hazır hissediyor musun?</p>
+          </div>
+        </div>
+        <div class="dash-banner-actions">
+          <button type="button" id="dash-b1-accept" class="btn-primary">Evet, B1’e Geç</button>
+          <button type="button" id="dash-b1-defer" class="btn-ghost">Hayır, Yarın Sor</button>
+        </div>
+      </section>
+
+      <!-- Natural Progress Backup Awareness Bar -->
+      <section id="backup-status-bar" class="backup-bar" hidden>
+        <div class="backup-bar-info">
+          <span class="backup-bar-dot" id="backup-bar-dot" aria-hidden="true"></span>
+          <div class="backup-bar-copy">
+            <div class="backup-bar-headline">
+              <strong id="backup-bar-status">Henüz yedek alınmadı</strong>
+              <span class="backup-bar-key-note" id="backup-bar-key-note">(Güvenlik için API anahtarları yedek dosyasına dahil edilmez)</span>
+            </div>
+            <p id="backup-bar-desc">İlerlemen ve Elo geçmişin yalnızca bu tarayıcıda tutulur. Tarayıcı/eklenti silinirse kaybetmemek için yedek al.</p>
+          </div>
+        </div>
+        <div class="backup-bar-actions">
+          <button type="button" id="backup-bar-export-btn" class="btn-primary btn-sm">⬇ Yedek İndir (.json)</button>
+          <label class="btn-ghost btn-sm backup-upload-label" for="backup-bar-import-file">
+            <input id="backup-bar-import-file" type="file" accept=".json,application/json,.txt,.tsv" />
+            <span id="backup-bar-import-text">⬆ Yedekten Yükle (.json)</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Natural No-API Key Onboarding Nudge Bar -->
+      <section id="no-api-nudge-bar" class="no-api-bar" hidden>
+        <div class="no-api-main">
+          <span class="no-api-icon" aria-hidden="true">🔑</span>
+          <div class="no-api-copy">
+            <strong id="no-api-bar-title">Henüz AI API anahtarı eklenmedi</strong>
+            <p id="no-api-bar-desc">Challenge modu ve akıllı AI değerlendirmesi için 1 dakikada ücretsiz anahtar alıp ekleyebilirsin.</p>
+          </div>
+        </div>
+        <div class="no-api-actions">
+          <button type="button" id="no-api-setup-btn" class="btn-primary btn-sm">Ücretsiz API Al &amp; Kur →</button>
+          <button type="button" id="no-api-dismiss-btn" class="btn-ghost btn-sm" aria-label="Gizle">×</button>
+        </div>
+      </section>
+
+      <!-- First-Run Onboarding Modal (Dashboard fallback) -->
+      <div id="options-onboarding" class="dash-onboarding-overlay" hidden>
+        <div class="dash-onboarding-card">
+          <div class="dash-ob-brand">
+            <span class="dash-ob-logo">⚡</span>
+            <span class="dash-ob-brand-name">EasyLang</span>
+          </div>
+
+          <section id="dash-ob-step-choice" class="dash-ob-step">
+            <h2 id="dash-ob-choice-title">EasyLang’e Hoş Geldin</h2>
+            <p id="dash-ob-choice-sub" class="dash-ob-sub">Başlamak için sana uygun seçeneği seç:</p>
+            <div class="dash-ob-choice-grid">
+              <button type="button" id="dash-ob-choose-new" class="dash-ob-choice-btn is-primary">
+                <strong id="dash-ob-new-title">İLK DEFA KULLANIYORUM</strong>
+                <span id="dash-ob-new-sub">Seviyene göre dengeli başlangıç ayarla</span>
+              </button>
+              <button type="button" id="dash-ob-choose-returning" class="dash-ob-choice-btn">
+                <strong id="dash-ob-returning-title">ZATEN DAHA ÖNCE KULLANDIM</strong>
+                <span id="dash-ob-returning-sub">Eski ilerleme yedeğini (.json) geri yükle</span>
+              </button>
+            </div>
+          </section>
+
+          <section id="dash-ob-step-new" class="dash-ob-step" hidden>
+            <button type="button" id="dash-ob-back-new" class="dash-ob-back">← Geri</button>
+            <h2 id="dash-ob-form-title">İLK DEFA KULLANIYORUM</h2>
+            <label class="dash-ob-field">
+              <span id="dash-ob-native-label">Ana Dilin</span>
+              <select id="dash-ob-native-lang"></select>
+            </label>
+            <div class="dash-ob-field">
+              <span id="dash-ob-current-label">Mevcut İngilizce Seviyen</span>
+              <div id="dash-ob-cur-levels" class="dash-ob-pills">
+                <button type="button" class="dash-ob-pill is-active" data-level="A1">A1</button>
+                <button type="button" class="dash-ob-pill" data-level="A2">A2</button>
+                <button type="button" class="dash-ob-pill" data-level="B1">B1</button>
+                <button type="button" class="dash-ob-pill" data-level="B2">B2</button>
+                <button type="button" class="dash-ob-pill" data-level="C1">C1</button>
+              </div>
+            </div>
+            <div class="dash-ob-field">
+              <span id="dash-ob-target-label">Hedeflediğin Seviye</span>
+              <div id="dash-ob-tgt-levels" class="dash-ob-pills">
+                <button type="button" class="dash-ob-pill" data-level="A2">A2</button>
+                <button type="button" class="dash-ob-pill is-active" data-level="B1">B1</button>
+                <button type="button" class="dash-ob-pill" data-level="B2">B2</button>
+                <button type="button" class="dash-ob-pill" data-level="C1">C1</button>
+                <button type="button" class="dash-ob-pill" data-level="C2">C2</button>
+              </div>
+            </div>
+            <div id="dash-ob-cap-notice" class="dash-ob-notice" hidden></div>
+            <button type="button" id="dash-ob-start-btn" class="btn-primary">Öğrenmeye Başla →</button>
+          </section>
+
+          <section id="dash-ob-step-returning" class="dash-ob-step" hidden>
+            <button type="button" id="dash-ob-back-ret" class="dash-ob-back">← Geri</button>
+            <h2 id="dash-ob-restore-title">ZATEN DAHA ÖNCE KULLANDIM</h2>
+            <p id="dash-ob-restore-sub" class="dash-ob-sub">Daha önce indirdiğin .json yedeğini seç veya yapıştır.</p>
+            <label class="dash-ob-file-drop" for="dash-ob-backup-file">
+              <input id="dash-ob-backup-file" type="file" accept=".json,application/json,.txt,.tsv" />
+              <span id="dash-ob-file-label">📁 Dosya Seç (.json)</span>
+            </label>
+            <textarea id="dash-ob-backup-text" rows="4" placeholder="{ ... }"></textarea>
+            <p id="dash-ob-restore-error" class="dash-ob-error" hidden></p>
+            <div class="dash-ob-actions">
+              <button type="button" id="dash-ob-restore-btn" class="btn-primary">Yedeği Yükle ve Devam Et</button>
+              <button type="button" id="dash-ob-skip-btn" class="btn-ghost">Yedeksiz Devam Et</button>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <nav class="tabs" role="tablist">
+        <button class="tab" data-tab="roadmap" type="button" data-i18n="tabRoadmap">
+          Öğrenme Yolu
+        </button>
+        <button class="tab" data-tab="analytics" type="button" data-i18n="tabAnalytics">
+          Gelişimim
+        </button>
+        <button class="tab" data-tab="ai" type="button" data-i18n="tabAi">
+          AI - API Ayarları
+        </button>
+        <button class="tab" data-tab="cards" type="button" data-i18n="tabCards">
+          Kelimelerim
+        </button>
+        <button class="tab tab-settings-right active" data-tab="settings" type="button">
+          <span class="tab-gear" aria-hidden="true">⚙</span>
+          <span data-i18n="tabSettings">Ayarlar</span>
+        </button>
+      </nav>
+
+      <!-- ROADMAP TAB -->
+      <section id="tab-roadmap" class="panel" hidden>
+        <div id="options-roadmap-mount" class="options-roadmap-mount"></div>
+      </section>
+
+      <!-- SETTINGS TAB -->
+      <section id="tab-settings" class="panel">
+        <form id="settings-form" class="settings-stack">
+          <div class="subcard settings-card-block">
+            <div class="settings-compact-grid">
+              <div class="field">
+                <label for="intervalMinutes" data-i18n="lblInterval">Soru Sıklığı (dakika)</label>
+                <div class="num-preset-row">
+                  <input id="intervalMinutes" class="num-compact" type="number" min="1" max="240" required />
+                  <div class="preset-pills" role="group" aria-label="Interval presets">
+                    <button type="button" class="preset-pill" data-preset-for="intervalMinutes" data-val="10">10</button>
+                    <button type="button" class="preset-pill" data-preset-for="intervalMinutes" data-val="15">15</button>
+                    <button type="button" class="preset-pill" data-preset-for="intervalMinutes" data-val="20">20</button>
+                    <button type="button" class="preset-pill" data-preset-for="intervalMinutes" data-val="30">30</button>
+                    <button type="button" class="preset-pill" data-preset-for="intervalMinutes" data-val="45">45</button>
+                  </div>
+                </div>
+                <small data-i18n="hintInterval">Varsayılan: 20 dakika</small>
+              </div>
+
+              <div class="field">
+                <label for="retryDelayMinutes" data-i18n="lblRetryDelay"
+                  >Yanlışları Tekrarla (dakika)</label
+                >
+                <div class="num-preset-row">
+                  <input id="retryDelayMinutes" class="num-compact" type="number" min="1" max="240" required />
+                  <div class="preset-pills" role="group" aria-label="Retry presets">
+                    <button type="button" class="preset-pill" data-preset-for="retryDelayMinutes" data-val="5">5</button>
+                    <button type="button" class="preset-pill" data-preset-for="retryDelayMinutes" data-val="10">10</button>
+                    <button type="button" class="preset-pill" data-preset-for="retryDelayMinutes" data-val="20">20</button>
+                    <button type="button" class="preset-pill" data-preset-for="retryDelayMinutes" data-val="30">30</button>
+                  </div>
+                </div>
+                <small data-i18n="hintRetryDelay"
+                  >Yanlış kartların tekrar sorulma süresi (varsayılan: 20 dk)</small
+                >
+              </div>
+
+              <div class="field full-span">
+                <label data-i18n="lblQuietHours"
+                  >Sessiz Saatler (0–23 saat aralığı, boş = kapalı)</label
+                >
+                <div class="quiet-range-row">
+                  <label class="quiet-part" for="quietHoursStart">
+                    <span class="quiet-sub" data-i18n="lblQuietStart">Başlangıç</span>
+                    <input
+                      id="quietHoursStart"
+                      class="num-compact"
+                      type="number"
+                      min="0"
+                      max="23"
+                      placeholder="23"
+                      data-i18n-ph="phQuietStart"
+                    />
+                  </label>
+                  <span class="quiet-sep">—</span>
+                  <label class="quiet-part" for="quietHoursEnd">
+                    <span class="quiet-sub" data-i18n="lblQuietEnd">Bitiş</span>
+                    <input
+                      id="quietHoursEnd"
+                      class="num-compact"
+                      type="number"
+                      min="0"
+                      max="23"
+                      placeholder="08"
+                      data-i18n-ph="phQuietEnd"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="subcard settings-card-block">
+            <div class="settings-compact-grid">
+              <div class="field">
+                <label for="contentMode" data-i18n="lblContentMode">Soru Türü</label>
+                <select id="contentMode" class="select-compact">
+                  <option value="mixed" data-i18n="optMixed">Karışık (Kelime + Cümle)</option>
+                  <option value="word" data-i18n="optWords">Sadece Kelimeler</option>
+                  <option value="sentence" data-i18n="optSentences">Sadece Cümleler</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label data-i18n="lblCefrLevels">Aktif Seviyeler</label>
+                <div class="checkbox-row" id="levels-group">
+                  <label class="chip-check"><input type="checkbox" value="A1" /><span>A1</span></label>
+                  <label class="chip-check"><input type="checkbox" value="A2" /><span>A2</span></label>
+                  <label class="chip-check"><input type="checkbox" value="B1" /><span>B1</span></label>
+                  <label class="chip-check"><input type="checkbox" value="B2" /><span>B2</span></label>
+                  <label class="chip-check"><input type="checkbox" value="C1" /><span>C1</span></label>
+                </div>
+              </div>
+
+              <div class="field full-span">
+                <label for="blockedDomains" data-i18n="lblBlockedDomains"
+                  >Hariç Tutulan Siteler</label
+                >
+                <textarea
+                  id="blockedDomains"
+                  rows="3"
+                  placeholder="Her satıra bir alan adı:&#10;example.com&#10;*.sinav-portali.edu"
+                  data-i18n-ph="phBlockedDomains"
+                ></textarea>
+                <small data-i18n="hintBlockedDomains">
+                  Bu sitelerde soru penceresi açılmaz. Aktif siteyi eklenti menüsünden de tek tıkla kapatabilirsin.
+                </small>
+              </div>
+            </div>
+          </div>
+
+          <div class="subcard settings-card-block">
+            <div class="pref-grid">
+              <label class="pref-card" for="enabled">
+                <span class="pref-label" data-i18n="togEnabled">Zamanlayıcıyla otomatik soru sor</span>
+                <span class="mini-switch">
+                  <input id="enabled" type="checkbox" />
+                  <span class="mini-slider"></span>
+                </span>
+              </label>
+
+              <label class="pref-card" for="adaptiveDifficulty">
+                <span class="pref-label" data-i18n="togAdaptive"
+                  >Uyarlanabilir zorluk (zayıf olduğun konulara &amp; Elo’ya odaklan)</span
+                >
+                <span class="mini-switch">
+                  <input id="adaptiveDifficulty" type="checkbox" />
+                  <span class="mini-slider"></span>
+                </span>
+              </label>
+
+              <label class="pref-card" for="includeUserCards">
+                <span class="pref-label" data-i18n="togIncludeUser"
+                  >Kendi eklediğim kartları da sor</span
+                >
+                <span class="mini-switch">
+                  <input id="includeUserCards" type="checkbox" />
+                  <span class="mini-slider"></span>
+                </span>
+              </label>
+
+              <label class="pref-card" for="skipFullscreen">
+                <span class="pref-label" data-i18n="togSkipFullscreen"
+                  >Tam ekran video izlerken soruları ertele</span
+                >
+                <span class="mini-switch">
+                  <input id="skipFullscreen" type="checkbox" />
+                  <span class="mini-slider"></span>
+                </span>
+              </label>
+
+              <label class="pref-card" for="autoSpeak">
+                <span class="pref-label" data-i18n="togAutoSpeak"
+                  >Kart açıldığında İngilizce ifadeyi seslendir</span
+                >
+                <span class="mini-switch">
+                  <input id="autoSpeak" type="checkbox" />
+                  <span class="mini-slider"></span>
+                </span>
+              </label>
+
+              <label class="pref-card" for="autoTranslateContextMenu">
+                <span class="pref-label" data-i18n="togAutoTranslate"
+                  >Sağ tıkla kelime eklerken anlam önerisi getir</span
+                >
+                <span class="mini-switch">
+                  <input id="autoTranslateContextMenu" type="checkbox" />
+                  <span class="mini-slider"></span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button class="btn btn-primary" type="submit" data-i18n="btnSaveSettings">
+              Değişiklikleri Kaydet
+            </button>
+            <span id="settings-saved-msg" class="saved-msg" hidden data-i18n="msgSaved"
+              >Kaydedildi ✓</span
+            >
+          </div>
+        </form>
+
+        <div class="settings-divider"></div>
+
+        <div class="settings-library-section">
+          <h2 class="settings-section-title" data-i18n="settingsCardsHeading">
+            Özel Kartlar &amp; İçe / Dışa Aktar
+          </h2>
+          <div class="split-cards">
+            <div class="subcard">
+              <h2 data-i18n="addTitle">Yeni Kelime veya Cümle Ekle</h2>
+              <form id="add-card-form" class="stack-form">
+                <div class="field">
+                  <label for="new-en" data-i18n="lblNewEn">İngilizce Kelime veya Cümle</label>
+                  <input
+                    id="new-en"
+                    type="text"
+                    placeholder="örn. resilient veya Take it easy."
+                    data-i18n-ph="phNewEn"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label for="new-tr" data-i18n="lblNewTr"
+                    >Kabul Edilen Anlamlar (virgül veya ; ile ayır)</label
+                  >
+                  <input
+                    id="new-tr"
+                    type="text"
+                    placeholder="örn. dayanıklı, dirençli, esnek"
+                    data-i18n-ph="phNewTr"
+                    required
+                  />
+                </div>
+                <div class="two-col">
+                  <div class="field">
+                    <label for="new-type" data-i18n="lblNewType">Tür</label>
+                    <select id="new-type">
+                      <option value="word" data-i18n="optWord">Kelime</option>
+                      <option value="sentence" data-i18n="optSentence">Cümle</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="new-level" data-i18n="lblNewLevel">CEFR Seviyesi</label>
+                    <select id="new-level">
+                      <option value="A1">A1</option>
+                      <option value="A2">A2</option>
+                      <option value="B1" selected>B1</option>
+                      <option value="B2">B2</option>
+                      <option value="C1">C1</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="new-ex-en" data-i18n="lblExEn">Örnek Cümle (isteğe bağlı)</label>
+                  <input id="new-ex-en" type="text" placeholder="She is remarkably resilient." />
+                </div>
+                <div class="field">
+                  <label for="new-ex-tr" data-i18n="lblExTr">Örnek Çeviri (isteğe bağlı)</label>
+                  <input
+                    id="new-ex-tr"
+                    type="text"
+                    placeholder="O dikkate değer ölçüde dayanıklıdır."
+                  />
+                </div>
+                <div class="form-footer">
+                  <button class="btn btn-primary" type="submit" data-i18n="btnAddCard">
+                    Kartı Ekle
+                  </button>
+                  <span id="add-card-msg" class="saved-msg" hidden data-i18n="msgAdded"
+                    >Eklendi ✓</span
+                  >
+                </div>
+              </form>
+            </div>
+
+            <div class="subcard">
+              <h2 data-i18n="bulkTitle">Toplu İçe / Dışa Aktar</h2>
+              <p class="muted small" data-i18n="bulkDesc">
+                TSV (ingilizce[TAB]anlam1 | anlam2), CSV veya JSON yapıştırın ya da dosya yükleyin.
+              </p>
+              <div class="file-picker-row">
+                <label class="btn btn-secondary file-picker-btn" for="import-file-input">
+                  <input id="import-file-input" type="file" accept=".json,.csv,.tsv,.txt" hidden />
+                  <span data-i18n="btnChooseFile">📁 Dosya Seç</span>
+                </label>
+                <span id="import-file-name" class="muted small" data-i18n="noFileSelected"
+                  >Dosya seçilmedi</span
+                >
+              </div>
+              <textarea
+                id="import-textarea"
+                rows="7"
+                placeholder="reluctant	isteksiz | gönülsüz&#10;I ran out of time.	Vaktim bitti | Zamanım kalmadı"
+              ></textarea>
+              <div class="row-buttons">
+                <button id="import-btn" class="btn btn-primary" type="button" data-i18n="btnImport">
+                  İçe Aktar
+                </button>
+                <button
+                  id="export-user-tsv-btn"
+                  class="btn btn-secondary"
+                  type="button"
+                  data-i18n="btnExportTsv"
+                >
+                  TSV İndir
+                </button>
+                <button
+                  id="export-user-json-btn"
+                  class="btn btn-secondary"
+                  type="button"
+                  data-i18n="btnExportJson"
+                >
+                  JSON İndir
+                </button>
+              </div>
+              <p id="import-msg" class="muted small" hidden></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ANALYTICS TAB -->
+      <section id="tab-analytics" class="panel" hidden>
+        <div class="analytics-hero">
+          <div class="metric-card accent">
+            <span class="metric-label" data-i18n="metricLevel">Tahmini Seviye (Elo)</span>
+            <strong class="metric-value" id="an-cefr-rating">A2 · 1000</strong>
+            <div class="meter-track"><div class="meter-fill" id="an-band-bar"></div></div>
+            <small class="muted" id="an-confidence">-</small>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label" data-i18n="metricAccuracy">Genel Doğruluk</span>
+            <strong class="metric-value" id="an-accuracy">0%</strong>
+            <small class="muted" id="an-answered">-</small>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label" data-i18n="metricSpeed">Ort. Yanıt Süresi</span>
+            <strong class="metric-value" id="an-speed">-</strong>
+            <small class="muted" id="an-streak">-</small>
+          </div>
+        </div>
+
+        <div class="analytics-grid">
+          <div class="subcard">
+            <h2 data-i18n="chartTitle">Puan Gelişim Eğrisi</h2>
+            <div id="analytics-chart" class="chart-box"></div>
+          </div>
+
+          <div class="subcard">
+            <h2 data-i18n="levelsTitle">CEFR Seviye Dağılımı</h2>
+            <div id="analytics-levels" class="bar-list"></div>
+          </div>
+
+          <div class="subcard">
+            <h2 data-i18n="posTitle">Kelime Türü &amp; Format</h2>
+            <div id="analytics-pos" class="bar-list"></div>
+          </div>
+
+          <div class="subcard">
+            <h2 data-i18n="topicsTitle">Konu Alanları</h2>
+            <p class="muted small" id="analytics-topic-summary"></p>
+            <div id="analytics-topics" class="bar-list"></div>
+          </div>
+        </div>
+
+        <div class="split-cards" style="margin-top: 14px">
+          <div class="subcard">
+            <h2 data-i18n="hardWordsTitle">En Çok Zorlanılan Kartlar</h2>
+            <div id="analytics-hard-words" class="hard-list"></div>
+          </div>
+
+          <div class="subcard">
+            <h2 data-i18n="coachTitle">AI Çalışma Koçu</h2>
+            <p class="muted small" data-i18n="coachDesc">
+              Elo puanını, CEFR dağılımını, konuları ve hatalarını analiz edip 4 çalışma önceliği çıkarır.
+            </p>
+            <div class="row-buttons">
+              <button id="ai-coach-btn" class="btn btn-primary" type="button" data-i18n="btnCoach">
+                AI Koç Raporu Oluştur
+              </button>
+            </div>
+            <div id="ai-coach-output" class="coach-output" hidden></div>
+          </div>
+        </div>
+
+        <div class="subcard" style="margin-top: 14px">
+          <h2 data-i18n="focusTitle">Odak &amp; Gramer Takipçisi</h2>
+          <p class="muted small" data-i18n="focusDesc">
+            Takıldığın kelimeler ve gramer yapıları farklı cümlelerde (+2 → +4 → +10 soru sonra) tekrar sorulur.
+          </p>
+          <div id="analytics-concepts" class="concept-list"></div>
+        </div>
+      </section>
+
+      <!-- AI SETTINGS TAB -->
+      <section id="tab-ai" class="panel" hidden>
+        <form id="ai-form" class="ai-layout">
+          <div class="subcard">
+            <div class="toggles-list" style="padding-top: 0">
+              <label class="toggle-item">
+                <input id="ai-enabled" type="checkbox" />
+                <span data-i18n="aiEnableLabel"
+                  >AI Anlamsal Değerlendirmeyi ve Sağ Tık Çevirisini Etkinleştir</span
+                >
+              </label>
+              <label class="toggle-item">
+                <input id="ai-always-evaluate" type="checkbox" />
+                <span data-i18n="aiAlwaysLabel"
+                  >Her cevabı AI ile değerlendir (kapalı = sadece yerel eşleştirici reddettiğinde AI kullan)</span
+                >
+              </label>
+            </div>
+          </div>
+
+          <div class="subcard ai-guide-card">
+            <div class="ai-guide-head">
+              <strong data-i18n="aiFreeGuideTitle">Tavsiye Edilen Ücretsiz AI Servisleri</strong>
+              <span class="ai-guide-sub" data-i18n="aiFreeGuideSub"
+                >Üzerine tıkla → desteklenen en iyi modelleri gör ve tek tıkla seç</span
+              >
+            </div>
+            <div id="free-ai-providers" class="free-ai-list">
+              <details class="free-api-item is-recommended" data-provider="groq">
+                <summary class="free-api-summary">
+                  <div class="free-api-title-group">
+                    <strong class="free-api-name">Groq</strong>
+                    <span class="free-api-tag tag-best" data-i18n="tagGroq"
+                      >⭐ Önerilen (Çok Hızlı &amp; Zeki)</span
+                    >
+                  </div>
+                  <span class="free-api-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <div class="free-api-body">
+                  <p class="free-api-desc" data-i18n="descGroq">
+                    Testlerde hem hız hem zekâ açısından en iyi sonuç veren ücretsiz API (console.groq.com).
+                  </p>
+                  <div class="free-api-steps" data-provider="groq"></div>
+                  <div class="free-models-grid" data-provider="groq"></div>
+                </div>
+              </details>
+
+              <details class="free-api-item" data-provider="nvidia">
+                <summary class="free-api-summary">
+                  <div class="free-api-title-group">
+                    <strong class="free-api-name">NVIDIA NIM</strong>
+                    <span class="free-api-tag tag-smart" data-i18n="tagNvidia"
+                      >🧠 Yavaş ama Daha Akıllı</span
+                    >
+                  </div>
+                  <span class="free-api-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <div class="free-api-body">
+                  <p class="free-api-desc" data-i18n="descNvidia">
+                    Büyük modellerde daha derin dil analizi sunar ama yanıt süresi Groq'a göre yavaştır (build.nvidia.com).
+                  </p>
+                  <div class="free-api-steps" data-provider="nvidia"></div>
+                  <div class="free-models-grid" data-provider="nvidia"></div>
+                </div>
+              </details>
+
+              <details class="free-api-item" data-provider="amd">
+                <summary class="free-api-summary">
+                  <div class="free-api-title-group">
+                    <strong class="free-api-name">AMD TokenLab</strong>
+                    <span class="free-api-tag tag-backup" data-i18n="tagAmd"
+                      >⚖️ Yavaş / İyi Yedek</span
+                    >
+                  </div>
+                  <span class="free-api-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <div class="free-api-body">
+                  <p class="free-api-desc" data-i18n="descAmd">
+                    Ücretsiz geliştirici kredisiyle güçlü açık modelleri çalıştırır; yedek API için idealdir (tokenlab.amd.com).
+                  </p>
+                  <div class="free-api-steps" data-provider="amd"></div>
+                  <div class="free-models-grid" data-provider="amd"></div>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <div class="provider-card">
+            <div class="provider-head">
+              <strong data-i18n="aiPrimaryTitle">ANA API</strong>
+              <span class="pill ok" data-i18n="aiPrimaryBadge">Birincil</span>
+            </div>
+
+            <div class="settings-grid">
+              <div class="field">
+                <label for="ai-provider-preset" data-i18n="aiPresetLabel">Sağlayıcı</label>
+                <select id="ai-provider-preset">
+                  <option value="groq">Groq</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="amd">AMD TokenLab</option>
+                  <option value="nvidia">NVIDIA NIM</option>
+                  <option value="openrouter">OpenRouter</option>
+                  <option value="custom">Özel (Custom URL)</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="ai-api-key" data-i18n="aiApiKeyLabel"
+                  >API Anahtarı (Yalnızca Tarayıcıda Saklanır)</label
+                >
+                <div class="input-with-toggle">
+                  <input
+                    id="ai-api-key"
+                    type="password"
+                    placeholder="API anahtarınızı yapıştırın"
+                    data-i18n-ph="aiKeyPlaceholder"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button
+                    id="toggle-ai-key-btn"
+                    class="btn btn-secondary btn-mini"
+                    type="button"
+                    data-i18n="btnShow"
+                  >
+                    Göster
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="ai-model-preset" data-i18n="aiQuickModelLabel"
+                  >Hızlı Model</label
+                >
+                <select id="ai-model-preset">
+                  <option value="qwen/qwen3.8-27b">Groq · qwen/qwen3.8-27b</option>
+                  <option value="openai/gpt-oss-120b">Groq · openai/gpt-oss-120b</option>
+                  <option value="openai/gpt-oss-20b">Groq · openai/gpt-oss-20b</option>
+                  <option value="gemini-2.5-flash">Gemini · gemini-2.5-flash</option>
+                  <option value="DeepSeek-V4-Flash">AMD · DeepSeek-V4-Flash</option>
+                  <option value="google/gemma-4-31b-it">NVIDIA · google/gemma-4-31b-it</option>
+                  <option value="google/gemma-3-12b-it">NVIDIA · google/gemma-3-12b-it</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="ai-model" data-i18n="aiModelIdLabel">Model ID</label>
+                <div class="row-buttons">
+                  <input
+                    id="ai-model"
+                    type="text"
+                    style="flex: 1"
+                    placeholder="qwen/qwen3.8-27b"
+                    required
+                  />
+                  <button
+                    id="ai-fetch-models-btn"
+                    class="btn btn-secondary"
+                    type="button"
+                    data-i18n="btnFetchModels"
+                  >
+                    Modelleri Getir
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-footer" style="margin-top: 12px">
+              <button class="btn btn-primary" type="submit" data-i18n="btnSaveAi">
+                Kaydet
+              </button>
+              <button
+                id="ai-test-btn"
+                class="btn btn-secondary"
+                type="button"
+                data-i18n="btnTestPrimary"
+              >
+                Bağlantıyı Test Et
+              </button>
+              <span id="ai-status-msg" class="saved-msg" hidden></span>
+            </div>
+          </div>
+
+          <details class="accordion-card">
+            <summary class="accordion-summary">
+              <span data-i18n="aiBackupSummary">Yedek API'ler (Opsiyonel)</span>
+            </summary>
+            <div class="accordion-body settings-grid">
+              <div
+                class="field full-span"
+                style="padding-bottom: 6px; border-bottom: 1px dashed rgba(255, 255, 255, 0.1)"
+              >
+                <label class="toggle-item">
+                  <input id="ai-fallback-enabled" type="checkbox" />
+                  <strong data-i18n="ai2Enable">Yedek API 1</strong>
+                </label>
+              </div>
+
+              <div class="field">
+                <label for="ai-fallback-provider-preset" data-i18n="aiPresetLabel">Sağlayıcı</label>
+                <select id="ai-fallback-provider-preset">
+                  <option value="amd">AMD TokenLab</option>
+                  <option value="groq">Groq</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="nvidia">NVIDIA NIM</option>
+                  <option value="openrouter">OpenRouter</option>
+                  <option value="custom">Özel (Custom URL)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="ai-fallback-api-key" data-i18n="ai2Key">Yedek API 1 Anahtarı</label>
+                <input
+                  id="ai-fallback-api-key"
+                  type="password"
+                  placeholder="İsteğe bağlı yedek API anahtarı"
+                  data-i18n-ph="ai2KeyPh"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <div class="field">
+                <label for="ai-fallback-model-preset" data-i18n="ai2Preset">Hızlı Model</label>
+                <select id="ai-fallback-model-preset">
+                  <option value="DeepSeek-V4-Flash">DeepSeek-V4-Flash</option>
+                  <option value="Qwen3.8-27B">Qwen3.8-27B</option>
+                  <option value="Gemma-4-31B-IT">Gemma-4-31B-IT</option>
+                  <option value="MiniCPM-V-4.7-35B-A3B">MiniCPM-V-4.7-35B-A3B</option>
+                  <option value="gemini-2.5-flash">Gemini · gemini-2.5-flash</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="ai-fallback-model" data-i18n="ai2ModelId">Model ID</label>
+                <div class="row-buttons">
+                  <input
+                    id="ai-fallback-model"
+                    type="text"
+                    style="flex: 1"
+                    placeholder="DeepSeek-V4-Flash"
+                  />
+                  <button
+                    id="ai-fallback-fetch-models-btn"
+                    class="btn btn-secondary"
+                    type="button"
+                    data-i18n="btnFetch"
+                  >
+                    Getir
+                  </button>
+                  <button
+                    id="ai-fallback-test-btn"
+                    class="btn btn-secondary"
+                    type="button"
+                    data-i18n="ai2Test"
+                  >
+                    Test Et
+                  </button>
+                </div>
+              </div>
+
+              <div
+                class="field full-span"
+                style="margin-top: 6px; padding-top: 10px; border-top: 1px dashed rgba(255, 255, 255, 0.1)"
+              >
+                <label class="toggle-item">
+                  <input id="ai-fallback2-enabled" type="checkbox" />
+                  <strong data-i18n="ai3Enable">Yedek API 2</strong>
+                </label>
+              </div>
+
+              <div class="field">
+                <label for="ai-fallback2-provider-preset" data-i18n="aiPresetLabel">Sağlayıcı</label>
+                <select id="ai-fallback2-provider-preset">
+                  <option value="nvidia">NVIDIA NIM</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="groq">Groq</option>
+                  <option value="amd">AMD TokenLab</option>
+                  <option value="openrouter">OpenRouter</option>
+                  <option value="custom">Özel (Custom URL)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="ai-fallback2-api-key" data-i18n="ai3Key">Yedek API 2 Anahtarı</label>
+                <input
+                  id="ai-fallback2-api-key"
+                  type="password"
+                  placeholder="İsteğe bağlı 2. yedek API anahtarı"
+                  data-i18n-ph="ai3KeyPh"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <div class="field">
+                <label for="ai-fallback2-model-preset" data-i18n="ai3Preset">Hızlı Model</label>
+                <select id="ai-fallback2-model-preset">
+                  <option value="google/gemma-4-31b-it">NVIDIA · google/gemma-4-31b-it</option>
+                  <option value="google/gemma-3-12b-it">NVIDIA · google/gemma-3-12b-it</option>
+                  <option value="nvidia/llama-3.1-nemotron-70b-instruct">
+                    NVIDIA · llama-3.1-nemotron-70b-instruct
+                  </option>
+                  <option value="nv-mistralai/mistral-nemo-12b-instruct">
+                    NVIDIA · mistral-nemo-12b-instruct
+                  </option>
+                  <option value="gemini-2.5-flash">Gemini · gemini-2.5-flash</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="ai-fallback2-model" data-i18n="ai3ModelId">Model ID</label>
+                <div class="row-buttons">
+                  <input
+                    id="ai-fallback2-model"
+                    type="text"
+                    style="flex: 1"
+                    placeholder="google/gemma-4-31b-it"
+                  />
+                  <button
+                    id="ai-fallback2-fetch-models-btn"
+                    class="btn btn-secondary"
+                    type="button"
+                    data-i18n="btnFetch"
+                  >
+                    Getir
+                  </button>
+                  <button
+                    id="ai-fallback2-test-btn"
+                    class="btn btn-secondary"
+                    type="button"
+                    data-i18n="ai3Test"
+                  >
+                    Test Et
+                  </button>
+                </div>
+              </div>
+
+              <div class="full-span form-footer">
+                <button class="btn btn-primary" type="submit" data-i18n="btnSaveAllAi">
+                  Ayarları Kaydet
+                </button>
+              </div>
+            </div>
+          </details>
+
+          <details id="ai-advanced-details" class="accordion-card">
+            <summary class="accordion-summary">
+              <span data-i18n="aiPromptSummary">Gelişmiş (Özel Base URL &amp; Sistem Komutu)</span>
+            </summary>
+            <div class="accordion-body settings-grid">
+              <div class="field">
+                <label for="ai-base-url" data-i18n="aiBaseUrlLabel">Ana API Base URL</label>
+                <input
+                  id="ai-base-url"
+                  type="url"
+                  placeholder="https://api.groq.com/openai/v1"
+                />
+              </div>
+
+              <div class="field">
+                <label for="ai-feedback-language" data-i18n="aiLangLabel"
+                  >Arayüz ve AI Açıklama Dili</label
+                >
+                <select id="ai-feedback-language">
+                  <option value="auto">Auto (Tarayıcı Dili)</option>
+                  <option value="tr">Türkçe</option>
+                  <option value="en">English</option>
+                  <option value="fr">Français</option>
+                  <option value="es">Español</option>
+                  <option value="de">Deutsch</option>
+                  <option value="ja">日本語</option>
+                  <option value="pt">Português</option>
+                  <option value="ru">Русский</option>
+                  <option value="it">Italiano</option>
+                  <option value="ko">한국어</option>
+                  <option value="zh">中文</option>
+                  <option value="ar">العربية</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="ai-fallback-base-url" data-i18n="ai2BaseUrl">Yedek API 1 Base URL</label>
+                <input
+                  id="ai-fallback-base-url"
+                  type="url"
+                  placeholder="https://api.tokenlab.amd.com/v1"
+                />
+              </div>
+
+              <div class="field">
+                <label for="ai-fallback2-base-url" data-i18n="ai3BaseUrl">Yedek API 2 Base URL</label>
+                <input
+                  id="ai-fallback2-base-url"
+                  type="url"
+                  placeholder="https://integrate.api.nvidia.com/v1"
+                />
+              </div>
+
+              <div class="field full-span">
+                <label for="ai-system-prompt" data-i18n="aiPromptLabel">Özel Değerlendirme Sistem Komutu</label>
+                <textarea id="ai-system-prompt" rows="4"></textarea>
+                <div class="row-buttons" style="margin-top: 8px">
+                  <button
+                    id="ai-reset-prompt-btn"
+                    class="btn btn-secondary btn-mini"
+                    type="button"
+                    data-i18n="btnResetPrompt"
+                  >
+                    Varsayılana Sıfırla
+                  </button>
+                  <button class="btn btn-primary btn-mini" type="submit" data-i18n="btnSavePrompt">
+                    Kaydet
+                  </button>
+                </div>
+              </div>
+            </div>
+          </details>
+        </form>
+      </section>
+
+      <!-- CARDS & QUEUE TAB -->
+      <section id="tab-cards" class="panel" hidden>
+        <div class="toolbar">
+          <input
+            id="search-input"
+            type="search"
+            placeholder="İngilizce veya Türkçe ara..."
+            data-i18n-ph="phSearch"
+          />
+          <select id="view-filter">
+            <option value="all" data-i18n="fltAll">Tüm Kartlar</option>
+            <option value="retry" data-i18n="fltRetry">20 Dk Tekrar Kuyruğu</option>
+            <option value="hard" data-i18n="fltHard">Zor Kartlar</option>
+            <option value="user" data-i18n="fltUser">Özel Kartlarım</option>
+            <option value="word" data-i18n="fltWord">Sadece Kelimeler</option>
+            <option value="sentence" data-i18n="fltSentence">Sadece Cümleler</option>
+          </select>
+          <select id="level-filter">
+            <option value="ALL" data-i18n="fltAllLevels">Tüm Seviyeler</option>
+            <option value="A1">A1</option>
+            <option value="A2">A2</option>
+            <option value="B1">B1</option>
+            <option value="B2">B2</option>
+            <option value="C1">C1</option>
+          </select>
+        </div>
+
+        <p class="muted small" id="cards-count-label"></p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="thLevelType">Seviye / Tür</th>
+                <th data-i18n="thEnglish">İngilizce</th>
+                <th data-i18n="thTurkish">Anlamlar</th>
+                <th data-i18n="thStatus">Durum</th>
+                <th data-i18n="thAction">İşlem</th>
+              </tr>
+            </thead>
+            <tbody id="cards-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <button id="prev-page-btn" class="btn btn-secondary" type="button" data-i18n="btnPrev">
+            ← Önceki
+          </button>
+          <span id="page-indicator" class="muted small">1 / 1</span>
+          <button id="next-page-btn" class="btn btn-secondary" type="button" data-i18n="btnNext">
+            Sonraki →
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

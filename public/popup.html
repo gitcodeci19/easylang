@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EasyLang</title>
+    <link rel="icon" type="image/png" href="icons/icon48.png" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <!-- Row 1: Compact Violet-Obsidian Header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <img src="icons/icon32.png" class="brand-icon" alt="Recall" />
+          <span class="rank-chip" id="rank-chip" title="CEFR Seviyesi &amp; Elo Puanı">B1 · 1200</span>
+          <span class="mini-telemetry" id="mini-telemetry" title="Bugün Doğru / Öğrenilen">0✓ · 0★</span>
+          <span class="timer-pill" id="countdown-text">...</span>
+        </div>
+
+        <div class="topbar-right">
+          <span class="stat-tag xp" id="hud-xp" title="Toplam Puan">0 XP</span>
+          <select id="popup-lang-select" class="lang-select" title="Dil / Language">
+            <option value="auto">AUTO</option>
+            <option value="tr">TR</option>
+            <option value="en">EN</option>
+            <option value="de">DE</option>
+            <option value="fr">FR</option>
+            <option value="es">ES</option>
+            <option value="it">IT</option>
+            <option value="pt">PT</option>
+            <option value="ru">RU</option>
+            <option value="ja">JA</option>
+            <option value="ko">KO</option>
+            <option value="zh">ZH</option>
+            <option value="ar">AR</option>
+          </select>
+          <button id="mute-hour-btn" class="icon-btn" type="button" title="1 Saat Sustur">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <path d="M8 2.5a3.5 3.5 0 00-3.5 3.5v2.6L3.2 10.5h9.6l-1.3-1.9V6A3.5 3.5 0 008 2.5zM6.6 12.5a1.5 1.5 0 002.8 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <button id="toggle-block-site-btn" class="icon-btn" type="button" title="Bu sitede kapat" hidden>
+            <span class="site-dot" id="site-dot"></span>
+          </button>
+          <button id="open-options-btn" class="icon-btn" type="button" title="Ayarlar &amp; Panel">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"
+                stroke="currentColor"
+                stroke-width="1.9"
+              />
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.78 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <label class="switch" title="Otomatik kartları aç/kapat">
+            <input type="checkbox" id="enabled-toggle" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </header>
+
+      <!-- Row 2: Full-Height Matte-Carbon Roadmap & Lesson Canvas -->
+      <section class="roadmap-stage">
+        <div id="b1-ready-banner" class="banner-card b1-banner" hidden>
+          <div class="banner-body">
+            <span class="banner-badge" id="b1-banner-badge">B1</span>
+            <div class="banner-copy">
+              <strong id="b1-banner-title">Kendini B1 öğrenmek için hazır hissediyor musun?</strong>
+              <p id="b1-banner-sub">A1–A2 temellerinde hedefine ulaştın. İstersen B1 seviyesine geçebilirsin.</p>
+            </div>
+          </div>
+          <div class="banner-actions">
+            <button type="button" id="b1-accept-btn" class="banner-btn banner-btn-primary">Evet, hazırım</button>
+            <button type="button" id="b1-defer-btn" class="banner-btn banner-btn-ghost">Hayır, yarın sor</button>
+          </div>
+        </div>
+
+        <div id="backup-nudge-banner" class="banner-card backup-nudge" hidden>
+          <div class="banner-body">
+            <span class="banner-icon" aria-hidden="true">💾</span>
+            <div class="banner-copy">
+              <strong id="backup-nudge-title">İlerleme yedeğini almayı unutma</strong>
+              <p id="backup-nudge-sub">Tarayıcı verileri silinirse emeğin kaybolabilir. Tek tıkla JSON yedeği indir.</p>
+            </div>
+          </div>
+          <div class="banner-actions">
+            <button type="button" id="backup-nudge-download" class="banner-btn banner-btn-primary">Yedek İndir</button>
+            <button type="button" id="backup-nudge-later" class="banner-btn banner-btn-ghost">Sonra hatırlat</button>
+          </div>
+        </div>
+
+        <div id="no-api-popup-banner" class="banner-card backup-nudge" hidden>
+          <div class="banner-body">
+            <span class="banner-icon" aria-hidden="true">🔑</span>
+            <div class="banner-copy">
+              <strong id="no-api-popup-title">Ücretsiz AI Değerlendirmesi Kapalı</strong>
+              <p id="no-api-popup-sub">1 dakikada ücretsiz Groq API anahtarı al — adım adım kurulum rehberi burada.</p>
+            </div>
+          </div>
+          <div class="banner-actions">
+            <button type="button" id="no-api-popup-setup" class="banner-btn banner-btn-primary">Adım Adım Kur →</button>
+            <button type="button" id="no-api-popup-later" class="banner-btn banner-btn-ghost">Sonra</button>
+          </div>
+        </div>
+
+        <div id="popup-roadmap-mount" class="roadmap-mount"></div>
+      </section>
+
+      <!-- Row 3: Single Clean Bottom Action Strip -->
+      <footer class="action-bar">
+        <button id="trigger-now-btn" class="act-btn act-primary" type="button">
+          <svg class="ico" viewBox="0 0 16 16" fill="none">
+            <path d="M9.2 1.5L3.5 9h4.1l-.8 5.5L12.5 7H8.4l.8-5.5z" fill="currentColor" />
+          </svg>
+          <span id="trigger-now-label">Şimdi Soru Sor</span>
+        </button>
+
+        <button id="page-quiz-btn" class="act-btn" type="button">
+          <span class="dot amber"></span>
+          <span id="page-quiz-label">Challenge</span>
+        </button>
+
+        <button id="listening-quiz-btn" class="act-btn" type="button">
+          <span class="dot emerald"></span>
+          <span id="listening-quiz-label">Dinle &amp; Yaz</span>
+        </button>
+      </footer>
+
+      <div id="popup-onboarding" class="onboarding-overlay" hidden>
+        <div class="onboarding-card">
+          <div class="ob-brand">
+            <span class="ob-logo">⚡</span>
+            <span class="ob-title-brand">EasyLang</span>
+          </div>
+
+          <section id="ob-step-choice" class="ob-step">
+            <h2 id="ob-choice-title" class="ob-heading">Hoş geldin! Nereden başlayalım?</h2>
+            <p id="ob-choice-sub" class="ob-sub">Sana en uygun başlangıç planını ayarlayalım.</p>
+            <div class="ob-choice-grid">
+              <button type="button" id="ob-choose-new" class="ob-choice-btn ob-choice-primary">
+                <span class="ob-choice-tag" id="ob-new-title">İLK DEFA KULLANIYORUM</span>
+                <span class="ob-choice-desc" id="ob-new-sub">Seviyemi belirle ve sıfırdan başla</span>
+              </button>
+              <button type="button" id="ob-choose-returning" class="ob-choice-btn">
+                <span class="ob-choice-tag" id="ob-returning-title">ZATEN DAHA ÖNCE KULLANDIM</span>
+                <span class="ob-choice-desc" id="ob-returning-sub">Eski JSON ilerleme yedeğimi yükle</span>
+              </button>
+            </div>
+          </section>
+
+          <section id="ob-step-new" class="ob-step" hidden>
+            <button type="button" id="ob-back-from-new" class="ob-back-btn">← Geri</button>
+            <h2 id="ob-form-title" class="ob-heading">Profilini Oluştur</h2>
+
+            <label class="ob-field">
+              <span id="ob-native-label" class="ob-label">Ana Dilin</span>
+              <select id="ob-native-lang" class="ob-select"></select>
+            </label>
+
+            <div class="ob-field">
+              <span id="ob-current-label" class="ob-label">Mevcut İngilizce Seviyen</span>
+              <div id="ob-cur-levels" class="ob-level-pills">
+                <button type="button" class="ob-pill is-active" data-level="A1">A1</button>
+                <button type="button" class="ob-pill" data-level="A2">A2</button>
+                <button type="button" class="ob-pill" data-level="B1">B1</button>
+                <button type="button" class="ob-pill" data-level="B2">B2</button>
+                <button type="button" class="ob-pill" data-level="C1">C1</button>
+              </div>
+            </div>
+
+            <div class="ob-field">
+              <span id="ob-target-label" class="ob-label">Hedef Seviyen</span>
+              <div id="ob-tgt-levels" class="ob-level-pills">
+                <button type="button" class="ob-pill" data-level="A2">A2</button>
+                <button type="button" class="ob-pill is-active" data-level="B1">B1</button>
+                <button type="button" class="ob-pill" data-level="B2">B2</button>
+                <button type="button" class="ob-pill" data-level="C1">C1</button>
+                <button type="button" class="ob-pill" data-level="C2">C2</button>
+              </div>
+            </div>
+
+            <div id="ob-cap-notice" class="ob-notice" hidden></div>
+
+            <button type="button" id="ob-start-btn" class="ob-submit-btn">Öğrenmeye Başla</button>
+          </section>
+
+          <section id="ob-step-returning" class="ob-step" hidden>
+            <button type="button" id="ob-back-from-returning" class="ob-back-btn">← Geri</button>
+            <h2 id="ob-restore-title" class="ob-heading">Eski İlerlemeni Geri Yükle</h2>
+            <p id="ob-restore-sub" class="ob-sub">Daha önce indirdiğin .json yedeğini seç veya yapıştır.</p>
+
+            <label class="ob-file-drop" for="ob-backup-file">
+              <input id="ob-backup-file" type="file" accept=".json,application/json,.txt,.tsv" />
+              <span id="ob-file-label">📁 Yedek JSON Dosyası Seç</span>
+            </label>
+
+            <textarea id="ob-backup-text" class="ob-textarea" rows="4" placeholder="{ ... }"></textarea>
+            <p id="ob-restore-error" class="ob-error" hidden></p>
+
+            <div class="ob-actions-row">
+              <button type="button" id="ob-restore-btn" class="ob-submit-btn">Yedeği Geri Yükle</button>
+              <button type="button" id="ob-skip-restore-btn" class="ob-ghost-btn">Yedeksiz Devam Et</button>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <p class="feedback" id="popup-feedback" hidden></p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

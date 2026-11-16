@@ -1,0 +1,69 @@
+import * as esbuild from 'esbuild';
+import { cp, mkdir, rm } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(__dirname, '..');
+const publicDir = path.join(rootDir, 'public');
+const distDir = path.join(rootDir, 'dist');
+const isWatch = process.argv.includes('--watch');
+
+async function copyStaticAssets() {
+  await mkdir(distDir, { recursive: true });
+  await cp(publicDir, distDir, { recursive: true, force: true });
+}
+
+async function runBuild() {
+  await rm(distDir, { recursive: true, force: true });
+  await copyStaticAssets();
+
+  const sharedOptions = {
+    bundle: true,
+    sourcemap: isWatch ? 'inline' : false,
+    minify: !isWatch,
+    target: 'chrome116',
+    logLevel: 'info',
+  };
+
+  const configs = [
+    {
+      ...sharedOptions,
+      entryPoints: [path.join(rootDir, 'src/background/index.ts')],
+      outfile: path.join(distDir, 'background.js'),
+      format: 'esm',
+    },
+    {
+      ...sharedOptions,
+      entryPoints: [path.join(rootDir, 'src/content/index.ts')],
+      outfile: path.join(distDir, 'content.js'),
+      format: 'iife',
+    },
+    {
+      ...sharedOptions,
+      entryPoints: [path.join(rootDir, 'src/popup/index.ts')],
+      outfile: path.join(distDir, 'popup.js'),
+      format: 'esm',
+    },
+    {
+      ...sharedOptions,
+      entryPoints: [path.join(rootDir, 'src/options/index.ts')],
+      outfile: path.join(distDir, 'options.js'),
+      format: 'esm',
+    },
+  ];
+
+  if (isWatch) {
+    const contexts = await Promise.all(configs.map((cfg) => esbuild.context(cfg)));
+    await Promise.all(contexts.map((ctx) => ctx.watch()));
+    console.log('[watch] Listening for TypeScript changes...');
+  } else {
+    await Promise.all(configs.map((cfg) => esbuild.build(cfg)));
+    console.log('[build] Extension bundled cleanly into dist/');
+  }
+}
+
+runBuild().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

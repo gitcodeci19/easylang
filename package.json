@@ -1,0 +1,20 @@
+{
+  "name": "easylang-extension",
+  "version": "1.0.0",
+  "description": "EasyLang: Manifest V3 browser extension for active-recall English learning, CEFR guided lessons, live webpage translation challenges, and optional AI feedback.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:data": "python scripts/build_dataset.py",
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.312",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.25.2",
+    "typescript": "^5.8.2"
+  }
+}

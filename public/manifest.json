@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "EasyLang",
+  "version": "1.0.0",
+  "description": "Learn English naturally while browsing — active-recall flashcards, page challenges, listening practice, and spaced repetition.",
+  "permissions": [
+    "alarms",
+    "storage",
+    "tabs",
+    "scripting",
+    "idle",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*",
+    "https://api.mymemory.translated.net/*"
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "EasyLang",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "commands": {
+    "trigger-question": {
+      "suggested_key": {
+        "default": "Alt+Shift+Q"
+      },
+      "description": "Show a recall prompt immediately without waiting"
+    },
+    "trigger-page-quiz": {
+      "suggested_key": {
+        "default": "Alt+Shift+P"
+      },
+      "description": "Highlight a sentence on the current page and quiz its translation"
+    },
+    "trigger-listening-quiz": {
+      "suggested_key": {
+        "default": "Alt+Shift+L"
+      },
+      "description": "Play an English sentence by audio and type what you heard"
+    }
+  }
+}
