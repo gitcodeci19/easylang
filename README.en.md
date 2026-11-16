@@ -1,6 +1,6 @@
 **Language / Dil:** [🇹🇷 Türkçe](README.md) · 🇬🇧 **English**
 
-# ⚡ EasyLang
+# ⚡ EasyLang - AI-Powered
 
 **Learn English effortlessly while browsing with free AI coaching — not just rote flashcards, but smart feedback that helps you truly improve.**
 
