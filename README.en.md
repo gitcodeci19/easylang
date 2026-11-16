@@ -8,14 +8,24 @@
 A free, **AI-powered** browser extension that pops up while you browse and makes sure you actually learn English!
 
 <p align="center">
-  <img src="docs/screenshots/01-browser-ai-feedback.png" alt="EasyLang popping up in the top-right corner while browsing Instagram" width="820" />
+  <img src="docs/screenshots/04-browser-popup-roadmap.png" alt="EasyLang popup menu opened from the browser toolbar" width="820" />
 </p>
 
-> Browse Instagram or read articles as usual — even when you use different words, AI understands your meaning and accepts it.
+> Open from the top right anytime — continue quick lessons or launch **Ask Now**, **Challenge**, and **Listen & Type** in one click.
 
 ---
 
-## 🤖 Catches Mistakes, Explains Why & Retests
+## 🤖 AI That Understands Your Meaning
+
+Browse Instagram or read articles as usual — even when you use different words, AI understands your meaning and accepts it.
+
+<p align="center">
+  <img src="docs/screenshots/01-browser-ai-feedback.png" alt="EasyLang popping up in the top-right corner while browsing Instagram" width="820" />
+</p>
+
+---
+
+## 🎯 Catches Mistakes, Explains Why & Retests
 
 When you slip up while watching videos or reading, AI explains the mistake in simple words, saves the rule, and tests you again later.
 
@@ -25,22 +35,12 @@ When you slip up while watching videos or reading, AI explains the mistake in si
 
 ---
 
-## 🎯 Practice Right on Any Page (`Challenge`)
+## ✍️ Practice Right on Any Page (`Challenge`)
 
 Highlight a sentence on any webpage in one click and translate it straight inside the box.
 
 <p align="center">
   <img src="docs/screenshots/03-browser-challenge-mode.png" alt="Challenge mode highlighting a sentence on a clean webpage" width="820" />
-</p>
-
----
-
-## 🗺️ Open From the Top Right Anytime
-
-Continue quick topic lessons or launch **Ask Now**, **Challenge**, and **Listen & Type** right away.
-
-<p align="center">
-  <img src="docs/screenshots/04-browser-popup-roadmap.png" alt="EasyLang popup menu opened from the browser toolbar" width="820" />
 </p>
 
 ---

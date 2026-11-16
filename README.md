@@ -8,14 +8,24 @@
 Siz normal internette gezerken karşınıza çıkıp **size zorla İngilizce öğreten**, **yapay zeka destekli** ücretsiz tarayıcı eklentisi!
 
 <p align="center">
-  <img src="docs/screenshots/01-browser-ai-feedback.png" alt="Instagram üzerinde sağ üstte soru soran ve anlama göre değerlendiren EasyLang" width="820" />
+  <img src="docs/screenshots/04-browser-popup-roadmap.png" alt="Sağ üst ikondan açılan EasyLang ana menüsü ve öğrenme yolu" width="820" />
 </p>
 
-> İster Instagram'da gezin, ister haber oku: farklı kelime kullansan bile yapay zeka anlamı doğru yakalar ve onaylar.
+> Sağ üstteki simgeden tek tıkla aç; kısa derslerden devam et ya da **Şimdi Soru Sor**, **Challenge** ve **Dinle & Yaz** modlarını hemen başlat.
 
 ---
 
-## 🤖 Hatanı Yakalar, Açıklar ve Tekrar Sorar
+## 🤖 Kelimeyi Değil, Anlamı Ölçen Yapay Zeka
+
+İster Instagram'da gezin, ister haber oku: farklı kelime kullansan bile yapay zeka anlamı doğru yakalar ve onaylar.
+
+<p align="center">
+  <img src="docs/screenshots/01-browser-ai-feedback.png" alt="Instagram üzerinde sağ üstte soru soran ve anlama göre değerlendiren EasyLang" width="820" />
+</p>
+
+---
+
+## 🎯 Hatanı Yakalar, Açıklar ve Tekrar Sorar
 
 Video izlerken bile önüne gelen soruda küçük bir hata yaptığında yapay zeka nedenini sade bir dille anlatır, kuralı odak listesine alır ve biraz sonra yeniden sorar.
 
@@ -25,22 +35,12 @@ Video izlerken bile önüne gelen soruda küçük bir hata yaptığında yapay z
 
 ---
 
-## 🎯 Okuduğun Sayfada Canlı Pratik (`Challenge`)
+## ✍️ Okuduğun Sayfada Canlı Pratik (`Challenge`)
 
 Herhangi bir web sayfasında tek tıkla cümle seç, ok işaretiyle direkt kutuya geç ve çevirini yap.
 
 <p align="center">
   <img src="docs/screenshots/03-browser-challenge-mode.png" alt="Web sayfasında sarı işaretli cümle ve Challenge çeviri kutusu" width="820" />
-</p>
-
----
-
-## 🗺️ Sağ Üstten Tek Tıkla Devam Et
-
-Menüden kısa derslere gir ya da **Şimdi Soru Sor**, **Challenge** ve **Dinle & Yaz** modlarını hemen başlat.
-
-<p align="center">
-  <img src="docs/screenshots/04-browser-popup-roadmap.png" alt="Sağ üst ikondan açılan EasyLang ana menüsü ve öğrenme yolu" width="820" />
 </p>
 
 ---
