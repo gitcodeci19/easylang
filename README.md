@@ -8,52 +8,59 @@
 Siz normal internette gezerken karşınıza çıkıp **size zorla İngilizce öğreten**, **yapay zeka destekli** ücretsiz tarayıcı eklentisi!
 
 <p align="center">
-  <img src="docs/screenshots/01-popup-roadmap.png" alt="EasyLang Ana Menü" width="420" />
+  <img src="docs/screenshots/01-browser-ai-feedback.png" alt="Instagram üzerinde sağ üstte soru soran ve anlama göre değerlendiren EasyLang" width="820" />
+</p>
+
+> İster Instagram'da gezin, ister haber oku: farklı kelime kullansan bile yapay zeka anlamı doğru yakalar ve onaylar.
+
+---
+
+## 🤖 Hatanı Yakalar, Açıklar ve Tekrar Sorar
+
+Video izlerken bile önüne gelen soruda küçük bir hata yaptığında yapay zeka nedenini sade bir dille anlatır, kuralı odak listesine alır ve biraz sonra yeniden sorar.
+
+<p align="center">
+  <img src="docs/screenshots/02-browser-ai-mistake-focus.png" alt="YouTube izlerken hatayı yakalayıp tekrar öğreten EasyLang AI kartı" width="820" />
 </p>
 
 ---
 
-## 🤖 Yapay Zeka Seni Nasıl Geliştirir?
+## 🎯 Okuduğun Sayfada Canlı Pratik (`Challenge`)
 
-- **Ezber yok, anlam var:** Sözlükteki kelimenin aynısını yazmak zorunda değilsin. Doğru anlamı yakalarsan yapay zeka kabul eder.
-- **Hatanı unutmaz:** Yanlış yaptığın kuralı not alır, açıklamasını yazar ve biraz sonra tekrar sorup öğretir.
-- **Ücretsiz AI koçu:** Nerede iyi, nerede zayıf olduğunu takip eder ve seni ona göre çalıştırır.
-
----
-
-## 📸 Uygulamadan Kareler
-
-### Okuduğun Sayfada Canlı Çeviri (`Challenge`)
-Haber okurken veya forumda gezerken tek tıkla sayfadan cümle seç, çevirini yaz.
+Herhangi bir web sayfasında tek tıkla cümle seç, ok işaretiyle direkt kutuya geç ve çevirini yap.
 
 <p align="center">
-  <img src="docs/screenshots/02-challenge-mode.png" alt="Challenge Modu" width="760" />
+  <img src="docs/screenshots/03-browser-challenge-mode.png" alt="Web sayfasında sarı işaretli cümle ve Challenge çeviri kutusu" width="820" />
 </p>
 
 ---
 
-### Yapay Zeka Değerlendirmesi
-| Anında Geç | Farklı Kelimeyi Anlar | Hatanı Yakalar & Tekrar Sorar |
-| :---: | :---: | :---: |
-| <img src="docs/screenshots/03-offline-exact-match.png" alt="Anında Doğru Onayı" width="270" /> | <img src="docs/screenshots/04-ai-semantic-feedback.png" alt="Anlama Göre AI Onayı" width="270" /> | <img src="docs/screenshots/05-ai-grammar-focus.png" alt="AI Hata ve Tekrar Takibi" width="270" /> |
-| Doğru bildiğini anında onaylar. | *Örnek:* "peron" yerine "reyon" yazsan bile doğru sayar. | İnce hatanı açıklar ve birkaç soru sonra yeniden sorar. |
+## 🗺️ Sağ Üstten Tek Tıkla Devam Et
 
----
-
-### Gelişimini Gör & Koçundan Tavsiye Al
-Seviyeni, doğruluk oranını ve yapay zeka çalışma koçunun önerilerini izle.
+Menüden kısa derslere gir ya da **Şimdi Soru Sor**, **Challenge** ve **Dinle & Yaz** modlarını hemen başlat.
 
 <p align="center">
-  <img src="docs/screenshots/06-progress-analytics.png" alt="Gelişimim ve AI Çalışma Koçu" width="760" />
+  <img src="docs/screenshots/04-browser-popup-roadmap.png" alt="Sağ üst ikondan açılan EasyLang ana menüsü ve öğrenme yolu" width="820" />
 </p>
 
 ---
 
-### Ücretsiz Yapay Zeka Kurulumu
-Ücretsiz **Groq**, **NVIDIA** veya **AMD** anahtarını 1 dakikada ekle. Nasıl alınacağını bilmiyorsan arayüz içindeki rehber adım adım gösteriyor.
+## 📈 Gelişimini Gör & AI Koçundan Tavsiye Al
+
+Doğruluk oranını, seviyeni ve kişisel **AI Çalışma Koçu** önerilerini tek ekranda takip et.
 
 <p align="center">
-  <img src="docs/screenshots/07-ai-api-setup.png" alt="Ücretsiz AI Kurulumu" width="760" />
+  <img src="docs/screenshots/05-browser-progress-coach.png" alt="Gelişimim paneli ve AI Çalışma Koçu" width="820" />
+</p>
+
+---
+
+## ⚡ Ücretsiz Yapay Zeka Kurulumu
+
+**Groq**, **NVIDIA** veya **AMD** üzerinden 1 dakikada ücretsiz anahtar alıp bağla. Nasıl alınacağını içindeki rehber adım adım gösterir.
+
+<p align="center">
+  <img src="docs/screenshots/06-browser-ai-setup.png" alt="Ücretsiz AI API kurulum rehberi" width="820" />
 </p>
 
 ---
@@ -65,8 +72,8 @@ Seviyeni, doğruluk oranını ve yapay zeka çalışma koçunun önerilerini izl
    npm install
    npm run build
    ```
-2. Tarayıcıda `chrome://extensions` aç, sağ üstten **Geliştirici modu**nu aktif et.
-3. **Paketlenmemiş öğe yükle** de ve `dist` klasörünü seç.
+2. Tarayıcıda `chrome://extensions` aç, sağ üstten **Geliştirici modu**nu aç.
+3. **Paketlenmemiş öğe yükle** de ve oluşan `dist` klasörünü seç.
 
 <details>
 <summary>Bilgi: Gizlilik ve Kaynaklar</summary>
