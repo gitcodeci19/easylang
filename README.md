@@ -2,7 +2,7 @@
 
 ### EKLENTİ NELER YAPABİLİYOR?
 
-- YouTube izlerken veya WhatsApp'ta sohbet ederken, aynı sekmede Duolingo benzeri interaktif İngilizce dersleri yapabilirsiniz.
+- Tarayıcınızda herhangi bir sekmede Duolingo benzeri İngilizce dersleri yapabilirsiniz.
 - Yapay Zeka her hatanızı not eder ve özellikle sadece eksiklerinizi gidecerek şekilde dersler işlemeye başlar
 - Web tarayıcınız açık olduğu sürece her 20 dakika da bir sizi soru çözmeye teşvik eder.
 
