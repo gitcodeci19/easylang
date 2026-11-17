@@ -8,59 +8,39 @@
 A free, **AI-powered** browser extension that pops up while you browse and makes sure you actually learn English!
 
 <p align="center">
-  <img src="docs/screenshots/04-browser-popup-roadmap.png" alt="EasyLang popup menu opened from the browser toolbar" width="820" />
+  <img src="docs/gifs/01-auto-exposure-ai.gif" alt="EasyLang triggering every 20 minutes while browsing Instagram and accepting semantic translations" width="820" />
 </p>
 
-> Open from the top right anytime — continue quick lessons or launch **Ask Now**, **Challenge**, and **Listen & Type** in one click.
+> Even if you don't open the extension, a question tailored to your target level appears every **20 minutes**. No rote memorization: AI recognizes your meaning even when you rephrase.
 
 ---
 
-## 🤖 AI That Understands Your Meaning
+## 🎯 Catches Mistakes, Explains Why & Schedules Focus Reviews
 
-Browse Instagram or read articles as usual — even when you use different words, AI understands your meaning and accepts it.
-
-<p align="center">
-  <img src="docs/screenshots/01-browser-ai-feedback.png" alt="EasyLang popping up in the top-right corner while browsing Instagram" width="820" />
-</p>
-
----
-
-## 🎯 Catches Mistakes, Explains Why & Retests
-
-When you slip up while watching videos or reading, AI explains the mistake in simple words, saves the rule, and tests you again later.
+When you slip up while watching videos or reading, AI explains the mistake in simple words, pins that grammar rule to your focus list, and tests you again shortly after.
 
 <p align="center">
-  <img src="docs/screenshots/02-browser-ai-mistake-focus.png" alt="EasyLang catching a grammar mistake on YouTube and scheduling focus reviews" width="820" />
+  <img src="docs/gifs/02-mistake-focus-loop.gif" alt="EasyLang catching a grammar mistake on YouTube, explaining it with AI, and pinning it to focus reviews" width="820" />
 </p>
 
 ---
 
-## ✍️ Practice Right on Any Page (`Challenge`)
+## ✍️ Extension Menu & Instant Page `Challenge`
 
-Highlight a sentence on any webpage in one click and translate it straight inside the box.
+Jump into the skill roadmap from the popup anytime, or launch **Challenge** in one click to translate a highlighted sentence right on any webpage.
 
 <p align="center">
-  <img src="docs/screenshots/03-browser-challenge-mode.png" alt="Challenge mode highlighting a sentence on a clean webpage" width="820" />
+  <img src="docs/gifs/03-popup-challenge-flow.gif" alt="Launching Challenge from the EasyLang popup menu and translating a webpage sentence inline" width="820" />
 </p>
 
 ---
 
-## 📈 Track Your Progress & AI Coach
+## 📈 Progress Analytics, AI Coach & 1-Minute Free Setup
 
-Follow your level, accuracy rate, and personalized **AI Study Coach** tips in one place.
-
-<p align="center">
-  <img src="docs/screenshots/05-browser-progress-coach.png" alt="Progress dashboard with AI Study Coach" width="820" />
-</p>
-
----
-
-## ⚡ Free AI Setup in 1 Minute
-
-Connect a free key from **Groq**, **NVIDIA**, or **AMD**. Built-in steps show you exactly how.
+Track your Elo curve, accuracy, and **AI Study Coach** feedback — and connect a free key from **Groq**, **NVIDIA**, or **AMD** in about a minute.
 
 <p align="center">
-  <img src="docs/screenshots/06-browser-ai-setup.png" alt="Free AI API setup steps and recommended providers" width="820" />
+  <img src="docs/gifs/04-progress-coach-setup.gif" alt="Progress analytics, AI Study Coach, and 1-minute free Groq API setup" width="820" />
 </p>
 
 ---
@@ -83,6 +63,12 @@ npm run build
 - Dataset credits: [ATTRIBUTIONS.md](ATTRIBUTIONS.md)
 
 </details>
+
+---
+
+## 🎬 Full Walkthrough Video *(Turkish Audio)*
+
+https://github.com/user-attachments/assets/8c34cede-0d40-493f-ba9c-981a12020011
 
 ---
 
