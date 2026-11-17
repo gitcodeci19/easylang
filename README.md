@@ -22,23 +22,11 @@ Video izlerken bile önüne gelen soruda küçük bir hata yaptığında yapay z
 
 ---
 
-## ✍️ Sağ Üst Menüden Ders Yolu & Canlı `Challenge`
+## EKLENTİ NELER YAPABİLİYOR?
 
-İstediğin an sağ üstteki menüden ders yoluna devam et ya da okuduğun herhangi bir web sayfasında tek tıkla **Challenge** başlatıp sayfadaki cümleyi anında çevir.
-
-<p align="center">
-  <img src="docs/gifs/03-popup-challenge-flow.gif" alt="EasyLang menüsünden tek tıkla Challenge başlatıp web sayfasında cümle çevirme akışı" width="820" />
-</p>
-
----
-
-## 📈 Gelişim Paneli, AI Koçu & 1 Dakikada Ücretsiz Kurulum
-
-Doğruluk oranını, Elo seviyeni ve **AI Çalışma Koçu** önerilerini takip et; **Groq**, **NVIDIA** veya **AMD** üzerinden 1 dakikada ücretsiz API anahtarı alıp bağla.
-
-<p align="center">
-  <img src="docs/gifs/04-progress-coach-setup.gif" alt="Gelişimim paneli, AI Çalışma Koçu ve ücretsiz Groq API kurulum adımları" width="820" />
-</p>
+- YouTube izlerken veya WhatsApp'ta sohbet ederken, aynı sekmede Duolingo benzeri interaktif İngilizce dersleri yapabilirsiniz.
+- Hatalarınızı ve doğrularınızı analiz ederek eksiklerinize göre kişisel bir öğrenme rotası oluşturur.
+- Web tarayıcınız açık olduğu sürece her 20 dakika da bir sizi soru çözmeye teşvik eder.
 
 ---
 
