@@ -1,6 +1,4 @@
-# EasyLang - İngilizce Öğrenebileceğin Yapay Zeka Destekli Tarayıcı Eklentisi
-
----
+İngilizce Öğrenebileceğin Yapay Zeka Destekli Tarayıcı Eklentisi
 
 https://github.com/user-attachments/assets/8c34cede-0d40-493f-ba9c-981a12020011
 
