@@ -1,11 +1,9 @@
 # Yapay Zeka Destekli Dil Öğrenme Tarayıcı Eklentisi
 
----
-
 ## EKLENTİ NELER YAPABİLİYOR?
 
 - YouTube izlerken veya WhatsApp'ta sohbet ederken, aynı sekmede Duolingo benzeri interaktif İngilizce dersleri yapabilirsiniz.
-- Hatalarınızı ve doğrularınızı analiz ederek eksiklerinize göre kişisel bir öğrenme rotası oluşturur.
+- Yapay Zekası sayesinde hatalarınızı ve doğrularınızı analiz ederek eksiklerinize göre kişisel bir öğrenme rotası oluşturur.
 - Web tarayıcınız açık olduğu sürece her 20 dakika da bir sizi soru çözmeye teşvik eder.
 
 ---
