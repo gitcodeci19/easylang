@@ -29,11 +29,10 @@ Groq, NVIDIA ve AMD gibi şirketler, geliştiricilerin kullanabilmesi için ücr
 
 **Sadece bir API anahtarı almanız yeterli.**
 
-<details open>
-<summary><strong>🟢 Groq – Önerilen (Hızlı ve Kolay)</strong></summary>
+<details>
+<summary><strong>🟢 Groq – Önerilen (Hızlı ve Akıllı) (TIKLAYIN)</strong></summary>
 
-**Tavsiye edilen servis:** Groq  
-**Tavsiye edilen model:** Qwen 3.8 27B
+  **Tavsiye edilen model:** Qwen 3.8 27B
 
 [Groq API Keys Sayfasını Aç ↗](https://console.groq.com/keys)
 
