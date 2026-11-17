@@ -1,6 +1,18 @@
 
 # EasyLang – Yapay Zekâ Destekli Dil Öğrenme Tarayıcı Eklentisi
 
+<p align="left">
+  <a href="https://github.com/gitcodeci19/easylang/releases">
+    <img src="https://img.shields.io/github/downloads/gitcodeci19/easylang/total?style=for-the-badge&label=%C4%B0ndirme&color=7c3aed" alt="Toplam İndirme" />
+  </a>
+  <a href="https://github.com/gitcodeci19/easylang/releases/latest">
+    <img src="https://img.shields.io/github/v/release/gitcodeci19/easylang?style=for-the-badge&label=S%C3%BCr%C3%BCm&color=10b981" alt="Son Sürüm" />
+  </a>
+  <a href="https://github.com/gitcodeci19/easylang/stargazers">
+    <img src="https://img.shields.io/github/stars/gitcodeci19/easylang?style=for-the-badge&label=Y%C4%B1ld%C4%B1z&color=f59e0b" alt="GitHub Yıldız" />
+  </a>
+</p>
+
 ### 🚀 EKLENTİ NELER YAPABİLİYOR?
 
 - Tarayıcınızda herhangi bir sekmede Duolingo benzeri interaktif İngilizce dersleri yapabilirsiniz.

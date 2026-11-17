@@ -2,6 +2,18 @@
 
 # ⚡ EasyLang - AI-Powered
 
+<p align="left">
+  <a href="https://github.com/gitcodeci19/easylang/releases">
+    <img src="https://img.shields.io/github/downloads/gitcodeci19/easylang/total?style=for-the-badge&label=Downloads&color=7c3aed" alt="Total Downloads" />
+  </a>
+  <a href="https://github.com/gitcodeci19/easylang/releases/latest">
+    <img src="https://img.shields.io/github/v/release/gitcodeci19/easylang?style=for-the-badge&label=Release&color=10b981" alt="Latest Release" />
+  </a>
+  <a href="https://github.com/gitcodeci19/easylang/stargazers">
+    <img src="https://img.shields.io/github/stars/gitcodeci19/easylang?style=for-the-badge&label=Stars&color=f59e0b" alt="GitHub Stars" />
+  </a>
+</p>
+
 **No need to pay for another language app.**
 **No need to open study websites every day.**
 
