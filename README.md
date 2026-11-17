@@ -8,9 +8,6 @@ https://github.com/user-attachments/assets/8c34cede-0d40-493f-ba9c-981a12020011
 
 ---
 
-**Başka uygulamalara para vermeye gerek yok.**
-**İngilizce öğrenmek için sürekli bir siteye girmek zorunda değilsiniz.**
-
 Siz normal internette gezerken karşınıza çıkıp **size zorla İngilizce öğreten**, **yapay zeka destekli** ücretsiz tarayıcı eklentisi!
 
 <p align="center">
