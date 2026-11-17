@@ -2,6 +2,14 @@
 
 # EasyLang - Yapay Zeka Destekli
 
+---
+
+## 🎬 Sesli Tanıtım Videosu
+
+https://github.com/user-attachments/assets/8c34cede-0d40-493f-ba9c-981a12020011
+
+---
+
 **Başka uygulamalara para vermeye gerek yok.**
 **İngilizce öğrenmek için sürekli bir siteye girmek zorunda değilsiniz.**
 
@@ -10,8 +18,6 @@ Siz normal internette gezerken karşınıza çıkıp **size zorla İngilizce ö�
 <p align="center">
   <img src="docs/gifs/01-auto-exposure-ai.gif" alt="Her 20 dakikada otomatik soru çıkaran ve anlamı yakalayan EasyLang AI kartı" width="820" />
 </p>
-
-> Eklentiyi aktif açmasanız bile her **20 dakikada bir** sayfanızda seviyenize uygun soru çıkar. Ezber yok: farklı kelimeler yazsanız bile yapay zekâ anlamı yakalar ve onaylar.
 
 ---
 
@@ -63,14 +69,6 @@ npm run build
 - Veri kaynakları: [ATTRIBUTIONS.md](ATTRIBUTIONS.md)
 
 </details>
-
----
-
-## 🎬 Sesli Tanıtım Videosu
-
-https://github.com/user-attachments/assets/8c34cede-0d40-493f-ba9c-981a12020011
-
----
 
 ## 👨‍💻 Geliştiriciler
 
