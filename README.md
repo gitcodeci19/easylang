@@ -1,6 +1,12 @@
 # Yapay Zeka Destekli Dil Öğrenme Tarayıcı Eklentisi
 
-https://github.com/user-attachments/assets/8c34cede-0d40-493f-ba9c-981a12020011
+---
+
+## EKLENTİ NELER YAPABİLİYOR?
+
+- YouTube izlerken veya WhatsApp'ta sohbet ederken, aynı sekmede Duolingo benzeri interaktif İngilizce dersleri yapabilirsiniz.
+- Hatalarınızı ve doğrularınızı analiz ederek eksiklerinize göre kişisel bir öğrenme rotası oluşturur.
+- Web tarayıcınız açık olduğu sürece her 20 dakika da bir sizi soru çözmeye teşvik eder.
 
 ---
 
@@ -20,13 +26,7 @@ Video izlerken bile önüne gelen soruda küçük bir hata yaptığında yapay z
   <img src="docs/gifs/02-mistake-focus-loop.gif" alt="YouTube izlerken hatayı yakalayıp AI açıklaması sunan ve odak listesine alan EasyLang kartı" width="820" />
 </p>
 
----
-
-## EKLENTİ NELER YAPABİLİYOR?
-
-- YouTube izlerken veya WhatsApp'ta sohbet ederken, aynı sekmede Duolingo benzeri interaktif İngilizce dersleri yapabilirsiniz.
-- Hatalarınızı ve doğrularınızı analiz ederek eksiklerinize göre kişisel bir öğrenme rotası oluşturur.
-- Web tarayıcınız açık olduğu sürece her 20 dakika da bir sizi soru çözmeye teşvik eder.
+https://github.com/user-attachments/assets/8c34cede-0d40-493f-ba9c-981a12020011
 
 ---
 
