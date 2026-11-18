@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   computeWeaknessProfile,
   evaluateDictationAnswer,
+  isAiConceptCard,
   recordCorrectProgress,
   recordWrongProgress,
   selectNextCard,
@@ -243,4 +244,69 @@ test('evaluateDictationAnswer treats standard English contractions and expanded 
   const res = evaluateDictationAnswer("I don't want to wait.", 'I do not want to wait');
   assert.equal(res.isCorrect, true);
   assert.equal(res.accuracyPercent, 100);
+});
+
+test('selectNextCard prioritizes manual user cards without letting A2 AI concept cards hijack B2 recall', () => {
+  const t0 = 1_700_000_000_000;
+  const aiA2Card: Card = {
+    id: 'u_concept_abc_0',
+    type: 'sentence',
+    level: 'A2',
+    pos: 'sentence',
+    en: 'We were invited to the wedding.',
+    phonetic: '',
+    acceptedTr: ['Düğüne davet edildik.'],
+    exampleEn: '',
+    exampleTr: '',
+    source: 'user',
+    origin: 'ai_concept',
+  };
+  const b2ModernCard: Card = {
+    id: 'm_0200',
+    type: 'sentence',
+    level: 'B2',
+    pos: 'sentence',
+    en: 'Clear written communication is a superpower on distributed teams.',
+    phonetic: '',
+    acceptedTr: ['Net yazılı iletişim uzaktan çalışan ekiplerde süper güçtür.'],
+    exampleEn: '',
+    exampleTr: '',
+    source: 'builtin',
+  };
+  const manualCard: Card = {
+    id: 'u_manual_1',
+    type: 'word',
+    level: 'B1',
+    pos: 'custom',
+    en: 'powerful',
+    phonetic: '',
+    acceptedTr: ['kuvvetli'],
+    exampleEn: '',
+    exampleTr: '',
+    source: 'user',
+    origin: 'manual',
+  };
+
+  assert.equal(isAiConceptCard(aiA2Card), true);
+  assert.equal(isAiConceptCard(manualCard), false);
+
+  // Without manual unseen cards, a B2 learner (1350 Elo) filtering ['B1', 'B2'] must get the B2 card, not the A2 AI concept card
+  const b2Pick = selectNextCard(
+    [aiA2Card, b2ModernCard],
+    {},
+    t0,
+    { contentMode: 'mixed', levels: ['B1', 'B2'], includeUserCards: true, preferredRating: 1350 },
+    () => 0
+  );
+  assert.equal(b2Pick?.card.id, 'm_0200');
+
+  // Manual user card still gets #1 priority over builtin cards
+  const manualPick = selectNextCard(
+    [aiA2Card, b2ModernCard, manualCard],
+    {},
+    t0,
+    { contentMode: 'mixed', levels: ['B1', 'B2'], includeUserCards: true, preferredRating: 1350 },
+    () => 0
+  );
+  assert.equal(manualPick?.card.id, 'u_manual_1');
 });

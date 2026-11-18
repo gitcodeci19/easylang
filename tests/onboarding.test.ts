@@ -180,6 +180,9 @@ test('parseFullBackupJson validates schema and restores progress safely', () => 
     onboardingState: createDefaultOnboardingState(true),
     roadmapState: { xp: 140 },
     askedPageSentences: [],
+    roadmapHistory: [{ id: 'rm_1', completedAt: 1000, unitId: 'u01_basics', unitTitleTr: 'Temel', unitTitleEn: 'Basics', nodeIndex: 0, stepIndex: 0, accuracyPct: 100, xpEarned: 15, totalQuestions: 8, firstTryCorrect: 8, repeatedMistakeCount: 0, strongWords: ['hello'], mistakes: [], byKind: {} }],
+    roadmapCoachInsight: { status: 'great', message: 'Harika!', generatedAt: 1000, lessonCountAnalyzed: 1, source: 'local' },
+    cardOverrides: {},
   });
 
   const parsed = parseFullBackupJson(raw);
@@ -187,6 +190,9 @@ test('parseFullBackupJson validates schema and restores progress safely', () => 
   assert.equal(parsed.skillProfile.rating, 1280);
   assert.equal(parsed.skillProfile.totalAnswered, 44);
   assert.equal(parsed.onboardingState.completed, true);
+  assert.equal(parsed.roadmapHistory?.length, 1);
+  assert.equal(parsed.roadmapCoachInsight?.status, 'great');
+  assert.deepEqual(parsed.cardOverrides, {});
 });
 
 test('getOnboardingCopy auto-detects browser language', () => {

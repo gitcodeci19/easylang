@@ -501,14 +501,20 @@ export async function launchListeningQuiz(): Promise<void> {
 
     restoreBlurredYouTubeCaptions();
     const evaluation = evaluateDictationAnswer(sentenceEn, attempt);
+    void sendBgMessage({
+      type: 'RECORD_LISTENING_RESULT',
+      cardId: liveYt ? undefined : fallbackChallenge?.cardId,
+      isCorrect: evaluation.isCorrect,
+      accuracyPercent: evaluation.accuracyPercent,
+    }).catch(() => {});
     bodyWrap.replaceChildren();
 
     const scoreLine = createEl(
       'div',
       'etr-lq-prompt',
       isTr
-        ? `${evaluation.isCorrect ? '✓' : '✕'} Doğruluk: %${evaluation.accuracyPercent}`
-        : `${evaluation.isCorrect ? '✓' : '✕'} Accuracy: ${evaluation.accuracyPercent}%`
+        ? `${evaluation.isCorrect ? '✓' : '✕'} Doğruluk: %${evaluation.accuracyPercent}${evaluation.isCorrect ? ' · +5 XP' : ''}`
+        : `${evaluation.isCorrect ? '✓' : '✕'} Accuracy: ${evaluation.accuracyPercent}%${evaluation.isCorrect ? ' · +5 XP' : ''}`
     );
     scoreLine.style.fontWeight = '700';
     scoreLine.style.color = evaluation.isCorrect ? '#34d399' : '#fbbf24';

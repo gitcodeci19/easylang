@@ -139,6 +139,10 @@ export interface WeaknessProfile {
  * - Areas where the user is consistently accurate (`>= 85%`) and fast receive negative
  *   weights (`-15` to `-35`) so the algorithm bothers them far less on mastered skills.
  */
+export function isAiConceptCard(card: Card): boolean {
+  return card.origin === 'ai_concept' || card.id.startsWith('u_concept_');
+}
+
 export function computeWeaknessProfile(reviewHistory: ReviewEvent[]): WeaknessProfile {
   const topicStats = new Map<TopicDomain, { attempts: number; wrong: number; totalMs: number }>();
   const posStats = new Map<PosGroup, { attempts: number; wrong: number; totalMs: number }>();
@@ -148,22 +152,28 @@ export function computeWeaknessProfile(reviewHistory: ReviewEvent[]): WeaknessPr
   const recentSlice = reviewHistory.slice(-120);
 
   for (const ev of recentSlice) {
+    // Ignore abandoned/backgrounded tab durations (> 30s) or 0ms anomalies so idle tabs don't fake hesitation
+    const cleanMs =
+      ev.responseMs > 0 && ev.responseMs <= 30_000
+        ? Math.max(500, ev.responseMs)
+        : 4000;
+
     const t = topicStats.get(ev.topic) ?? { attempts: 0, wrong: 0, totalMs: 0 };
     t.attempts += 1;
     if (!ev.isCorrect) t.wrong += 1;
-    t.totalMs += Math.min(30_000, Math.max(500, ev.responseMs || 4000));
+    t.totalMs += cleanMs;
     topicStats.set(ev.topic, t);
 
     const p = posStats.get(ev.posGroup) ?? { attempts: 0, wrong: 0, totalMs: 0 };
     p.attempts += 1;
     if (!ev.isCorrect) p.wrong += 1;
-    p.totalMs += Math.min(30_000, Math.max(500, ev.responseMs || 4000));
+    p.totalMs += cleanMs;
     posStats.set(ev.posGroup, p);
 
     const l = levelStats.get(ev.level) ?? { attempts: 0, wrong: 0, totalMs: 0 };
     l.attempts += 1;
     if (!ev.isCorrect) l.wrong += 1;
-    l.totalMs += Math.min(30_000, Math.max(500, ev.responseMs || 4000));
+    l.totalMs += cleanMs;
     levelStats.set(ev.level, l);
   }
 
@@ -216,7 +226,11 @@ export function isCardEligible(
 ): boolean {
   if (card.source === 'user' && !includeUserCards) return false;
   if (contentMode !== 'mixed' && card.type !== contentMode) return false;
-  if (card.source === 'builtin' && levels.length > 0 && !levels.includes(card.level)) {
+  if (
+    (card.source === 'builtin' || isAiConceptCard(card)) &&
+    levels.length > 0 &&
+    !levels.includes(card.level)
+  ) {
     return false;
   }
   return true;
@@ -312,13 +326,13 @@ export function selectNextCard(
     };
   }
 
-  // 3. Unseen cards: prefer user cards, then score by WeaknessProfile + Elo Zone of Proximal Development
+  // 3. Unseen cards: prioritize ONLY manually added user cards; AI concept cards participate in normal Elo scoring
   if (unseen.length > 0) {
-    const userFirst = unseen.filter((c) => c.source === 'user');
-    const candidates = userFirst.length > 0 ? userFirst : unseen;
+    const manualUserFirst = unseen.filter((c) => c.source === 'user' && !isAiConceptCard(c));
+    const candidates = manualUserFirst.length > 0 ? manualUserFirst : unseen;
     const hasWeaknessSignals = (filters.reviewHistory?.length ?? 0) > 0;
 
-    if (userFirst.length === 0 && (filters.preferredRating !== undefined || hasWeaknessSignals)) {
+    if (manualUserFirst.length === 0 && (filters.preferredRating !== undefined || hasWeaknessSignals)) {
       const target = (filters.preferredRating ?? 1000) + 25; // Slightly above current Elo for growth
       const scored = candidates.map((card) => {
         const diff = getCardDifficultyRating(card);
@@ -327,14 +341,18 @@ export function selectNextCard(
         const tooEasyPenalty = diff < target - 160 ? (target - diff) * 0.22 : 0;
         const eloScore = 100 - distance * 0.18 - tooEasyPenalty;
         const weaknessScore = getWeaknessBoost(card);
+        // Give modern relatable sentences (m_*) a modest freshness lift so recall mixes engaging modern lines with classic deck cards
+        const modernFreshnessBonus = card.id.startsWith('m_') ? 8 : 0;
+        // Slightly dampen auto-generated concept cards outside targeted concept drills so they never flood regular recall
+        const aiConceptDampen = isAiConceptCard(card) ? -14 : 0;
         return {
           card,
-          score: eloScore + weaknessScore,
+          score: eloScore + weaknessScore + modernFreshnessBonus + aiConceptDampen,
         };
       });
 
       scored.sort((a, b) => b.score - a.score);
-      const windowSize = Math.min(scored.length, hasWeaknessSignals ? 10 : 25);
+      const windowSize = Math.min(scored.length, hasWeaknessSignals ? 16 : 30);
       const idx = Math.floor(randomFn() * windowSize);
       const chosen = scored[idx]?.card ?? scored[0]!.card;
       return {

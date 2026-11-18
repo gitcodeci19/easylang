@@ -25,6 +25,7 @@ import {
   type Card,
   type RoadmapActiveSession,
   type RoadmapLessonRecord,
+  type UserCardProgress,
 } from '../src/shared/types.ts';
 
 const deckCards = JSON.parse(
@@ -250,8 +251,13 @@ test('cleaned deck removes railway/Latin/archaic FreeDict artifacts from A1-B2 w
     if (ex.kind === 'select_en' || (ex.kind === 'free_translation' && ex.direction === 'tr-to-en')) {
       assert.equal(ex.promptText, ex.card.acceptedTr[0] ?? ex.card.exampleTr ?? '');
     }
-    if (ex.kind === 'cloze_blank' || ex.kind === 'audio_dictation') {
+    if (ex.kind === 'audio_dictation') {
       assert.equal(ex.promptSubtext, '');
+      assert.ok((ex.postAnswerSubtext ?? '').length > 0);
+    }
+    if (ex.kind === 'cloze_blank') {
+      // cloze_blank displays the Turkish sentence cue pre-check so frequency/context blanks are unambiguous
+      assert.ok(ex.promptSubtext.trim().length > 0);
       assert.ok((ex.postAnswerSubtext ?? '').length > 0);
     }
   }
@@ -507,5 +513,71 @@ test('multiple-choice answer positions are well-distributed for large Date.now()
   // Every answer slot 0..3 must be represented meaningfully instead of locking onto slot 3
   for (const slot of [0, 1, 2, 3]) {
     assert.ok((positionCounts.get(slot) ?? 0) >= 10, `Expected slot ${slot} to appear >= 10 times, got ${positionCounts.get(slot)}`);
+  }
+});
+
+test('spiral review releases recovered words after streak >= 2 and modern sentences integrate cleanly without cross-unit leakage', () => {
+  // 1. Modern sentences (including GTA 6, rock music, and C1 science/law) exist with stable m_ IDs
+  const gtaCard = deckCards.find((c) => c.en === "I can't wait to play GTA 6.");
+  const rockCard = deckCards.find((c) => c.en === 'I feel good when I listen to rock music.');
+  assert.ok(gtaCard && gtaCard.id.startsWith('m_'), 'Expected GTA 6 modern sentence card');
+  assert.ok(rockCard && rockCard.id.startsWith('m_'), 'Expected rock music modern sentence card');
+  assert.equal(gtaCard.unitId, 'u07_cinema');
+
+  const c1Sentences = deckCards.filter((c) => c.type === 'sentence' && c.level === 'C1');
+  assert.ok(c1Sentences.length >= 40, `Expected >= 40 C1 sentences, got ${c1Sentences.length}`);
+
+  // Explicit-unit modern card stays exclusive to its unit (e.g. sea turtles m_ card only in u02_animals)
+  const turtlesCard = deckCards.find((c) => c.en.includes('sea turtles swimming near the quiet beach'));
+  assert.ok(turtlesCard && turtlesCard.unitId === 'u02_animals');
+  const travelPool = getCardsForUnit('u08_travel', deckCards);
+  assert.ok(!travelPool.some((c) => c.id === turtlesCard.id));
+
+  // 2. Clean modern examples replaced awkward Tatoeba lines on wing & inch
+  const wingCard = deckCards.find((c) => c.id === 'w_wing');
+  assert.ok(wingCard && !wingCard.exampleEn.toLowerCase().includes('communism'));
+  const inchCard = deckCards.find((c) => c.id === 'w_inch');
+  assert.ok(inchCard && inchCard.exampleEn.toLowerCase().includes('monitor'));
+
+  // 3. A word missed once in Step 0 and then answered right twice must NOT lock into every subsequent step
+  const animalWords = getCardsForUnit('u02_animals', deckCards).filter((c) => c.type === 'word');
+  const recoveredWord = animalWords[0]!;
+  const recoveredProgress: Record<string, UserCardProgress> = {
+    [recoveredWord.id]: {
+      cardId: recoveredWord.id,
+      retryAt: null,
+      retryCount: 0,
+      nextDueAt: Date.now() + 86_400_000,
+      streak: 3,
+      intervalDays: 7,
+      totalCorrect: 4,
+      totalWrong: 1,
+      lastReviewedAt: Date.now(),
+    },
+  };
+  let appearancesAcross15Steps = 0;
+  for (let node = 0; node < 5; node += 1) {
+    for (let step = 0; step < 3; step += 1) {
+      const exs = buildUnitLessonExercises('u02_animals', node, deckCards, recoveredProgress, 1795000000000 + node * 100 + step, step);
+      for (const ex of exs) {
+        if (ex.card.id === recoveredWord.id) appearancesAcross15Steps += 1;
+      }
+    }
+  }
+  assert.ok(
+    appearancesAcross15Steps <= 6,
+    `Expected recovered word to appear <= 6 times across 15 steps (not locked into every lesson), got ${appearancesAcross15Steps}`
+  );
+
+  // 4. Cloze blank properly masks irregular phrasal verb inflections ("break down" -> "broke down")
+  const breakDownExercises = buildUnitLessonExercises('u15_phrasal_verbs', 0, deckCards, {}, 123, 1);
+  const allPhrasalCloze = [
+    ...breakDownExercises,
+    ...buildUnitLessonExercises('u15_phrasal_verbs', 1, deckCards, {}, 123, 1),
+    ...buildUnitLessonExercises('u15_phrasal_verbs', 3, deckCards, {}, 123, 0),
+  ].filter((e) => e.kind === 'cloze_blank' && e.card.en === 'break down');
+  for (const ex of allPhrasalCloze) {
+    assert.equal(ex.correctChoice?.toLowerCase(), 'broke down');
+    assert.ok(ex.promptText.includes('_______'));
   }
 });

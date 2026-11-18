@@ -18,7 +18,8 @@ export const CONCEPT_STAGE_GAPS: Record<0 | 1 | 2, number> = {
 
 /** Global cooldown between any two concept-targeted prompts to avoid repetitive drills. */
 export const MIN_QUESTIONS_BETWEEN_CONCEPT_PROMPTS = 2;
-const MAX_CONCEPT_NOTES = 100;
+export const MAX_ACTIVE_CONCEPTS = 8;
+const MAX_CONCEPT_NOTES = 60;
 
 interface GrammarRule {
   id: string;
@@ -243,6 +244,71 @@ export function sanitizeConceptExplanationForCard(
   return kept.join(' ').trim();
 }
 
+function tokensOverlapStrongly(a: string, b: string): boolean {
+  const na = a.trim().toLowerCase().replace(/\s+/g, ' ');
+  const nb = b.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.length >= 4 && nb.length >= 4 && (na.includes(nb) || nb.includes(na))) {
+    return true;
+  }
+  const wa = new Set(na.split(/[^a-z0-9']+/).filter((w) => w.length >= 3));
+  const wb = new Set(nb.split(/[^a-z0-9']+/).filter((w) => w.length >= 3));
+  if (wa.size === 0 || wb.size === 0) return false;
+  let shared = 0;
+  for (const w of wa) {
+    if (wb.has(w)) shared += 1;
+  }
+  return shared > 0 && shared >= Math.min(wa.size, wb.size);
+}
+
+/**
+ * Deduplicate overlapping active concepts (e.g. 'is getting' + 'getting too late')
+ * and enforce a healthy cap (`MAX_ACTIVE_CONCEPTS`) so the recall queue never clogs.
+ */
+export function consolidateConceptState(state: ConceptTrackerState): ConceptTrackerState {
+  const mastered: ConceptNote[] = [];
+  const activeRaw: ConceptNote[] = [];
+  for (const n of state.notes) {
+    if (n.stage >= 3 || n.masteredAt !== null) {
+      mastered.push(n);
+    } else {
+      activeRaw.push(n);
+    }
+  }
+
+  // Keep most recently practiced/created active notes first when merging overlaps
+  activeRaw.sort((a, b) => (b.lastPracticedAt || b.createdAt) - (a.lastPracticedAt || a.createdAt));
+
+  const mergedActive: ConceptNote[] = [];
+  for (const candidate of activeRaw) {
+    const existing = mergedActive.find(
+      (kept) =>
+        kept.id === candidate.id ||
+        (kept.id.startsWith('token:') &&
+          candidate.id.startsWith('token:') &&
+          tokensOverlapStrongly(kept.focusToken, candidate.focusToken))
+    );
+    if (existing) {
+      existing.practicedCardIds = Array.from(
+        new Set([...existing.practicedCardIds, ...candidate.practicedCardIds])
+      ).slice(-24);
+      continue;
+    }
+    mergedActive.push(candidate);
+  }
+
+  const cappedActive = mergedActive.slice(0, MAX_ACTIVE_CONCEPTS);
+  const cappedMastered = mastered
+    .sort((a, b) => (b.masteredAt ?? b.lastPracticedAt) - (a.masteredAt ?? a.lastPracticedAt))
+    .slice(0, MAX_CONCEPT_NOTES - cappedActive.length);
+
+  return {
+    ...state,
+    notes: [...cappedActive, ...cappedMastered],
+  };
+}
+
 /**
  * Record or re-activate a weak-spot/grammar concept and schedule its first
  * non-consecutive check after CONCEPT_STAGE_GAPS[0] (2) questions.
@@ -257,7 +323,20 @@ export function upsertConceptNote(
 ): { nextState: ConceptTrackerState; note: ConceptNote } {
   const spec = inferConceptSpec(card, focusToken, aiWeakPoint);
   const notes = [...state.notes];
-  const idx = notes.findIndex((n) => n.id === spec.id);
+  const exactIdx = notes.findIndex((n) => n.id === spec.id);
+  const overlapIdx =
+    exactIdx >= 0
+      ? exactIdx
+      : spec.id.startsWith('token:')
+        ? notes.findIndex(
+            (n) =>
+              n.stage < 3 &&
+              n.masteredAt === null &&
+              n.id.startsWith('token:') &&
+              tokensOverlapStrongly(n.focusToken, spec.focusToken)
+          )
+        : -1;
+  const idx = overlapIdx;
   const nextCheck = currentQuestionSeq + CONCEPT_STAGE_GAPS[0];
 
   if (idx >= 0) {
@@ -279,7 +358,7 @@ export function upsertConceptNote(
       masteredAt: null,
     };
     notes[idx] = updated;
-    return { nextState: { ...state, notes }, note: updated };
+    return { nextState: consolidateConceptState({ ...state, notes }), note: updated };
   }
 
   const created: ConceptNote = {
@@ -302,8 +381,8 @@ export function upsertConceptNote(
   };
 
   notes.unshift(created);
-  const trimmed = notes.slice(0, MAX_CONCEPT_NOTES);
-  return { nextState: { ...state, notes: trimmed }, note: created };
+  const consolidated = consolidateConceptState({ ...state, notes });
+  return { nextState: consolidated, note: created };
 }
 
 export function countUnusedMatchingCards(concept: ConceptNote, cards: Card[]): number {

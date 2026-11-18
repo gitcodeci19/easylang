@@ -589,7 +589,92 @@ export function renderRecallWidget(
     flagRow.append(flagInput, flagSubmitBtn);
     flagPanel.append(flagPromptLabel, chipsWrap, flagRow);
 
-    cardEl.append(header, enEl, feedbackBox, repeatNote, conceptSlot, flagPanel);
+    // Instant AI Tutor Q&A panel on Recall card
+    const askAiPanel = createEl('div', 'etr-flag-panel etr-ask-panel');
+    askAiPanel.hidden = true;
+
+    const askAiLabel = createEl(
+      'span',
+      'etr-label',
+      isTr ? '✨ AI Öğretmene Sor (Neden böyle?):' : '✨ Ask AI Tutor:'
+    );
+    askAiLabel.style.marginBottom = '5px';
+
+    const askAiHistory: Array<{ role: 'user' | 'assistant'; text: string }> = [];
+    const askAiOutput = createEl('div', 'etr-ask-output');
+    askAiOutput.hidden = true;
+
+    const askAiInput = createEl('input', 'etr-input-sm');
+    askAiInput.type = 'text';
+    askAiInput.placeholder = isTr
+      ? 'Örn: Neden "run" kullanılıyor, koşmak değil mi?'
+      : 'e.g. Why is this word used here?';
+    isolateKeyboardEvents(askAiInput);
+
+    const askAiSendBtn = createEl(
+      'button',
+      'etr-btn etr-btn-primary',
+      isTr ? 'Sor' : 'Ask'
+    );
+    askAiSendBtn.type = 'button';
+
+    const submitAskAi = async (): Promise<void> => {
+      const q = askAiInput.value.trim();
+      if (!q) {
+        askAiInput.focus();
+        return;
+      }
+      askAiSendBtn.disabled = true;
+      askAiSendBtn.textContent = '...';
+      askAiOutput.hidden = false;
+      askAiOutput.textContent = isTr ? '✨ AI düşünüyor...' : '✨ Thinking...';
+      const prevHist = [...askAiHistory];
+      askAiHistory.push({ role: 'user', text: q });
+      const res = await sendBgMessage<{
+        ok: boolean;
+        answer?: string;
+        error?: string;
+      }>({
+        type: 'ASK_AI_TUTOR',
+        question: q,
+        history: prevHist,
+        context: {
+          sentenceEn: card.en,
+          meaningTr: card.acceptedTr.join(', '),
+          userAnswer: userAnswer || undefined,
+          expectedAnswer: card.acceptedTr[0],
+          existingExplanation: outcome.evaluation.aiNote,
+        },
+      });
+      askAiSendBtn.disabled = false;
+      askAiSendBtn.textContent = isTr ? 'Sor' : 'Ask';
+      if (res?.ok && res.answer) {
+        askAiHistory.push({ role: 'assistant', text: res.answer });
+        askAiInput.value = '';
+        askAiOutput.textContent = res.answer;
+      } else {
+        askAiHistory.pop();
+        askAiOutput.textContent =
+          res?.error ||
+          (isTr
+            ? 'AI şu an yanıt veremedi (Ayarlar → AI bölümünden ücretsiz anahtar eklenebilir).'
+            : 'AI unavailable right now (enable AI in Settings).');
+      }
+    };
+
+    askAiSendBtn.addEventListener('click', () => void submitAskAi());
+    askAiInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        void submitAskAi();
+      }
+    });
+
+    const askAiRow = createEl('div', 'etr-flag-row');
+    askAiRow.append(askAiInput, askAiSendBtn);
+    askAiPanel.append(askAiLabel, askAiOutput, askAiRow);
+
+    cardEl.append(header, enEl, feedbackBox, repeatNote, conceptSlot, flagPanel, askAiPanel);
 
     const footer = createEl('div', 'etr-outcome-footer');
     const nextBtn = createEl('button', 'etr-btn etr-btn-next', ui.nextQuestion);
@@ -626,6 +711,21 @@ export function renderRecallWidget(
       secondaryRow.appendChild(overrideBtn);
     }
 
+    const askAiToggleBtn = createEl(
+      'button',
+      'etr-btn etr-btn-ghost',
+      isTr ? '💬 AI’a Sor' : '💬 Ask AI'
+    );
+    askAiToggleBtn.type = 'button';
+    askAiToggleBtn.title = isTr
+      ? 'Bu cümle hakkında yapay zekâya soru sor'
+      : 'Ask the AI tutor about this card';
+    askAiToggleBtn.addEventListener('click', () => {
+      flagPanel.hidden = true;
+      askAiPanel.hidden = !askAiPanel.hidden;
+      if (!askAiPanel.hidden) askAiInput.focus();
+    });
+
     const flagToggleBtn = createEl(
       'button',
       'etr-btn etr-btn-ghost',
@@ -636,6 +736,7 @@ export function renderRecallWidget(
       ? 'Kelime veya gramer kuralını odak listesine ekle'
       : 'Pin word or grammar rule for review';
     flagToggleBtn.addEventListener('click', () => {
+      askAiPanel.hidden = true;
       flagPanel.hidden = !flagPanel.hidden;
       if (!flagPanel.hidden) flagInput.focus();
     });
@@ -648,7 +749,7 @@ export function renderRecallWidget(
     closeNowBtn.type = 'button';
     closeNowBtn.addEventListener('click', removeRecallWidget);
 
-    secondaryRow.append(flagToggleBtn, closeNowBtn);
+    secondaryRow.append(askAiToggleBtn, flagToggleBtn, closeNowBtn);
     footer.append(secondaryRow, nextBtn);
     cardEl.appendChild(footer);
   };

@@ -998,14 +998,66 @@ function getLevelsByDistance(targetLevel: CefrLevel): CefrLevel[][] {
   return buckets;
 }
 
+interface DeckIndex {
+  byUnit: Map<string, Card[]>;
+  byLevel: Map<CefrLevel, Card[]>;
+  wordByEnLower: Map<string, Card>;
+  sampleWords: Card[];
+}
+
+const deckIndexCache = new WeakMap<Card[], DeckIndex>();
+const unitPoolCache = new WeakMap<Card[], Map<string, Card[]>>();
+
+function getDeckIndex(allCards: Card[]): DeckIndex {
+  const cached = deckIndexCache.get(allCards);
+  if (cached) return cached;
+  const byUnit = new Map<string, Card[]>();
+  const byLevel = new Map<CefrLevel, Card[]>();
+  const wordByEnLower = new Map<string, Card>();
+  const sampleWords: Card[] = [];
+  for (const c of allCards) {
+    if (c.unitId) {
+      let arr = byUnit.get(c.unitId);
+      if (!arr) {
+        arr = [];
+        byUnit.set(c.unitId, arr);
+      }
+      arr.push(c);
+    }
+    let lvlArr = byLevel.get(c.level);
+    if (!lvlArr) {
+      lvlArr = [];
+      byLevel.set(c.level, lvlArr);
+    }
+    lvlArr.push(c);
+    if (c.type === 'word') {
+      wordByEnLower.set(c.en.trim().toLowerCase(), c);
+      if (sampleWords.length < 120) sampleWords.push(c);
+    }
+  }
+  const index: DeckIndex = { byUnit, byLevel, wordByEnLower, sampleWords };
+  deckIndexCache.set(allCards, index);
+  return index;
+}
+
 /**
- * Retrieve the thematic card pool for a given CurriculumUnit.
- * Priority 1: Explicit `card.unitId === unit.id`
+ * Retrieve the thematic card pool for a given CurriculumUnit (O(1) cached per deck array).
+ * Priority 1: Explicit `card.unitId === unit.id` (includes curated modern sentences)
  * Priority 2: Cards matching `unit.keywords` on `card.en` ordered by CEFR distance
  * Priority 3: Same-level fallback only when a unit lacks enough words or sentences
  */
 export function getCardsForUnit(unitId: string, allCards: Card[]): Card[] {
   const unit = getUnitById(unitId);
+  let perUnitMap = unitPoolCache.get(allCards);
+  if (perUnitMap) {
+    const cachedPool = perUnitMap.get(unit.id);
+    if (cachedPool) return cachedPool;
+  } else {
+    perUnitMap = new Map<string, Card[]>();
+    unitPoolCache.set(allCards, perUnitMap);
+  }
+
+  const index = getDeckIndex(allCards);
   const seen = new Set<string>();
   const result: Card[] = [];
   let wordCount = 0;
@@ -1020,33 +1072,39 @@ export function getCardsForUnit(unitId: string, allCards: Card[]): Card[] {
     }
   };
 
-  for (const c of allCards) {
-    if (c.unitId === unit.id) {
-      pushUnique(c);
-    }
+  for (const c of index.byUnit.get(unit.id) ?? []) {
+    pushUnique(c);
   }
 
   const levelBuckets = getLevelsByDistance(unit.level);
   for (let dist = 0; dist < levelBuckets.length; dist += 1) {
-    const allowedLevels = new Set(levelBuckets[dist]);
-    const wantMoreWords = dist <= 1 || wordCount < 24;
-    const wantMoreSentences = dist === 0 || (dist === 1 && sentenceCount < 80) || (dist > 1 && sentenceCount < 30) || result.length < 60;
+    const wantMoreWords = dist <= 1 || wordCount < 32;
+    const wantMoreSentences =
+      dist === 0 || (dist === 1 && sentenceCount < 85) || (dist > 1 && sentenceCount < 45) || result.length < 65;
 
     if (!wantMoreWords && !wantMoreSentences) continue;
 
-    for (const c of allCards) {
-      if (!allowedLevels.has(c.level) || !matchesUnitTopic(unit, c)) continue;
-      if (c.type === 'word') {
-        if (dist <= 1 || wordCount < 24) pushUnique(c);
-      } else if (dist === 0 || (dist === 1 && result.length < 130) || sentenceCount < 35 || result.length < 60) {
-        pushUnique(c);
+    for (const lvl of levelBuckets[dist]!) {
+      for (const c of index.byLevel.get(lvl) ?? []) {
+        // Cards with an explicit unitId stay exclusively in their designated unit (zero cross-unit modern sentence duplication)
+        if (c.unitId && c.unitId !== unit.id) continue;
+        if (!matchesUnitTopic(unit, c)) continue;
+        if (c.type === 'word') {
+          if (dist <= 1 || wordCount < 32) pushUnique(c);
+        } else if (
+          dist === 0 ||
+          (dist === 1 && result.length < 150) ||
+          sentenceCount < 45 ||
+          result.length < 65
+        ) {
+          pushUnique(c);
+        }
       }
     }
   }
 
   if (wordCount < 16 || sentenceCount < 15) {
-    for (const c of allCards) {
-      if (c.level !== unit.level) continue;
+    for (const c of index.byLevel.get(unit.level) ?? []) {
       if (c.type === 'word' && wordCount < 16) {
         pushUnique(c);
       } else if (c.type === 'sentence' && sentenceCount < 15) {
@@ -1056,6 +1114,7 @@ export function getCardsForUnit(unitId: string, allCards: Card[]): Card[] {
     }
   }
 
+  perUnitMap.set(unit.id, result);
   return result;
 }
 
@@ -1444,9 +1503,15 @@ export function buildUnitLessonExercises(
     rawPureSentences.filter((c) => c.unitId !== unit.id),
     unitSeed + 303
   );
-  // Interleave pure sentences with example-bearing words (offset by half the pool so they never collide with current step's words)
+  // Interleave curated modern sentences (explicit unitId) 1:1 with natural deck sentences so every step gets fresh modern lines
+  const interleavedPureSents: Card[] = [];
+  const maxS = Math.max(explicitSents.length, extraSents.length);
+  for (let i = 0; i < maxS; i += 1) {
+    if (i < explicitSents.length) interleavedPureSents.push(explicitSents[i]!);
+    if (i < extraSents.length) interleavedPureSents.push(extraSents[i]!);
+  }
   const shiftedExampleWords = deterministicShuffle(wordsWithExamples, unitSeed + 404);
-  const orderedSentences: Card[] = [...explicitSents, ...extraSents, ...shiftedExampleWords];
+  const orderedSentences: Card[] = [...interleavedPureSents, ...shiftedExampleWords];
 
   const distractorPoolTrWords = (rawWords.length >= 4 ? rawWords : allCards.filter((c) => c.type === 'word'))
     .map((c) => c.acceptedTr[0] ?? '')
@@ -1477,18 +1542,108 @@ export function buildUnitLessonExercises(
     .map((t) => cleanToken(t))
     .filter((t) => t.length >= 2);
 
+  const foldTrKey = (text: string): string =>
+    text
+      .toLocaleLowerCase('tr-TR')
+      .replace(/ç/g, 'c')
+      .replace(/ğ/g, 'g')
+      .replace(/ı/g, 'i')
+      .replace(/ö/g, 'o')
+      .replace(/ş/g, 's')
+      .replace(/ü/g, 'u')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const EN_SYNONYM_GROUPS: readonly string[][] = [
+    ['often', 'frequently'],
+    ['hire', 'recruit', 'employ'],
+    ['evaluate', 'assess', 'estimate'],
+    ['danger', 'hazard', 'risk', 'peril'],
+    ['ashamed', 'embarrassed'],
+    ['agreement', 'deal', 'contract', 'treaty'],
+    ['class', 'grade', 'course', 'lesson'],
+    ['integrity', 'justice', 'honesty'],
+    ['broadcast', 'issue', 'publish', 'release'],
+    ['welcome', 'meet', 'greet'],
+    ['follow', 'follow up', 'track'],
+    ['big', 'large', 'huge', 'enormous'],
+    ['small', 'little', 'tiny'],
+    ['fast', 'quick', 'rapid', 'swift'],
+    ['start', 'begin', 'launch'],
+    ['end', 'finish', 'complete'],
+    ['buy', 'purchase'],
+    ['help', 'assist', 'support'],
+    ['choose', 'select', 'pick'],
+    ['reply', 'answer', 'respond'],
+    ['error', 'mistake', 'fault'],
+    ['trip', 'journey', 'tour', 'travel'],
+    ['gift', 'present'],
+    ['job', 'work', 'occupation', 'career'],
+    ['angry', 'mad', 'furious'],
+    ['sad', 'unhappy', 'upset'],
+    ['happy', 'glad', 'cheerful'],
+    ['afraid', 'scared', 'frightened'],
+    ['tired', 'exhausted', 'weary'],
+    ['smart', 'clever', 'intelligent'],
+    ['hard', 'difficult', 'tough'],
+    ['easy', 'simple'],
+    ['rich', 'wealthy'],
+    ['true', 'correct', 'right'],
+    ['false', 'wrong', 'incorrect'],
+    ['quiet', 'silent'],
+    ['strong', 'powerful'],
+    ['leave', 'depart'],
+    ['look', 'watch', 'see'],
+    ['speak', 'talk'],
+    ['tell', 'inform'],
+    ['need', 'require'],
+    ['want', 'desire'],
+    ['house', 'home'],
+    ['child', 'kid'],
+    ['film', 'movie'],
+    ['shop', 'store'],
+    ['road', 'street'],
+    ['usually', 'normally', 'generally'],
+    ['sometimes', 'occasionally'],
+    ['rarely', 'seldom'],
+  ];
+
+  const areEnglishSynonyms = (enA: string, enB: string): boolean => {
+    const la = enA.trim().toLowerCase();
+    const lb = enB.trim().toLowerCase();
+    if (!la || !lb) return false;
+    if (la === lb) return true;
+    for (const grp of EN_SYNONYM_GROUPS) {
+      if (grp.includes(la) && grp.includes(lb)) return true;
+    }
+    return false;
+  };
+
+  const deckIdx = getDeckIndex(allCards);
+  const wordCardByEnLower = deckIdx.wordByEnLower;
+  const sampleFallbackWords = deckIdx.sampleWords;
+
   const pickDistractors = (correct: string, pool: string[], count: number, s: number): string[] => {
-    const normCorrect = correct.trim().toLowerCase();
-    const candidates = deterministicShuffle(
-      [...new Set(pool.filter((x) => x.trim().toLowerCase() !== normCorrect))],
-      s
-    );
-    return candidates.slice(0, count);
+    const normCorrect = foldTrKey(correct);
+    const seen = new Set<string>([normCorrect]);
+    const uniqueClean: string[] = [];
+    for (const raw of pool) {
+      const k = foldTrKey(raw);
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      uniqueClean.push(raw);
+    }
+    return deterministicShuffle(uniqueClean, s).slice(0, count);
   };
 
   const cardsShareMeaning = (a: Card, b: Card): boolean => {
-    const aSet = new Set(a.acceptedTr.map((t) => t.trim().toLowerCase()));
-    return b.acceptedTr.some((t) => aSet.has(t.trim().toLowerCase()));
+    if (areEnglishSynonyms(a.en, b.en)) return true;
+    const aSet = new Set(a.acceptedTr.map(foldTrKey).filter(Boolean));
+    return b.acceptedTr.some((t) => {
+      const k = foldTrKey(t);
+      return Boolean(k) && aSet.has(k);
+    });
   };
 
   const makeSelectMeaning = (card: Card, idx: number, isReview = false): LessonExercise => {
@@ -1508,7 +1663,12 @@ export function buildUnitLessonExercises(
               .filter((c) => c.id !== card.id && !cardsShareMeaning(card, c))
               .map((c) => c.acceptedTr[0] ?? '')
               .filter((t) => t.length > 0);
-      if (trPool.length < 3) trPool = distractorPoolTrWords;
+      if (trPool.length < 3) {
+        trPool = sampleFallbackWords
+          .filter((c) => c.id !== card.id && !cardsShareMeaning(card, c))
+          .map((c) => c.acceptedTr[0] ?? '')
+          .filter((t) => t.length > 0);
+      }
     }
     const distractors = pickDistractors(correct, trPool, 3, seed + idx * 13);
     const choices = deterministicShuffle([correct, ...distractors], seed + idx * 17);
@@ -1546,9 +1706,9 @@ export function buildUnitLessonExercises(
           ? samePosEn
           : unitWordEn.length >= 4
             ? unitWordEn
-            : distractorPoolEnWords.length >= 4
-              ? distractorPoolEnWords
-              : allCards.filter((c) => c.type === 'word').slice(0, 40).map((c) => c.en);
+            : sampleFallbackWords
+                .filter((c) => c.id !== card.id && !cardsShareMeaning(card, c))
+                .map((c) => c.en);
     }
     const distractors = pickDistractors(correct, pool, 3, seed + idx * 19);
     const choices = deterministicShuffle([correct, ...distractors], seed + idx * 23);
@@ -1569,6 +1729,74 @@ export function buildUnitLessonExercises(
     };
   };
 
+  const IRREGULAR_CLOZE_FORMS: Record<string, string[]> = {
+    break: ['broke', 'broken', 'breaking'],
+    bring: ['brought', 'bringing'],
+    buy: ['bought', 'buying'],
+    catch: ['caught', 'catching'],
+    come: ['came', 'coming'],
+    cut: ['cutting'],
+    draw: ['drew', 'drawn', 'drawing'],
+    drink: ['drank', 'drunk', 'drinking'],
+    eat: ['ate', 'eaten', 'eating'],
+    fall: ['fell', 'fallen', 'falling'],
+    feel: ['felt', 'feeling'],
+    find: ['found', 'finding'],
+    forget: ['forgot', 'forgotten', 'forgetting'],
+    get: ['got', 'gotten', 'getting'],
+    give: ['gave', 'given', 'giving'],
+    go: ['went', 'gone', 'going'],
+    grow: ['grew', 'grown', 'growing'],
+    hang: ['hung', 'hanging'],
+    hold: ['held', 'holding'],
+    keep: ['kept', 'keeping'],
+    leave: ['left', 'leaving'],
+    lose: ['lost', 'losing'],
+    make: ['made', 'making'],
+    meet: ['met', 'meeting'],
+    pay: ['paid', 'paying'],
+    put: ['putting'],
+    ride: ['rode', 'ridden', 'riding'],
+    run: ['ran', 'running'],
+    say: ['said', 'saying'],
+    see: ['saw', 'seen', 'seeing'],
+    sell: ['sold', 'selling'],
+    send: ['sent', 'sending'],
+    set: ['setting'],
+    sleep: ['slept', 'sleeping'],
+    speak: ['spoke', 'spoken', 'speaking'],
+    spend: ['spent', 'spending'],
+    stand: ['stood', 'standing'],
+    swim: ['swam', 'swum', 'swimming'],
+    take: ['took', 'taken', 'taking'],
+    teach: ['taught', 'teaching'],
+    tell: ['told', 'telling'],
+    think: ['thought', 'thinking'],
+    throw: ['threw', 'thrown', 'throwing'],
+    understand: ['understood', 'understanding'],
+    wake: ['woke', 'woken', 'waking'],
+    wear: ['wore', 'worn', 'wearing'],
+    win: ['won', 'winning'],
+    write: ['wrote', 'written', 'writing'],
+  };
+
+  const buildClozeTargetRegex = (phrase: string): RegExp | null => {
+    const trimmed = phrase.trim();
+    if (!trimmed) return null;
+    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const parts = trimmed.split(/\s+/);
+    const firstLower = parts[0]!.toLowerCase();
+    const irreg = IRREGULAR_CLOZE_FORMS[firstLower];
+    const headForms = irreg
+      ? `(?:${[esc(parts[0]!), ...irreg.map(esc)].join('|')}|${esc(parts[0]!)}[a-z]*)`
+      : `${esc(parts[0]!)}[a-z]*`;
+    const body =
+      parts.length > 1
+        ? `${headForms}\\s+${parts.slice(1).map((p) => `${esc(p)}[a-z]*`).join('\\s+')}`
+        : headForms;
+    return new RegExp(`(?<![A-Za-z0-9-])${body}(?![A-Za-z0-9-])`, 'i');
+  };
+
   const makeClozeBlank = (card: Card, idx: number): LessonExercise => {
     const sentenceEn = card.exampleEn && card.exampleEn.length >= 10 ? card.exampleEn : card.en;
     const sentenceTr =
@@ -1580,8 +1808,7 @@ export function buildUnitLessonExercises(
     let targetWord = card.type === 'word' ? card.en : '';
     let maskedSentence = sentenceEn;
 
-    const escaped = targetWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = targetWord ? new RegExp(`\\b${escaped}[a-z]*\\b`, 'i') : null;
+    const regex = targetWord ? buildClozeTargetRegex(targetWord) : null;
     const match = regex ? sentenceEn.match(regex) : null;
 
     if (match && match[0]) {
@@ -1601,11 +1828,32 @@ export function buildUnitLessonExercises(
         .join(' ');
     }
 
+    const targetLookupCard =
+      wordCardByEnLower.get(targetWord.toLowerCase()) ??
+      (card.type === 'word' ? card : undefined);
+
+    const isSafeClozeDistractor = (candEn: string): boolean => {
+      const lowCand = candEn.trim().toLowerCase();
+      const lowTarget = targetWord.trim().toLowerCase();
+      if (!lowCand || lowCand === lowTarget) return false;
+      if (areEnglishSynonyms(lowCand, lowTarget)) return false;
+      if (lowCand.startsWith(`${lowTarget} `) || lowTarget.startsWith(`${lowCand} `)) return false;
+      if (targetLookupCard) {
+        const candCard = wordCardByEnLower.get(lowCand);
+        if (candCard && cardsShareMeaning(targetLookupCard, candCard)) return false;
+      }
+      return true;
+    };
+
+    const safeUnitPool = distractorPoolEnWords.filter(isSafeClozeDistractor);
+    const safeFallbackPool = sampleFallbackWords
+      .filter((c) => isSafeClozeDistractor(c.en))
+      .map((c) => c.en);
+    const clozePool = safeUnitPool.length >= 4 ? safeUnitPool : safeFallbackPool;
+
     const distractors = pickDistractors(
       targetWord,
-      distractorPoolEnWords.length >= 4
-        ? distractorPoolEnWords
-        : ['always', 'careful', 'wildlife', 'stadium'],
+      clozePool.length >= 3 ? clozePool : ['always', 'careful', 'wildlife', 'stadium'],
       3,
       seed + idx * 29
     );
@@ -1617,7 +1865,7 @@ export function buildUnitLessonExercises(
       card,
       isNewWord: false,
       promptText: maskedSentence,
-      promptSubtext: '',
+      promptSubtext: sentenceTr,
       postAnswerSubtext: sentenceTr,
       audioText: sentenceEn,
       choices,
@@ -1779,13 +2027,23 @@ export function buildUnitLessonExercises(
     };
   };
 
-  // Compute unique lesson slot (0..14 across 5 nodes x 3 steps) so every step has a fresh cohort!
+  // Compute unique lesson slot (0..14 across 5 nodes x 3 steps) with node-accurate cumulative strides
+  // so consecutive steps (including Node 2's 4-sentence dictation) never collide on sentence boundaries.
   const numericNode = typeof nodeIndex === 'number' ? nodeIndex : 4;
   const safeStep = Math.max(0, Math.min(2, stepIndex));
   const lessonSlot = nodeIndex === 'jump_test' ? 14 : numericNode * STEPS_PER_NODE + safeStep;
 
-  const wordBaseOffset = lessonSlot * 4;
-  const sentBaseOffset = lessonSlot * 3;
+  const WORDS_PER_STEP_BY_NODE = [4, 4, 3, 3, 3] as const;
+  const SENT_PER_STEP_BY_NODE = [2, 3, 4, 3, 3] as const;
+  let wordBaseOffset = 0;
+  let sentBaseOffset = 0;
+  for (let n = 0; n < numericNode; n += 1) {
+    wordBaseOffset += (WORDS_PER_STEP_BY_NODE[n] ?? 3) * STEPS_PER_NODE;
+    sentBaseOffset += (SENT_PER_STEP_BY_NODE[n] ?? 3) * STEPS_PER_NODE;
+  }
+  wordBaseOffset += safeStep * (WORDS_PER_STEP_BY_NODE[numericNode] ?? 3);
+  sentBaseOffset += safeStep * (SENT_PER_STEP_BY_NODE[numericNode] ?? 3);
+
   const usedIdsInStep = new Set<string>();
 
   const pickFreshWord = (offset: number): Card => {
@@ -1812,24 +2070,48 @@ export function buildUnitLessonExercises(
     return pool[(sentBaseOffset + offset) % pool.length]!;
   };
 
-  // Pick a Spiral Review card from an earlier step in this unit (or a weak card with errors)
+  /**
+   * Only treat a card as actively weak if it is still due for retry OR has not yet
+   * recovered with consecutive correct answers (prevents a single lifetime mistake from
+   * locking a mastered word into every subsequent lesson of the unit).
+   */
+  const isActivelyWeakCard = (p: UserCardProgress | undefined): boolean => {
+    if (!p) return false;
+    if (p.retryAt !== null) return true;
+    if (p.totalWrong <= 0) return false;
+    return p.streak < 2 || (p.totalWrong >= 2 && p.streak < 3 && p.totalWrong > p.totalCorrect);
+  };
+
+  // Pick a Spiral Review card from genuinely weak unit cards (rotating across steps) or earlier cohorts
   const pickSpiralReviewWord = (reviewOffset: number): Card => {
-    const missedCards = unitCards.filter((c) => (progressMap[c.id]?.totalWrong ?? 0) > 0 && !usedIdsInStep.has(c.id));
-    if (missedCards.length > 0) {
-      const chosen = missedCards[reviewOffset % missedCards.length]!;
+    const weakCards = unitCards
+      .filter((c) => isActivelyWeakCard(progressMap[c.id]) && !usedIdsInStep.has(c.id))
+      .sort((a, b) => {
+        const pa = progressMap[a.id]!;
+        const pb = progressMap[b.id]!;
+        const retryDiff = Number(pb.retryAt !== null) - Number(pa.retryAt !== null);
+        if (retryDiff !== 0) return retryDiff;
+        if (pa.streak !== pb.streak) return pa.streak - pb.streak;
+        return pb.lastReviewedAt - pa.lastReviewedAt;
+      });
+    if (weakCards.length > 0) {
+      const chosen = weakCards[(lessonSlot + reviewOffset) % weakCards.length]!;
       usedIdsInStep.add(chosen.id);
       return chosen;
     }
     if (lessonSlot > 0 && orderedWords.length > 0) {
-      const prevSlot = Math.max(0, lessonSlot - 1 - (reviewOffset % Math.max(1, lessonSlot)));
-      const prevIdx = (prevSlot * 4 + reviewOffset) % orderedWords.length;
-      const candidate = orderedWords[prevIdx]!;
-      if (!usedIdsInStep.has(candidate.id)) {
-        usedIdsInStep.add(candidate.id);
-        return candidate;
+      const lookbackSteps = Math.min(lessonSlot, 4);
+      for (let back = 1; back <= lookbackSteps; back += 1) {
+        const prevSlot = lessonSlot - back;
+        const prevIdx = (prevSlot * 3 + ((reviewOffset + back) % 3)) % orderedWords.length;
+        const candidate = orderedWords[prevIdx]!;
+        if (!usedIdsInStep.has(candidate.id)) {
+          usedIdsInStep.add(candidate.id);
+          return candidate;
+        }
       }
     }
-    return pickFreshWord(reviewOffset + 3);
+    return pickFreshWord(reviewOffset + 4);
   };
 
   const nw0 = pickFreshWord(0);
@@ -1838,38 +2120,40 @@ export function buildUnitLessonExercises(
   const ns0 = pickFreshSentence(0);
   const ns1 = pickFreshSentence(1);
   const ns2 = pickFreshSentence(2);
-  const rev0 = lessonSlot > 0 ? pickSpiralReviewWord(0) : pickFreshWord(3);
+  const rev0 = lessonSlot > 0 ? pickSpiralReviewWord(0) : pickFreshWord(4);
 
   if (nodeIndex === 0) {
-    // Node 0: Word Discovery (3 steps: each step introduces 3 new words + 2 sentences + 1 spiral review + 1 scaffolded revisit)
+    // Node 0: Word Discovery (1 intentional scaffold revisit nw0->cloze; distinct card for free_translation)
+    const nw3 = pickFreshWord(3);
     return [
       makeSelectMeaning(nw0, 0),
       makeSelectMeaning(nw1, 1),
       makeSelectEn(nw2, 2),
       makeWordBank(ns0, 3, safeStep % 2 === 1),
-      makeClozeBlank(nw0, 4), // Scaffolded revisit of nw0 in sentence context!
+      makeClozeBlank(nw0, 4), // Scaffolded revisit of nw0 in sentence context
       makeSelectEn(rev0, 5, lessonSlot > 0),
       makeWordBank(ns1, 6, safeStep % 2 === 0),
-      makeFreeTranslation(nw1, 7),
+      makeFreeTranslation(nw3, 7),
     ];
   }
 
   if (nodeIndex === 1) {
-    // Node 1: Context & Sentence Builder (Both EN->TR and TR->EN Word Banks + Cloze + Spiral Review)
+    // Node 1: Context & Sentence Builder (all distinct sentences — no double-translating ns0 in the same step)
+    const nw3 = pickFreshWord(3);
     return [
       makeSelectMeaning(nw0, 0),
       makeClozeBlank(nw1, 1),
       makeWordBank(ns0, 2, true), // EN -> TR Word Bank
-      makeClozeBlank(rev0, 3), // Spiral review from Node 0!
+      makeClozeBlank(rev0, 3), // Spiral review
       makeWordBank(ns1, 4, false), // TR -> EN Word Bank
       makeSelectEn(nw2, 5),
       makeWordBank(ns2, 6, safeStep % 2 === 1),
-      makeFreeTranslation(ns0, 7),
+      makeFreeTranslation(nw3, 7),
     ];
   }
 
   if (nodeIndex === 2) {
-    // Node 2: Duo Radio & Audio Dictation (Varied listening + context + spiral review)
+    // Node 2: Duo Radio & Audio Dictation (4 non-overlapping sentences via node-accurate sentBaseOffset)
     const ns3 = pickFreshSentence(3);
     return [
       makeAudioDictation(nw0, 0),
@@ -1877,14 +2161,14 @@ export function buildUnitLessonExercises(
       makeAudioDictation(ns0, 2),
       makeWordBank(ns1, 3, true),
       makeAudioDictation(ns2, 4),
-      makeClozeBlank(rev0, 5), // Spiral review from earlier steps
+      makeClozeBlank(rev0, 5),
       makeAudioDictation(ns3, 6),
       makeFreeTranslation(nw2, 7),
     ];
   }
 
   if (nodeIndex === 3) {
-    // Node 3: Weak-Point & Spiral Drill
+    // Node 3: Weak-Point & Spiral Drill (all 8 exercises use distinct cards)
     const rev1 = pickSpiralReviewWord(1);
     return [
       makeSelectEn(nw0, 0),
@@ -1894,7 +2178,7 @@ export function buildUnitLessonExercises(
       makeWordBank(ns2, 4, true),
       makeClozeBlank(rev1, 5),
       makeFreeTranslation(nw1, 6, true),
-      makeFreeTranslation(ns0, 7),
+      makeFreeTranslation(nw2, 7),
     ];
   }
 

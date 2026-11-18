@@ -1,5 +1,5 @@
 import { createInitialSkillProfile } from './analytics.ts';
-import { createInitialConceptState } from './concepts.ts';
+import { consolidateConceptState, createInitialConceptState } from './concepts.ts';
 import {
   createInitialRoadmapState,
   normalizeRoadmapState,
@@ -11,6 +11,7 @@ import {
   parseFullBackupJson,
 } from './onboarding.ts';
 import { normalizePageSentenceKey } from './pageSentenceExtractor.ts';
+import { isAiConceptCard } from './srs.ts';
 import { parseImportedCards } from './textImport.ts';
 import type {
   ActivePrompt,
@@ -22,6 +23,9 @@ import type {
   DailyStats,
   ExtensionSettings,
   FullBackupPayload,
+  RemedialActiveSession,
+  RemedialAiOverlayCache,
+  RemedialMasteryRecord,
   ReviewEvent,
   RoadmapActiveSession,
   RoadmapCoachInsight,
@@ -29,6 +33,7 @@ import type {
   UserCardProgress,
   UserOnboardingState,
   UserSkillProfile,
+  WeakSkillId,
 } from './types';
 
 export const DEFAULT_SYSTEM_PROMPT = [
@@ -91,13 +96,23 @@ const STORAGE_KEYS = {
   AI_FAILOVER_UNTIL: 'aiFailoverUntil',
   AI_FAILOVER_COOLDOWNS: 'aiFailoverCooldowns',
   PAGE_QUIZ_ASKED_SENTENCES: 'pageQuizAskedSentences',
+  LISTENING_ASKED_IDS: 'listeningAskedIds',
   ROADMAP_STATE: 'roadmapState',
   ROADMAP_ACTIVE_SESSION: 'roadmapActiveSession',
+  REMEDIAL_ACTIVE_SESSION: 'remedialActiveSession',
+  ROADMAP_UI_MODE: 'roadmapUiMode',
+  ROADMAP_OPEN_GUIDEBOOK: 'roadmapOpenGuidebook',
+  REMEDIAL_AI_OVERLAY: 'remedialAiOverlay',
   ROADMAP_HISTORY: 'roadmapHistory',
   ROADMAP_COACH_INSIGHT: 'roadmapCoachInsight',
+  REMEDIAL_PROGRESS: 'remedialProgress',
   ONBOARDING_STATE: 'onboardingState',
+  STORAGE_HYGIENE_VERSION: 'storageHygieneVersion',
 } as const;
 
+const CURRENT_STORAGE_HYGIENE_VERSION = 1;
+const MAX_AI_CONCEPT_USER_CARDS = 20;
+const MAX_LISTENING_ASKED_IDS = 120;
 const MAX_REVIEW_HISTORY = 1000;
 const MAX_ROADMAP_HISTORY = 200;
 const MAX_ASKED_PAGE_SENTENCES = 1000;
@@ -109,6 +124,24 @@ const SESSION_KEYS = {
 } as const;
 
 let builtinCardsCache: Card[] | null = null;
+let allCardsCache: Card[] | null = null;
+
+export function invalidateAllCardsCache(): void {
+  allCardsCache = null;
+}
+
+if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (
+      areaName === 'local' &&
+      (STORAGE_KEYS.USER_CARDS in changes ||
+        STORAGE_KEYS.CARD_OVERRIDES in changes ||
+        STORAGE_KEYS.DELETED_CARD_IDS in changes)
+    ) {
+      allCardsCache = null;
+    }
+  });
+}
 
 /** Return YYYY-MM-DD in the user's local timezone. */
 export function getLocalDateKey(date: Date = new Date()): string {
@@ -217,6 +250,7 @@ export async function getUserCards(): Promise<Card[]> {
 
 export async function saveUserCards(cards: Card[]): Promise<void> {
   await chrome.storage.local.set({ [STORAGE_KEYS.USER_CARDS]: cards });
+  invalidateAllCardsCache();
 }
 
 export async function getCardOverrides(): Promise<Record<string, Card>> {
@@ -228,6 +262,7 @@ export async function saveCardOverride(card: Card): Promise<void> {
   const overrides = await getCardOverrides();
   overrides[card.id] = card;
   await chrome.storage.local.set({ [STORAGE_KEYS.CARD_OVERRIDES]: overrides });
+  invalidateAllCardsCache();
 }
 
 export async function getDeletedCardIds(): Promise<string[]> {
@@ -244,10 +279,12 @@ export async function markCardDeleted(cardId: string): Promise<void> {
   const deleted = new Set(await getDeletedCardIds());
   deleted.add(cardId);
   await chrome.storage.local.set({ [STORAGE_KEYS.DELETED_CARD_IDS]: Array.from(deleted) });
+  invalidateAllCardsCache();
 }
 
-/** Merge built-in cards, overrides, deletions, and user-created cards. */
+/** Merge built-in cards, overrides, deletions, and user-created cards (memoized for WeakMap index speed). */
 export async function getAllCards(): Promise<Card[]> {
+  if (allCardsCache) return allCardsCache;
   const [builtin, userCards, overrides, deletedIds] = await Promise.all([
     loadBuiltinCards(),
     getUserCards(),
@@ -269,6 +306,7 @@ export async function getAllCards(): Promise<Card[]> {
     }
   }
 
+  allCardsCache = merged;
   return merged;
 }
 
@@ -303,9 +341,14 @@ export async function resetAllProgress(): Promise<void> {
     [STORAGE_KEYS.DAILY_STATS]: createEmptyDailyStats(),
     [STORAGE_KEYS.ROADMAP_STATE]: createInitialRoadmapState(),
     [STORAGE_KEYS.ROADMAP_HISTORY]: [],
+    [STORAGE_KEYS.REMEDIAL_PROGRESS]: {},
   });
   await chrome.storage.local.remove([
     STORAGE_KEYS.ROADMAP_ACTIVE_SESSION,
+    STORAGE_KEYS.REMEDIAL_ACTIVE_SESSION,
+    STORAGE_KEYS.ROADMAP_UI_MODE,
+    STORAGE_KEYS.ROADMAP_OPEN_GUIDEBOOK,
+    STORAGE_KEYS.REMEDIAL_AI_OVERLAY,
     STORAGE_KEYS.ROADMAP_COACH_INSIGHT,
   ]);
 }
@@ -336,6 +379,59 @@ export async function clearActiveRoadmapSession(): Promise<void> {
   await chrome.storage.local.remove(STORAGE_KEYS.ROADMAP_ACTIVE_SESSION);
 }
 
+export async function getActiveRemedialSession(): Promise<RemedialActiveSession | null> {
+  const res = await chrome.storage.local.get(STORAGE_KEYS.REMEDIAL_ACTIVE_SESSION);
+  return (res[STORAGE_KEYS.REMEDIAL_ACTIVE_SESSION] as RemedialActiveSession | undefined) ?? null;
+}
+
+export async function saveActiveRemedialSession(session: RemedialActiveSession): Promise<void> {
+  await chrome.storage.local.set({ [STORAGE_KEYS.REMEDIAL_ACTIVE_SESSION]: session });
+}
+
+export async function clearActiveRemedialSession(): Promise<void> {
+  await chrome.storage.local.remove(STORAGE_KEYS.REMEDIAL_ACTIVE_SESSION);
+}
+
+export async function getRoadmapUiMode(): Promise<'path' | 'remedial'> {
+  const res = await chrome.storage.local.get(STORAGE_KEYS.ROADMAP_UI_MODE);
+  return res[STORAGE_KEYS.ROADMAP_UI_MODE] === 'remedial' ? 'remedial' : 'path';
+}
+
+export async function saveRoadmapUiMode(mode: 'path' | 'remedial'): Promise<void> {
+  await chrome.storage.local.set({ [STORAGE_KEYS.ROADMAP_UI_MODE]: mode });
+}
+
+export async function getOpenGuidebookUnitId(): Promise<string | null> {
+  const res = await chrome.storage.local.get(STORAGE_KEYS.ROADMAP_OPEN_GUIDEBOOK);
+  const raw = res[STORAGE_KEYS.ROADMAP_OPEN_GUIDEBOOK];
+  return typeof raw === 'string' && raw.length > 0 ? raw : null;
+}
+
+export async function saveOpenGuidebookUnitId(unitId: string | null): Promise<void> {
+  if (!unitId) {
+    await chrome.storage.local.remove(STORAGE_KEYS.ROADMAP_OPEN_GUIDEBOOK);
+    return;
+  }
+  await chrome.storage.local.set({ [STORAGE_KEYS.ROADMAP_OPEN_GUIDEBOOK]: unitId });
+}
+
+export async function getRemedialAiOverlay(): Promise<RemedialAiOverlayCache | null> {
+  const res = await chrome.storage.local.get(STORAGE_KEYS.REMEDIAL_AI_OVERLAY);
+  const raw = res[STORAGE_KEYS.REMEDIAL_AI_OVERLAY] as RemedialAiOverlayCache | undefined;
+  if (!raw || !Array.isArray(raw.items) || typeof raw.updatedAt !== 'number') return null;
+  if (Date.now() - raw.updatedAt > 24 * 3_600_000) return null;
+  return raw;
+}
+
+export async function saveRemedialAiOverlay(items: RemedialAiOverlayCache['items']): Promise<void> {
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.REMEDIAL_AI_OVERLAY]: {
+      items,
+      updatedAt: Date.now(),
+    } satisfies RemedialAiOverlayCache,
+  });
+}
+
 export async function getRoadmapHistory(): Promise<RoadmapLessonRecord[]> {
   const res = await chrome.storage.local.get(STORAGE_KEYS.ROADMAP_HISTORY);
   const raw = res[STORAGE_KEYS.ROADMAP_HISTORY];
@@ -362,6 +458,31 @@ export async function getRoadmapCoachInsight(): Promise<RoadmapCoachInsight | nu
 
 export async function saveRoadmapCoachInsight(insight: RoadmapCoachInsight): Promise<void> {
   await chrome.storage.local.set({ [STORAGE_KEYS.ROADMAP_COACH_INSIGHT]: insight });
+}
+
+export async function getRemedialProgress(): Promise<Record<string, RemedialMasteryRecord>> {
+  const res = await chrome.storage.local.get(STORAGE_KEYS.REMEDIAL_PROGRESS);
+  const raw = res[STORAGE_KEYS.REMEDIAL_PROGRESS];
+  return raw && typeof raw === 'object' ? (raw as Record<string, RemedialMasteryRecord>) : {};
+}
+
+export async function recordRemedialCompletion(
+  skillId: WeakSkillId,
+  accuracyPct: number,
+  now: number = Date.now()
+): Promise<Record<string, RemedialMasteryRecord>> {
+  const current = await getRemedialProgress();
+  const prev = current[skillId];
+  const clampedAcc = Math.max(0, Math.min(100, Math.round(accuracyPct)));
+  current[skillId] = {
+    skillId,
+    completions: (prev?.completions ?? 0) + 1,
+    lastAccuracyPct: clampedAcc,
+    lastCompletedAt: now,
+    bestAccuracyPct: Math.max(prev?.bestAccuracyPct ?? 0, clampedAcc),
+  };
+  await chrome.storage.local.set({ [STORAGE_KEYS.REMEDIAL_PROGRESS]: current });
+  return current;
 }
 
 export async function getConceptState(): Promise<ConceptTrackerState> {
@@ -569,6 +690,134 @@ export async function saveOnboardingState(
   return next;
 }
 
+export async function getListeningAskedIds(): Promise<string[]> {
+  const res = await chrome.storage.local.get(STORAGE_KEYS.LISTENING_ASKED_IDS);
+  const raw = res[STORAGE_KEYS.LISTENING_ASKED_IDS];
+  return Array.isArray(raw) ? (raw as string[]) : [];
+}
+
+export async function appendListeningAskedId(cardId: string): Promise<void> {
+  if (!cardId) return;
+  const current = await getListeningAskedIds();
+  const deduped = current.filter((id) => id !== cardId);
+  deduped.push(cardId);
+  const trimmed =
+    deduped.length > MAX_LISTENING_ASKED_IDS
+      ? deduped.slice(deduped.length - MAX_LISTENING_ASKED_IDS)
+      : deduped;
+  await chrome.storage.local.set({ [STORAGE_KEYS.LISTENING_ASKED_IDS]: trimmed });
+}
+
+export interface StorageHygieneReport {
+  ran: boolean;
+  removedOrphanProgress: number;
+  removedAiConceptCards: number;
+  consolidatedConcepts: number;
+  removedLegacyKeys: string[];
+}
+
+/**
+ * Safely clean up legacy dead storage keys (`cardVisuals`), orphan `progressMap` entries
+ * from deleted/renamed dataset IDs, duplicate/overflow auto-generated AI concept cards
+ * (strictly preserving all manual user cards), and overlapping overdue concept notes.
+ */
+export async function runStorageHygiene(force: boolean = false): Promise<StorageHygieneReport> {
+  const verRes = await chrome.storage.local.get(STORAGE_KEYS.STORAGE_HYGIENE_VERSION);
+  const currentVer = Number(verRes[STORAGE_KEYS.STORAGE_HYGIENE_VERSION] ?? 0);
+  if (!force && currentVer >= CURRENT_STORAGE_HYGIENE_VERSION) {
+    return {
+      ran: false,
+      removedOrphanProgress: 0,
+      removedAiConceptCards: 0,
+      consolidatedConcepts: 0,
+      removedLegacyKeys: [],
+    };
+  }
+
+  const [builtin, userCards, progressMap, conceptState, rawLegacy] = await Promise.all([
+    loadBuiltinCards(),
+    getUserCards(),
+    getProgressMap(),
+    getConceptState(),
+    chrome.storage.local.get('cardVisuals'),
+  ]);
+
+  // 1. Deduplicate and cap auto-generated AI concept cards without touching any manual user card
+  const manualCards: Card[] = [];
+  const aiConceptCards: Card[] = [];
+  const seenAiEn = new Set<string>();
+  for (const card of userCards) {
+    if (!isAiConceptCard(card)) {
+      manualCards.push(card.origin ? card : { ...card, origin: 'manual' });
+      continue;
+    }
+    const key = card.en.trim().toLowerCase();
+    if (!key || seenAiEn.has(key)) continue;
+    seenAiEn.add(key);
+    aiConceptCards.push({ ...card, origin: 'ai_concept' });
+  }
+
+  // Keep only the most recent AI concept cards (preferring those with active retry or recent activity)
+  aiConceptCards.sort((a, b) => {
+    const pa = progressMap[a.id];
+    const pb = progressMap[b.id];
+    const retryDiff = Number(Boolean(pb?.retryAt)) - Number(Boolean(pa?.retryAt));
+    if (retryDiff !== 0) return retryDiff;
+    return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+  });
+  const keptAiCards = aiConceptCards.slice(0, MAX_AI_CONCEPT_USER_CARDS);
+  const nextUserCards = [...manualCards, ...keptAiCards];
+  const removedAiConceptCards = Math.max(0, userCards.length - nextUserCards.length);
+
+  // 2. Remove orphan progressMap entries whose cardId no longer exists in builtin or userCards
+  const validIds = new Set<string>([
+    ...builtin.map((c) => c.id),
+    ...nextUserCards.map((c) => c.id),
+  ]);
+  const cleanedProgress: Record<string, UserCardProgress> = {};
+  let removedOrphanProgress = 0;
+  for (const [cid, entry] of Object.entries(progressMap)) {
+    if (validIds.has(cid)) {
+      cleanedProgress[cid] = entry;
+    } else {
+      removedOrphanProgress += 1;
+    }
+  }
+
+  // 3. Consolidate overlapping/flooded active concept notes
+  const nextConceptState = consolidateConceptState(conceptState);
+  const consolidatedConcepts = Math.max(0, conceptState.notes.length - nextConceptState.notes.length);
+
+  const updates: Record<string, unknown> = {
+    [STORAGE_KEYS.STORAGE_HYGIENE_VERSION]: CURRENT_STORAGE_HYGIENE_VERSION,
+  };
+  if (removedAiConceptCards > 0 || userCards.some((c) => !c.origin)) {
+    updates[STORAGE_KEYS.USER_CARDS] = nextUserCards;
+  }
+  if (removedOrphanProgress > 0) {
+    updates[STORAGE_KEYS.PROGRESS_MAP] = cleanedProgress;
+  }
+  if (consolidatedConcepts > 0) {
+    updates[STORAGE_KEYS.CONCEPT_STATE] = nextConceptState;
+  }
+  await chrome.storage.local.set(updates);
+
+  const removedLegacyKeys: string[] = [];
+  if ('cardVisuals' in rawLegacy) {
+    await chrome.storage.local.remove('cardVisuals');
+    removedLegacyKeys.push('cardVisuals');
+  }
+
+  invalidateAllCardsCache();
+  return {
+    ran: true,
+    removedOrphanProgress,
+    removedAiConceptCards,
+    consolidatedConcepts,
+    removedLegacyKeys,
+  };
+}
+
 /**
  * Serialize all user progress into a portable JSON backup (explicitly excluding API keys).
  */
@@ -586,6 +835,10 @@ export async function exportFullBackupJson(): Promise<{ json: string; filename: 
     settings,
     onboardingCurrent,
     askedPageSentences,
+    roadmapHistory,
+    roadmapCoachInsight,
+    cardOverrides,
+    remedialProgress,
   ] = await Promise.all([
     getSkillProfile(),
     getProgressMap(),
@@ -598,6 +851,10 @@ export async function exportFullBackupJson(): Promise<{ json: string; filename: 
     getSettings(),
     getOnboardingState(),
     getAskedPageSentences(),
+    getRoadmapHistory(),
+    getRoadmapCoachInsight(),
+    getCardOverrides(),
+    getRemedialProgress(),
   ]);
 
   const updatedOnboarding = await saveOnboardingState({
@@ -619,6 +876,10 @@ export async function exportFullBackupJson(): Promise<{ json: string; filename: 
     settings,
     onboardingState: updatedOnboarding,
     askedPageSentences,
+    roadmapHistory,
+    roadmapCoachInsight,
+    cardOverrides,
+    remedialProgress,
   };
 
   return {
@@ -662,11 +923,30 @@ export async function restoreFromBackupText(
       ...(Array.isArray(full.askedPageSentences)
         ? { [STORAGE_KEYS.PAGE_QUIZ_ASKED_SENTENCES]: full.askedPageSentences }
         : {}),
+      ...(Array.isArray(full.roadmapHistory)
+        ? { [STORAGE_KEYS.ROADMAP_HISTORY]: full.roadmapHistory }
+        : {}),
+      ...(full.roadmapCoachInsight
+        ? { [STORAGE_KEYS.ROADMAP_COACH_INSIGHT]: full.roadmapCoachInsight }
+        : {}),
+      ...(full.cardOverrides && typeof full.cardOverrides === 'object'
+        ? { [STORAGE_KEYS.CARD_OVERRIDES]: full.cardOverrides }
+        : {}),
+      ...(full.remedialProgress && typeof full.remedialProgress === 'object'
+        ? { [STORAGE_KEYS.REMEDIAL_PROGRESS]: full.remedialProgress }
+        : {}),
     });
 
     if (full.settings && typeof full.settings === 'object') {
       await saveSettings(full.settings);
     }
+    await chrome.storage.local.remove([
+      STORAGE_KEYS.ROADMAP_ACTIVE_SESSION,
+      STORAGE_KEYS.REMEDIAL_ACTIVE_SESSION,
+      STORAGE_KEYS.ROADMAP_OPEN_GUIDEBOOK,
+      STORAGE_KEYS.REMEDIAL_AI_OVERLAY,
+    ]);
+    invalidateAllCardsCache();
 
     return {
       ok: true,

@@ -502,6 +502,24 @@ export const WIDGET_CSS = `
   border-color: #f4f4f6;
 }
 
+.etr-ask-panel {
+  border-color: rgba(168, 85, 247, 0.34);
+}
+
+.etr-ask-output {
+  margin-bottom: 6px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  color: #f5f3ff;
+  font-size: 11.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
 .etr-toast {
   position: fixed;
   top: 14px;

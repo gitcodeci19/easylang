@@ -24,9 +24,11 @@ from pathlib import Path
 from curated_enrichment import (
     CURATED_PHRASES_AND_VOCAB,
     CURATED_SENTENCES,
+    CURATED_WORD_EXAMPLES,
     MISSING_OXFORD_TRANSLATIONS,
     PRIMARY_WORD_OVERRIDES,
 )
+from modern_sentences import MODERN_SENTENCES
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 CACHE_DIR = ROOT_DIR / ".cache"
@@ -171,7 +173,41 @@ NOISY_TR_PATTERNS = (
     "müküfat",
     "mobil ya",
     "buzdolabu",
+    "gömrüşmeye",
+    "ic gr!",
+    "0404 dönüm",
+    "0404 hektar",
+    "2000 libre",
+    "2240 libre",
 )
+
+FREEDICT_ABBREV_STOPWORDS = frozenset({
+    "ing", "amer", "esk", "kıs", "çoğ", "sf", "is", "f", "zf", "ed", "bağ", "ünl",
+    "argo", "mec", "ayn", "vb", "vs", "örn", "bkz", "bknz",
+})
+
+LEADING_PROPER_BLOCKLIST = frozenset({
+    "minnesota", "tufts", "twitter", "youtube", "lidia", "franco", "yumi", "lucy",
+    "emily", "sumatra", "ireland", "tokyo", "keiko", "mariko", "sabrina", "olga",
+    "vladimir", "natasha", "pedro", "juan", "elena", "sofia", "marco", "paolo",
+    "hans", "fritz", "claire", "pierre", "marie", "nicolas", "chloe", "diego",
+    "ramon", "akira", "sato", "suzuki", "wang", "chen", "zhang", "ahmed", "fatima",
+    "hassan", "omar", "leila", "yusuf", "ayse", "mehmet", "mustafa", "dan", "tom",
+    "mary", "john", "alice", "bob", "jack", "jim", "ann", "sami", "layla", "linda",
+    "mike", "bill", "jane", "nancy", "paul", "peter", "sarah", "david", "george",
+    "charles", "henry", "edward", "richard", "thomas", "william", "robert", "james",
+    "kate", "sue", "meg", "ben", "ned", "tim", "sam", "max", "alex", "chris", "mark",
+    "luke", "matthew", "carlos", "maria", "taro", "hanako", "jiro", "kenji", "yuki",
+    "tanaka", "boston", "chicago", "london", "paris", "spain", "australia", "brazil",
+    "canada", "china", "france", "germany", "india", "italy", "japan", "korea",
+    "mexico", "russia", "sweden", "texas", "california", "florida", "alaska",
+})
+
+TR_FOLD_MAP = str.maketrans("çğıöşüâîûÇĞİÖŞÜÂÎÛ", "cgiosuaiuCGIOSUAIU")
+TR_HELPER_WORDS = frozenset({
+    "etmek", "olmak", "yapmak", "vermek", "almak", "bir", "ve", "ile", "icin",
+    "gibi", "olan", "sey", "kimse", "kisi", "taraf", "sekilde", "olarak",
+})
 
 LATIN_BINOMIAL_RE = re.compile(r"^[A-Z][a-z]{2,}\s+[a-z]{3,}(?:\s+[a-z]{2,})?$")
 NON_BINOMIAL_FIRST_WORDS = frozenset({
@@ -258,7 +294,7 @@ def clean_tr_gloss(raw: str) -> list[tuple[str, bool]]:
     text = TAG_PREFIX_RE.sub("", text).strip()
     text = BRACKET_NOTE_RE.sub("", text).strip()
 
-    if "(" in text or ")" in text or "?" in text:
+    if "(" in text or ")" in text or "?" in text or "!" in text or '"' in text:
         return []
 
     sub_match = SUBENTRY_SPLIT_RE.search(text)
@@ -279,6 +315,10 @@ def clean_tr_gloss(raw: str) -> list[tuple[str, bool]]:
             continue
         part = normalize_ocr_turkish(part)
         part_lower = part.lower()
+        if part_lower in FREEDICT_ABBREV_STOPWORDS:
+            continue
+        if re.fullmatch(r"\d+", part):
+            continue
         if any(pat in part_lower for pat in NOISY_TR_PATTERNS):
             continue
         if (
@@ -382,10 +422,82 @@ def rank_meanings_for_pos(
     return [text for _, (text, _, _) in ranked][:4]
 
 
+def _norm_tr_match(text: str) -> str:
+    folded = text.lower().translate(TR_FOLD_MAP)
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s]", " ", folded)).strip()
+
+
+def _extract_tr_stems(meaning: str) -> list[str]:
+    toks = _norm_tr_match(meaning).split()
+    stems: list[str] = []
+    for tok in toks:
+        if tok in TR_HELPER_WORDS:
+            continue
+        base = tok
+        if len(base) > 5 and (base.endswith("mak") or base.endswith("mek")):
+            base = base[:-3]
+        if len(base) >= 4:
+            stems.append(base[: max(4, len(base) - 1)])
+            if base[-1] in "kptc":
+                stems.append(base[:-1])
+        elif len(base) >= 2:
+            stems.append(base)
+    # Fallback when the entire meaning consists of short/helper words (e.g. 'bir', 'için', 'ile', 'yapmak', 'almak')
+    if not stems and toks:
+        for tok in toks:
+            base = tok[:-3] if len(tok) > 5 and (tok.endswith("mak") or tok.endswith("mek")) else tok
+            if len(base) >= 2:
+                stems.append(base)
+    return stems
+
+
+def tr_meaning_matches_sentence(example_tr: str, meanings: list[str]) -> bool:
+    """Return True if example_tr genuinely expresses at least one meaning in meanings."""
+    if not example_tr or not meanings:
+        return False
+    ex_words = _norm_tr_match(example_tr).split()
+    if not ex_words:
+        return False
+    for m in meanings:
+        for stem in _extract_tr_stems(m):
+            if len(stem) >= 4:
+                if any(w.startswith(stem) for w in ex_words):
+                    return True
+            else:
+                if any(w == stem or (len(stem) == 3 and w.startswith(stem)) for w in ex_words):
+                    return True
+    return False
+
+
+def example_en_has_exact_headword(headword: str, example_en: str) -> bool:
+    """Return True if example_en strictly contains the full standalone headword (never inside hyphenated compounds)."""
+    w = headword.lower().strip()
+    ex = example_en.lower()
+    if not w or not ex:
+        return False
+    if " " in w or "-" in w:
+        return bool(re.search(rf"(?<![a-z0-9-]){re.escape(w)}(?:s|es|ed|ing)?(?![a-z0-9-])", ex))
+    if re.search(rf"(?<![a-z0-9-]){re.escape(w)}(?:s|es|ed|ing|d|er|est|ly)?(?![a-z0-9-])", ex):
+        return True
+    if len(w) >= 4 and w.endswith("e"):
+        if re.search(rf"(?<![a-z0-9-]){re.escape(w[:-1])}(?:ing|ed|es|er|est)(?![a-z0-9-])", ex):
+            return True
+    if len(w) >= 4 and w.endswith("y"):
+        if re.search(rf"(?<![a-z0-9-]){re.escape(w[:-1])}(?:ies|ied|ier|iest)(?![a-z0-9-])", ex):
+            return True
+    return False
+
+
+def has_leading_weird_proper_noun(en_text: str) -> bool:
+    first = en_text.split()[0] if en_text.split() else ""
+    clean = re.sub(r"[^a-zA-Z']", "", first).lower().removesuffix("'s")
+    return clean in LEADING_PROPER_BLOCKLIST
+
+
 def parse_tatoeba(
     links_path: Path, tur_path: Path, eng_path: Path
-) -> tuple[list[tuple[str, str]], dict[str, tuple[str, str]]]:
-    """Load proper-noun-free English-Turkish Tatoeba sentence pairs and build a word->example index."""
+) -> tuple[list[tuple[str, str]], dict[str, list[tuple[str, str, int]]]]:
+    """Load proper-noun-free English-Turkish Tatoeba sentence pairs and build a multi-candidate word->examples pool."""
     print("[parse] Tatoeba links & sentences (filtering out synthetic proper nouns)...")
     tur_to_eng: dict[str, list[str]] = defaultdict(list)
     needed_tur_ids: set[str] = set()
@@ -417,13 +529,49 @@ def parse_tatoeba(
 
     pairs: list[tuple[str, str]] = []
     seen_eng: set[str] = set()
-    word_examples: dict[str, tuple[str, str]] = {}
+    word_examples_pool: dict[str, list[tuple[str, str, int]]] = defaultdict(list)
+    MAX_CANDS_PER_TOKEN = 45
 
-    # Seed word_examples with our AI-curated sentences first for maximum quality
+    def index_example(en_s: str, tr_s: str, tier: int) -> None:
+        if has_leading_weird_proper_noun(en_s):
+            return
+        seen_toks: set[str] = set()
+        for tok in WORD_TOKEN_RE.findall(en_s.casefold()):
+            if tok in seen_toks:
+                continue
+            seen_toks.add(tok)
+            if len(word_examples_pool[tok]) < MAX_CANDS_PER_TOKEN:
+                word_examples_pool[tok].append((en_s, tr_s, tier))
+            # Index regular base forms cleanly for verbs/plurals (strict length guards)
+            if tok.endswith("ies") and len(tok) > 5:
+                base = tok[:-3] + "y"
+                if len(word_examples_pool[base]) < MAX_CANDS_PER_TOKEN:
+                    word_examples_pool[base].append((en_s, tr_s, tier))
+            elif tok.endswith("ied") and len(tok) > 5:
+                base = tok[:-3] + "y"
+                if len(word_examples_pool[base]) < MAX_CANDS_PER_TOKEN:
+                    word_examples_pool[base].append((en_s, tr_s, tier))
+            elif tok.endswith("s") and not tok.endswith("ss") and len(tok) > 4:
+                base = tok[:-1]
+                if len(word_examples_pool[base]) < MAX_CANDS_PER_TOKEN:
+                    word_examples_pool[base].append((en_s, tr_s, tier))
+            elif tok.endswith("ed") and len(tok) > 5:
+                for base in (tok[:-2], tok[:-1]):
+                    if len(word_examples_pool[base]) < MAX_CANDS_PER_TOKEN:
+                        word_examples_pool[base].append((en_s, tr_s, tier))
+            elif tok.endswith("ing") and len(tok) > 6:
+                for base in (tok[:-3], tok[:-3] + "e"):
+                    if len(word_examples_pool[base]) < MAX_CANDS_PER_TOKEN:
+                        word_examples_pool[base].append((en_s, tr_s, tier))
+
+    # Tier 0: Modern relatable sentences first!
+    for en_mod, tr_mod_list, _, _ in MODERN_SENTENCES:
+        if tr_mod_list:
+            index_example(en_mod, tr_mod_list[0], 0)
+
+    # Tier 1: AI-curated clean grammar sentences
     for en_cur, tr_cur, _ in CURATED_SENTENCES:
-        for tok in WORD_TOKEN_RE.findall(en_cur.casefold()):
-            if tok not in word_examples:
-                word_examples[tok] = (en_cur, tr_cur)
+        index_example(en_cur, tr_cur, 1)
 
     for tur_id, eng_ids in tur_to_eng.items():
         tr_text = tur_sentences.get(tur_id)
@@ -452,49 +600,110 @@ def parse_tatoeba(
             seen_eng.add(norm_en)
             pairs.append((en_text, tr_text))
 
-            if 4 <= len(en_words) <= 9:
-                for tok in WORD_TOKEN_RE.findall(norm_en):
-                    if tok not in word_examples:
-                        word_examples[tok] = (en_text, tr_text)
-                        # Also index simple stem variants so inflected examples help base headwords
-                        if tok.endswith("s") and len(tok) > 4 and tok[:-1] not in word_examples:
-                            word_examples[tok[:-1]] = (en_text, tr_text)
-                        if tok.endswith("ed") and len(tok) > 5 and tok[:-2] not in word_examples:
-                            word_examples[tok[:-2]] = (en_text, tr_text)
-                        if tok.endswith("ing") and len(tok) > 6 and tok[:-3] not in word_examples:
-                            word_examples[tok[:-3]] = (en_text, tr_text)
+            if 4 <= len(en_words) <= 10:
+                index_example(en_text, tr_text, 2)
             break
 
     pairs.sort(key=lambda p: (len(p[0].split()), len(p[0])))
     print(f"[parse] Clean proper-noun-free Tatoeba EN-TR sentence pairs: {len(pairs)}")
-    return pairs, word_examples
+    return pairs, dict(word_examples_pool)
 
 
 def synthesize_fallback_example(word: str, pos: str, tr_meaning: str) -> tuple[str, str]:
-    """Generate a clean, natural bilingual example when a rare or compound headword has no corpus match."""
+    """Generate a clean, grammatically accurate bilingual example with Turkish vowel harmony."""
     pos_low = pos.lower()
     w = word.strip()
     tr = tr_meaning.strip()
     if "adverb" in pos_low:
         return (
-            f"The team handled the entire situation {w}.",
-            f"Ekip tüm durumu {tr} ele aldı.",
+            f"The team handled the situation {w}.",
+            f"Ekip durumu {tr} ele aldı.",
         )
     if "adjective" in pos_low:
         return (
-            f"This approach proved to be very {w} in practice.",
-            f"Bu yaklaşımın pratikte çok {tr} olduğu kanıtlandı.",
+            f"This method proved to be very {w} in practice.",
+            f"Bu yöntemin pratikte çok {tr} olduğu görüldü.",
         )
-    if "verb" in pos_low:
-        clean_tr_stem = re.sub(r"(mak|mek)$", "", tr).strip()
+    if "verb" in pos_low and tr.lower().endswith(("mak", "mek")):
+        clean_tr_stem = tr[:-3].strip()
+        suffix = "mamız" if tr.lower().endswith("mak") else "memiz"
         return (
-            f"We need to {w} this carefully before making a decision.",
-            f"Karar vermeden önce bunu dikkatlice {clean_tr_stem}memiz gerekiyor.",
+            f"We need to {w} this carefully before deciding.",
+            f"Karar vermeden önce bunu dikkatlice {clean_tr_stem}{suffix} gerekiyor.",
         )
     return (
-        f"Understanding the concept of {w} is essential in this field.",
-        f"Bu alanda {tr} kavramını anlamak çok önemlidir.",
+        f"Understanding the concept of {w} is very useful here.",
+        f"Burada {tr} kavramını anlamak çok faydalıdır.",
     )
+
+
+def pick_sense_aligned_example(
+    word: str,
+    pos: str,
+    tr_list: list[str],
+    word_examples_pool: dict[str, list[tuple[str, str, int]]],
+    allow_promote_meaning: bool = False,
+) -> tuple[str, str, list[str]]:
+    """Select an example sentence strictly matching both the English headword and Turkish acceptedTr sense."""
+    key = word.strip().lower()
+    if key in CURATED_WORD_EXAMPLES:
+        en_s, tr_s = CURATED_WORD_EXAMPLES[key]
+        return en_s, tr_s, tr_list
+
+    # Collect candidates strictly containing the full headword (never split compounds into unrelated words!)
+    raw_cands: list[tuple[str, str, int]] = []
+    if " " in key or "-" in key:
+        first_part = WORD_TOKEN_RE.findall(key)
+        anchor = max(first_part, key=len) if first_part else ""
+        for cand in word_examples_pool.get(anchor, []):
+            if example_en_has_exact_headword(key, cand[0]):
+                raw_cands.append(cand)
+    else:
+        for cand in word_examples_pool.get(key, []):
+            if example_en_has_exact_headword(key, cand[0]):
+                raw_cands.append(cand)
+
+    best_pair: tuple[str, str] | None = None
+    best_match_idx = 0
+    best_score = -1
+
+    for en_s, tr_s, tier in raw_cands:
+        if has_synthetic_or_proper_name(en_s) or has_leading_weird_proper_noun(en_s):
+            continue
+        match_idx = -1
+        if tr_meaning_matches_sentence(tr_s, [tr_list[0]]):
+            score = 100
+            match_idx = 0
+        else:
+            for idx_m in range(1, min(len(tr_list), 4)):
+                if tr_meaning_matches_sentence(tr_s, [tr_list[idx_m]]):
+                    score = 68 - idx_m * 3
+                    match_idx = idx_m
+                    break
+        if match_idx < 0:
+            # Sense mismatch (homonym/idiom/wrong POS): strictly reject!
+            continue
+
+        # Prefer modern (tier 0) > curated (tier 1) > Tatoeba (tier 2) and crisp 5-9 word length
+        score += (2 - tier) * 14
+        wc = len(en_s.split())
+        if 5 <= wc <= 9:
+            score += 6
+        if score > best_score:
+            best_score = score
+            best_pair = (en_s, tr_s)
+            best_match_idx = match_idx
+
+    if best_pair:
+        final_tr_list = list(tr_list)
+        # If FreeDict put a rarer/archaic synonym first but real Turkish sentences use tr_list[match_idx],
+        # promote that cleaner active sense to index 0 so acceptedTr[0] and exampleTr stay 100% aligned!
+        if allow_promote_meaning and best_match_idx > 0 and best_match_idx < len(final_tr_list):
+            promoted = final_tr_list.pop(best_match_idx)
+            final_tr_list.insert(0, promoted)
+        return best_pair[0], best_pair[1], final_tr_list
+    en_fb, tr_fb = synthesize_fallback_example(word, pos, tr_list[0])
+    return en_fb, tr_fb, tr_list
 
 
 def normalize_level(raw: str) -> str:
@@ -584,7 +793,7 @@ def build_cards() -> dict[str, object]:
     eng_path = download_cached("Tatoeba eng", URLS["tatoeba_eng"])
 
     freedict = parse_freedict(freedict_path)
-    tatoeba_pairs, word_examples = parse_tatoeba(links_path, tur_path, eng_path)
+    tatoeba_pairs, word_examples_pool = parse_tatoeba(links_path, tur_path, eng_path)
 
     raw_oxford = json.loads(oxford_path.read_text(encoding="utf-8"))
     oxford_entries = raw_oxford.values() if isinstance(raw_oxford, dict) else raw_oxford
@@ -601,21 +810,12 @@ def build_cards() -> dict[str, object]:
         if key in seen_words:
             continue
 
-        ex_pair = word_examples.get(key)
-        if not ex_pair:
-            # Try first token for multi-word headwords like 'according to', 'used to'
-            for part_tok in WORD_TOKEN_RE.findall(key):
-                if len(part_tok) >= 4 and part_tok in word_examples:
-                    ex_pair = word_examples[part_tok]
-                    break
-
         pos = str(entry.get("type") or "noun").strip()
-        ex_tr_hint = ex_pair[1] if (ex_pair and not has_synthetic_or_proper_name(ex_pair[0])) else ""
         if key in PRIMARY_WORD_OVERRIDES:
             tr_list = list(PRIMARY_WORD_OVERRIDES[key])
         else:
             raw_candidates = freedict.get(key, [])
-            tr_list = rank_meanings_for_pos(raw_candidates, pos, ex_tr_hint) if raw_candidates else []
+            tr_list = rank_meanings_for_pos(raw_candidates, pos, "") if raw_candidates else []
 
         # Use AI-curated translations when FreeDict lacks the Oxford 5000 word
         if not tr_list and key in MISSING_OXFORD_TRANSLATIONS:
@@ -626,10 +826,13 @@ def build_cards() -> dict[str, object]:
             continue
         seen_words.add(key)
 
-        if ex_pair and not has_synthetic_or_proper_name(ex_pair[0]):
-            example_en, example_tr = ex_pair
-        else:
-            example_en, example_tr = synthesize_fallback_example(word, pos, tr_list[0])
+        example_en, example_tr, tr_list = pick_sense_aligned_example(
+            word,
+            pos,
+            tr_list,
+            word_examples_pool,
+            allow_promote_meaning=(key not in PRIMARY_WORD_OVERRIDES),
+        )
 
         phonetic = str(entry.get("phon_br") or entry.get("phon_n_am") or "").strip()
         level = normalize_level(str(entry.get("cefr") or ""))
@@ -686,17 +889,51 @@ def build_cards() -> dict[str, object]:
 
     sentence_cards = select_stratified_sentences(tatoeba_pairs, target_total=5500)
 
-    all_cards = word_cards + sentence_cards
+    # Append modern, relatable, unit-tagged sentences with stable m_XXXX IDs
+    # (never shifts existing w_* or s_XXXX IDs stored in user progressMap).
+    seen_all_en = {str(c["en"]).strip().casefold() for c in sentence_cards}
+    modern_cards: list[dict[str, object]] = []
+    for idx, (en_text, tr_list, lvl, unit_id) in enumerate(MODERN_SENTENCES, start=1):
+        clean_en = en_text.strip()
+        key = clean_en.casefold()
+        if not key or key in seen_all_en:
+            continue
+        seen_all_en.add(key)
+        clean_tr = [t.strip() for t in tr_list if t.strip()]
+        if not clean_tr:
+            continue
+        modern_cards.append(
+            {
+                "id": f"m_{idx:04d}",
+                "type": "sentence",
+                "level": normalize_level(lvl),
+                "pos": "sentence",
+                "en": clean_en,
+                "phonetic": "",
+                "acceptedTr": clean_tr,
+                "exampleEn": "",
+                "exampleTr": "",
+                "source": "builtin",
+                "unitId": unit_id,
+            }
+        )
+
+    all_cards = word_cards + sentence_cards + modern_cards
     OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     OUT_FILE.write_text(json.dumps(all_cards, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
     size_kb = OUT_FILE.stat().st_size / 1024
     print(
         f"[done] Rescued {rescued_from_curated} missing Oxford words + added {added_curated_phrases} new phrasal verbs/idioms/vocab.\n"
-        f"[done] Wrote {len(word_cards)} words/phrases + {len(sentence_cards)} natural sentences "
+        f"[done] Wrote {len(word_cards)} words/phrases + {len(sentence_cards)} natural sentences + {len(modern_cards)} modern sentences "
         f"= {len(all_cards)} total cards to {OUT_FILE} ({size_kb:.1f} KB)"
     )
-    return {"words": len(word_cards), "sentences": len(sentence_cards), "total": len(all_cards)}
+    return {
+        "words": len(word_cards),
+        "sentences": len(sentence_cards) + len(modern_cards),
+        "modern": len(modern_cards),
+        "total": len(all_cards),
+    }
 
 
 if __name__ == "__main__":

@@ -199,6 +199,10 @@ function switchDashboardTab(target: string): void {
   for (const [key, panel] of Object.entries(tabPanels)) {
     panel.hidden = key !== validTarget;
   }
+  if (validTarget !== 'roadmap') {
+    document.body.classList.remove('remedial-crimson-active');
+    optionsRoadmapMount.replaceChildren();
+  }
   if (validTarget === 'cards') {
     void refreshCardsData();
   } else if (validTarget === 'analytics') {
@@ -823,7 +827,11 @@ function applyLanguageMode(mode: FeedbackLanguageMode): void {
   if (tabPanels.cards && !tabPanels.cards.hidden) {
     renderCardsTable();
   }
-  void optionsRoadmap.setLanguage(mode);
+  if (tabPanels.roadmap && !tabPanels.roadmap.hidden) {
+    void optionsRoadmap.setLanguage(mode);
+  } else {
+    void optionsRoadmap.setLanguage(mode, false);
+  }
 }
 
 async function handleLanguageChange(mode: FeedbackLanguageMode): Promise<void> {

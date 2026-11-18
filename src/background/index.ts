@@ -1,13 +1,28 @@
 import { shouldShowB1ReadinessPrompt } from '../shared/onboarding';
+import {
+  mergePendingTutorReplyIntoHistory,
+  mergeRemedialBriefingAiIntoSession,
+} from '../shared/roadmapCoach';
 import { isUrlBlocked, normalizeBlockedEntry, toChromeExcludeMatches } from '../shared/siteFilter';
 import {
   deleteConceptNoteById,
+  getActiveRemedialSession,
+  getActiveRoadmapSession,
   getAiConfig,
-  getRoadmapHistory,
+  getAllCards,
+  getConceptState,
   getOnboardingState,
   getPendingPrompt,
+  getProgressMap,
+  getRemedialProgress,
+  getReviewHistory,
+  getRoadmapHistory,
   getSettings,
   getSkillProfile,
+  runStorageHygiene,
+  saveActiveRemedialSession,
+  saveActiveRoadmapSession,
+  saveRemedialAiOverlay,
   saveSettings,
   setCurrentPrompt,
   setNextAlarmAt,
@@ -15,10 +30,14 @@ import {
   upsertUserCard,
 } from '../shared/storage';
 import type { ActivePrompt, Card, ExtensionMessage } from '../shared/types';
+import { getResolvedRemedialSkillIds } from '../shared/weaknessDetector';
 import {
+  askAiTutorWithContext,
+  diagnoseWeaknessesWithAi,
   evaluatePageTranslationWithAi,
   fetchModelsForSlot,
   generateAiCoachReport,
+  generateRemedialBriefingWithAi,
   generateRoadmapCoachBanner,
   testProviderConnection,
   translateSelectionWithAi,
@@ -31,6 +50,8 @@ import {
   handleFlagConceptGap,
   handleMarkDontKnow,
   handleOverrideCorrect,
+  handleRecordListeningResult,
+  handleRecordPageQuizResult,
   handleSubmitAnswer,
   isWithinQuietHours,
   prepareListeningChallenge,
@@ -174,6 +195,19 @@ async function fetchMyMemoryTranslation(text: string): Promise<string[]> {
   }
 }
 
+async function hideWidgetOnOtherTabs(keepTabId: number): Promise<void> {
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const t of tabs) {
+      if (t.id !== undefined && t.id !== keepTabId) {
+        void chrome.tabs.sendMessage(t.id, { type: 'HIDE_CARD' } satisfies ExtensionMessage).catch(() => {});
+      }
+    }
+  } catch {
+    // Ignore tab query failures
+  }
+}
+
 async function deliverPrompt(
   prompt: ActivePrompt,
   preferredTabId?: number
@@ -191,6 +225,7 @@ async function deliverPrompt(
 
   if (delivered) {
     await setPendingPrompt(null);
+    void hideWidgetOnOtherTabs(tab.id);
     return { delivered: true, blockedActiveTab: false };
   }
 
@@ -212,6 +247,7 @@ async function flushPendingPromptToTab(tab: chrome.tabs.Tab | undefined): Promis
   });
   if (ok) {
     await setPendingPrompt(null);
+    void hideWidgetOnOtherTabs(tab.id);
   }
 }
 
@@ -277,12 +313,14 @@ chrome.runtime.onInstalled.addListener(() => {
   void syncPeriodicAlarm();
   void syncContentScriptRegistration();
   void syncActionBadge();
+  void runStorageHygiene();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   void syncPeriodicAlarm();
   void syncContentScriptRegistration();
   void syncActionBadge();
+  void runStorageHygiene();
 });
 
 async function triggerPageQuiz(
@@ -383,6 +421,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     exampleEn: '',
     exampleTr: '',
     source: 'user',
+    origin: 'manual',
     createdAt: Date.now(),
   };
 
@@ -546,6 +585,131 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         sendResponse({ ok: true, insight });
         break;
       }
+      case 'GENERATE_REMEDIAL_BRIEFING': {
+        const [aiConfig, settings] = await Promise.all([getAiConfig(), getSettings()]);
+        const effectiveLang =
+          message.language ??
+          (settings.uiLanguage && settings.uiLanguage !== 'auto'
+            ? settings.uiLanguage
+            : aiConfig.feedbackLanguage ?? 'auto');
+        const briefingAi = await generateRemedialBriefingWithAi(
+          {
+            skillId: message.skillId,
+            titleTr: message.titleTr,
+            titleEn: message.titleEn,
+            evidence: message.evidence,
+            language: effectiveLang,
+          },
+          aiConfig
+        );
+        if (briefingAi) {
+          const activeRem = await getActiveRemedialSession();
+          const merged = mergeRemedialBriefingAiIntoSession(activeRem, message.skillId, briefingAi);
+          if (merged) {
+            await saveActiveRemedialSession(merged);
+          }
+        }
+        sendResponse({ ok: Boolean(briefingAi), briefingAi });
+        break;
+      }
+      case 'DIAGNOSE_WEAKNESSES_AI': {
+        const [
+          aiConfig,
+          settings,
+          roadmapHistory,
+          reviewHistory,
+          conceptState,
+          allCards,
+          progressMap,
+          remedialProgress,
+        ] = await Promise.all([
+          getAiConfig(),
+          getSettings(),
+          getRoadmapHistory(),
+          getReviewHistory(),
+          getConceptState(),
+          getAllCards(),
+          getProgressMap(),
+          getRemedialProgress(),
+        ]);
+        const effectiveLang =
+          message.language ??
+          (settings.uiLanguage && settings.uiLanguage !== 'auto'
+            ? settings.uiLanguage
+            : aiConfig.feedbackLanguage ?? 'auto');
+        const resolvedSkillIds = getResolvedRemedialSkillIds({
+          cards: allCards,
+          progressMap,
+          reviewHistory,
+          roadmapHistory,
+          conceptState,
+          remedialProgress,
+        });
+        const cardsById = new Map<string, Card>();
+        for (const c of allCards) cardsById.set(c.id, c);
+        const weaknesses = await diagnoseWeaknessesWithAi(
+          {
+            roadmapHistory,
+            reviewHistory,
+            conceptNotes: conceptState.notes,
+            cardsById,
+            resolvedSkillIds,
+            language: effectiveLang,
+          },
+          aiConfig
+        );
+        if (Array.isArray(weaknesses)) {
+          await saveRemedialAiOverlay(weaknesses);
+        }
+        sendResponse({ ok: true, weaknesses });
+        break;
+      }
+      case 'ASK_AI_TUTOR': {
+        const [aiConfig, settings] = await Promise.all([getAiConfig(), getSettings()]);
+        const effectiveLang =
+          message.language ??
+          (settings.uiLanguage && settings.uiLanguage !== 'auto'
+            ? settings.uiLanguage
+            : aiConfig.feedbackLanguage ?? 'auto');
+        const reply = await askAiTutorWithContext(
+          {
+            question: message.question,
+            context: message.context,
+            history: message.history,
+            language: effectiveLang,
+          },
+          aiConfig
+        );
+        if (reply.answer) {
+          const [activeRem, activeRm] = await Promise.all([
+            getActiveRemedialSession(),
+            getActiveRoadmapSession(),
+          ]);
+          const nextRemHist = activeRem?.tutorOpen
+            ? mergePendingTutorReplyIntoHistory(activeRem.tutorHistory, message.question, reply.answer)
+            : null;
+          if (activeRem && nextRemHist) {
+            await saveActiveRemedialSession({
+              ...activeRem,
+              tutorHistory: nextRemHist,
+              updatedAt: Date.now(),
+            });
+          } else {
+            const nextRmHist = activeRm?.tutorOpen
+              ? mergePendingTutorReplyIntoHistory(activeRm.tutorHistory, message.question, reply.answer)
+              : null;
+            if (activeRm && nextRmHist) {
+              await saveActiveRoadmapSession({
+                ...activeRm,
+                tutorHistory: nextRmHist,
+                updatedAt: Date.now(),
+              });
+            }
+          }
+        }
+        sendResponse({ ok: true, ...reply });
+        break;
+      }
       case 'DISMISS_PROMPT': {
         await setCurrentPrompt(null);
         sendResponse({ ok: true });
@@ -572,6 +736,21 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
       case 'GET_LISTENING_CHALLENGE': {
         const challenge = await prepareListeningChallenge(message.excludeIds);
         sendResponse({ ok: Boolean(challenge), challenge });
+        break;
+      }
+      case 'RECORD_LISTENING_RESULT': {
+        await handleRecordListeningResult(message.cardId, message.isCorrect, Date.now());
+        sendResponse({ ok: true });
+        break;
+      }
+      case 'RECORD_PAGE_QUIZ_RESULT': {
+        await handleRecordPageQuizResult(message.isCorrect);
+        sendResponse({ ok: true });
+        break;
+      }
+      case 'RUN_STORAGE_HYGIENE': {
+        const report = await runStorageHygiene(true);
+        sendResponse({ ok: true, report });
         break;
       }
       case 'VALIDATE_PAGE_SENTENCES': {

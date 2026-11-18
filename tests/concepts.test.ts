@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   advanceConceptAfterAnswer,
+  consolidateConceptState,
   createInitialConceptState,
+  MAX_ACTIVE_CONCEPTS,
   sanitizeConceptExplanationForCard,
   selectDueConceptAndCard,
   upsertConceptNote,
@@ -132,4 +134,27 @@ test('sanitizeConceptExplanationForCard drops sentences referencing stale phrase
     "I didn't arrive until it was already too late."
   );
   assert.equal(cleaned, "'Arrive' fiili 'varmak' anlamına gelir, 'yaklaşmak' değildir.");
+});
+
+test('upsertConceptNote merges overlapping active tokens and caps active concepts at MAX_ACTIVE_CONCEPTS', () => {
+  const card = makeSentence('c10', "Let's cut the movie short, it is getting too late.", 'Filmi kısa keselim, çok geç oluyor.');
+  let state = createInitialConceptState();
+
+  state = upsertConceptNote(state, card, 'getting too late', 10, 1000).nextState;
+  state = upsertConceptNote(state, card, 'is getting too late', 11, 2000).nextState;
+  state = upsertConceptNote(state, card, 'it is getting too late', 12, 3000).nextState;
+
+  const activeAfterOverlap = state.notes.filter((n) => n.stage < 3);
+  assert.equal(activeAfterOverlap.length, 1, 'Overlapping tokens from the same phrase must merge into 1 active concept');
+
+  // Add 12 distinct tokens -> active queue stays capped at MAX_ACTIVE_CONCEPTS
+  const distinctWords = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf', 'hotel', 'india', 'juliet', 'kilo', 'lima'];
+  for (let i = 0; i < distinctWords.length; i += 1) {
+    const w = distinctWords[i]!;
+    const c = makeSentence(`d_${i}`, `We noticed ${w} clearly.`, `${w} fark ettik.`);
+    state = upsertConceptNote(state, c, w, 20 + i, 4000 + i * 100).nextState;
+  }
+  const consolidated = consolidateConceptState(state);
+  const activeCount = consolidated.notes.filter((n) => n.stage < 3).length;
+  assert.equal(activeCount, MAX_ACTIVE_CONCEPTS);
 });

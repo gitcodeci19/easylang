@@ -2,6 +2,7 @@ import {
   applyAnswerToSkillProfile,
   buildAnalyticsSummary,
   classifyCardTopic,
+  getCardDifficultyRating,
   normalizePosGroup,
   ratingToCefrProgress,
 } from '../shared/analytics';
@@ -14,12 +15,14 @@ import {
 import { getCardsForUnit } from '../shared/curriculum';
 import { evaluateEnglishAnswer, evaluateTurkishAnswer } from '../shared/matcher';
 import {
+  isAiConceptCard,
   recordCorrectProgress,
   recordWrongProgress,
   selectNextCard,
 } from '../shared/srs';
 import { hasSyntheticProperName } from '../shared/youglish';
 import {
+  appendListeningAskedId,
   appendReviewEvent,
   getAiConfig,
   getAiFailoverCooldowns,
@@ -28,6 +31,7 @@ import {
   getCurrentPrompt,
   getDailyStats,
   getLastActiveTab,
+  getListeningAskedIds,
   getNextAlarmAt,
   getPendingPrompt,
   getProgressMap,
@@ -177,16 +181,18 @@ export async function prepareNextPrompt(now: number = Date.now()): Promise<Activ
 export async function prepareListeningChallenge(
   excludeIds: string[] = []
 ): Promise<ListeningChallenge | null> {
-  const [settings, aiConfig, cards, progressMap, skillProfile, reviewHistory] = await Promise.all([
-    getSettings(),
-    getAiConfig(),
-    getAllCards(),
-    getProgressMap(),
-    getSkillProfile(),
-    getReviewHistory(),
-  ]);
+  const [settings, aiConfig, cards, progressMap, skillProfile, reviewHistory, persistedAskedIds] =
+    await Promise.all([
+      getSettings(),
+      getAiConfig(),
+      getAllCards(),
+      getProgressMap(),
+      getSkillProfile(),
+      getReviewHistory(),
+      getListeningAskedIds(),
+    ]);
 
-  const excludeSet = new Set(excludeIds);
+  const excludeSet = new Set([...persistedAskedIds, ...excludeIds]);
   const allSentenceCards = cards.filter(
     (c) =>
       !excludeSet.has(c.id) &&
@@ -227,17 +233,26 @@ export async function prepareListeningChallenge(
   };
 }
 
+const MAX_AI_CONCEPT_CARDS_TOTAL = 20;
+
 function ensurePracticeVarietyInBackground(
   concept: ConceptNote,
   cards: Card[],
-  aiConfig: Awaited<ReturnType<typeof getAiConfig>>
+  aiConfig: Awaited<ReturnType<typeof getAiConfig>>,
+  targetLevel: Card['level'] = 'B1'
 ): void {
   if (!aiConfig.enabled || !aiConfig.apiKey.trim()) return;
   if (countUnusedMatchingCards(concept, cards) >= 2) return;
+  const existingAiCount = cards.filter((c) => isAiConceptCard(c)).length;
+  if (existingAiCount >= MAX_AI_CONCEPT_CARDS_TOTAL) return;
 
-  void generateConceptPracticeCards(concept, aiConfig)
+  const existingNormalized = new Set(cards.map((c) => c.en.trim().toLowerCase()));
+  void generateConceptPracticeCards(concept, aiConfig, targetLevel)
     .then(async (generated) => {
       for (const c of generated) {
+        const key = c.en.trim().toLowerCase();
+        if (!key || existingNormalized.has(key)) continue;
+        existingNormalized.add(key);
         await upsertUserCard(c);
       }
     })
@@ -253,7 +268,7 @@ export async function handleSubmitAnswer(
   cardOverride?: Card,
   source: 'recall' | 'roadmap' = 'recall'
 ): Promise<AnswerOutcomeResult> {
-  const [settings, aiConfig, cards, progressMap, skillProfile, currentPrompt, conceptState] =
+  const [settings, aiConfig, cards, progressMap, skillProfile, currentPrompt, conceptState, roadmapState] =
     await Promise.all([
       getSettings(),
       getAiConfig(),
@@ -262,6 +277,7 @@ export async function handleSubmitAnswer(
       getSkillProfile(),
       getCurrentPrompt(),
       getConceptState(),
+      getRoadmapState(),
     ]);
 
   const deckCard = cards.find((c) => c.id === cardId);
@@ -323,23 +339,61 @@ export async function handleSubmitAnswer(
   }
 
   const existing = progressMap[cardId] ?? null;
+  const isRoadmapSource = source === 'roadmap';
+
+  // Duplicate-tab submission guard: if the same recall card was already answered seconds ago
+  // and currentPrompt was already cleared, return smoothly without double-penalizing or writing a 0ms duplicate event.
+  const isDuplicateRecallSubmit =
+    !isRoadmapSource &&
+    !currentPrompt &&
+    existing !== null &&
+    existing.lastReviewedAt > 0 &&
+    now - existing.lastReviewedAt < 15_000;
+  if (isDuplicateRecallSubmit) {
+    const cefr = ratingToCefrProgress(skillProfile.rating);
+    return {
+      evaluation,
+      updatedProgress: existing,
+      nextRepeatLabel: existing.retryAt ? `Retry in ${settings.retryDelayMinutes} min` : `In ${existing.intervalDays || 1} day`,
+      ratingDelta: 0,
+      newRating: skillProfile.rating,
+      estimatedLevel: cefr.level,
+    };
+  }
+
   const responseMs =
-    currentPrompt && currentPrompt.card.id === cardId ? Math.max(0, now - currentPrompt.shownAt) : 0;
+    currentPrompt && currentPrompt.card.id === cardId
+      ? Math.min(60_000, Math.max(0, now - currentPrompt.shownAt))
+      : 0;
   const isRetryAttempt = Boolean(existing && existing.retryCount > 0);
 
   const outcome = evaluation.isCorrect
     ? recordCorrectProgress(existing, cardId, now, responseMs)
     : recordWrongProgress(existing, cardId, now, settings.retryDelayMinutes);
 
-  const isRoadmapSource = source === 'roadmap';
+  // Protect Elo from unfair -24 drops when user focuses background Recall on a lower-CEFR roadmap unit
+  const isLowLevelUnitFocusCard =
+    !isRoadmapSource &&
+    Boolean(roadmapState.focusUnitOnly) &&
+    skillProfile.rating - getCardDifficultyRating(card) >= 250;
+
   // Keep 20-minute Recall Elo completely separate from Roadmap exercises
-  const ratingUpdate = isRoadmapSource
+  let ratingUpdate = isRoadmapSource
     ? { nextProfile: skillProfile, delta: 0 }
     : applyAnswerToSkillProfile(skillProfile, card, evaluation.isCorrect, {
         responseMs,
         isRetryAttempt,
         now,
       });
+  if (isLowLevelUnitFocusCard && ratingUpdate.delta < 0) {
+    ratingUpdate = {
+      delta: 0,
+      nextProfile: {
+        ...ratingUpdate.nextProfile,
+        rating: skillProfile.rating,
+      },
+    };
+  }
 
   const nextQuestionSeq = ratingUpdate.nextProfile.totalAnswered;
   let nextConceptState = conceptState;
@@ -358,7 +412,8 @@ export async function handleSubmitAnswer(
     nextConceptState = upserted.nextState;
     recordedConcept = upserted.note;
     conceptProgressNote = `📌 "${recordedConcept.label}" added to focus list (next check in 2 questions).`;
-    ensurePracticeVarietyInBackground(recordedConcept, cards, aiConfig);
+    const userCefr = ratingToCefrProgress(ratingUpdate.nextProfile.rating).level;
+    ensurePracticeVarietyInBackground(recordedConcept, cards, aiConfig, userCefr);
   } else if (!isRoadmapSource && currentPrompt?.card.id === cardId && currentPrompt.targetConcept) {
     const advanced = advanceConceptAfterAnswer(
       nextConceptState,
@@ -429,7 +484,7 @@ export async function handleMarkDontKnow(
   cardOverride?: Card,
   source: 'recall' | 'roadmap' = 'recall'
 ): Promise<AnswerOutcomeResult> {
-  const [settings, cards, progressMap, skillProfile, currentPrompt, conceptState] =
+  const [settings, cards, progressMap, skillProfile, currentPrompt, conceptState, roadmapState] =
     await Promise.all([
       getSettings(),
       getAllCards(),
@@ -437,16 +492,25 @@ export async function handleMarkDontKnow(
       getSkillProfile(),
       getCurrentPrompt(),
       getConceptState(),
+      getRoadmapState(),
     ]);
 
   const isRoadmapSource = source === 'roadmap';
   const card = cardOverride ?? cards.find((c) => c.id === cardId);
   const existing = progressMap[cardId] ?? null;
   const responseMs =
-    currentPrompt && currentPrompt.card.id === cardId ? Math.max(0, now - currentPrompt.shownAt) : 0;
+    currentPrompt && currentPrompt.card.id === cardId
+      ? Math.min(60_000, Math.max(0, now - currentPrompt.shownAt))
+      : 0;
   const outcome = recordWrongProgress(existing, cardId, now, settings.retryDelayMinutes);
 
-  const ratingUpdate =
+  const isLowLevelUnitFocusCard =
+    !isRoadmapSource &&
+    Boolean(roadmapState.focusUnitOnly) &&
+    Boolean(card) &&
+    skillProfile.rating - getCardDifficultyRating(card!) >= 250;
+
+  let ratingUpdate =
     !isRoadmapSource && card
       ? applyAnswerToSkillProfile(skillProfile, card, false, {
           responseMs,
@@ -454,6 +518,15 @@ export async function handleMarkDontKnow(
           now,
         })
       : { nextProfile: skillProfile, delta: 0 };
+  if (isLowLevelUnitFocusCard && ratingUpdate.delta < 0) {
+    ratingUpdate = {
+      delta: 0,
+      nextProfile: {
+        ...ratingUpdate.nextProfile,
+        rating: skillProfile.rating,
+      },
+    };
+  }
 
   let nextConceptState = conceptState;
   let recordedConcept: ConceptNote | undefined;
@@ -552,7 +625,8 @@ export async function handleFlagConceptGap(
   );
 
   await saveConceptState(nextState);
-  ensurePracticeVarietyInBackground(note, cards, aiConfig);
+  const userCefr = ratingToCefrProgress(skillProfile.rating).level;
+  ensurePracticeVarietyInBackground(note, cards, aiConfig, userCefr);
   return note;
 }
 
@@ -859,6 +933,66 @@ export async function getStatusSnapshot(): Promise<StatusSnapshot> {
     activeConceptsCount,
     masteredConceptsCount,
   };
+}
+
+export async function handleRecordListeningResult(
+  cardId: string | undefined,
+  isCorrect: boolean,
+  now: number = Date.now()
+): Promise<void> {
+  const tasks: Promise<unknown>[] = [
+    updateDailyStats((s) => ({
+      ...s,
+      shown: s.shown + 1,
+      correct: s.correct + (isCorrect ? 1 : 0),
+      wrong: s.wrong + (isCorrect ? 0 : 1),
+    })),
+  ];
+
+  if (isCorrect) {
+    tasks.push(
+      getRoadmapState().then((rm) =>
+        saveRoadmapState({
+          xp: rm.xp + 5,
+          dailyXp: rm.dailyXp + 5,
+        })
+      )
+    );
+  }
+
+  if (cardId) {
+    tasks.push(appendListeningAskedId(cardId));
+    const [settings, progressMap] = await Promise.all([getSettings(), getProgressMap()]);
+    const existing = progressMap[cardId] ?? null;
+    const outcome = isCorrect
+      ? recordCorrectProgress(existing, cardId, now)
+      : recordWrongProgress(existing, cardId, now, settings.retryDelayMinutes);
+    tasks.push(saveProgressEntry(outcome.progress));
+  }
+
+  await Promise.all(tasks);
+}
+
+export async function handleRecordPageQuizResult(isCorrect: boolean): Promise<void> {
+  const tasks: Promise<unknown>[] = [
+    updateDailyStats((s) => ({
+      ...s,
+      shown: s.shown + 1,
+      correct: s.correct + (isCorrect ? 1 : 0),
+      wrong: s.wrong + (isCorrect ? 0 : 1),
+    })),
+  ];
+  if (isCorrect) {
+    tasks.push(
+      getRoadmapState().then((rm) =>
+        saveRoadmapState({
+          xp: rm.xp + 5,
+          dailyXp: rm.dailyXp + 5,
+        })
+      )
+    );
+  }
+  await Promise.all(tasks);
 }
 
 export async function buildCurrentAnalyticsReport() {

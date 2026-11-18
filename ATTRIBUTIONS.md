@@ -1,6 +1,6 @@
 # Data Sources & Attributions
 
-The built-in English–Turkish flashcard deck (`public/data/cards.json`, 10,643 cards total) is compiled from the following open-source projects:
+The built-in English–Turkish flashcard deck (`public/data/cards.json`, 10,968 cards total — including 328 modern everyday sentences) is compiled from the following open-source projects:
 
 1. **Tatoeba Project** (`https://tatoeba.org`)
    - English–Turkish sentence pairs and contextual examples extracted from Tatoeba exports.

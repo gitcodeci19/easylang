@@ -287,6 +287,21 @@ export function parseFullBackupJson(rawText: string): FullBackupPayload | null {
       askedPageSentences: Array.isArray(parsed.askedPageSentences)
         ? parsed.askedPageSentences
         : [],
+      roadmapHistory: Array.isArray(parsed.roadmapHistory)
+        ? parsed.roadmapHistory
+        : undefined,
+      roadmapCoachInsight:
+        parsed.roadmapCoachInsight && typeof parsed.roadmapCoachInsight === 'object'
+          ? parsed.roadmapCoachInsight
+          : undefined,
+      cardOverrides:
+        parsed.cardOverrides && typeof parsed.cardOverrides === 'object'
+          ? parsed.cardOverrides
+          : undefined,
+      remedialProgress:
+        parsed.remedialProgress && typeof parsed.remedialProgress === 'object'
+          ? parsed.remedialProgress
+          : undefined,
     };
   } catch {
     return null;

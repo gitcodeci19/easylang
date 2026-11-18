@@ -16,6 +16,8 @@ export interface Card {
   exampleEn: string;
   exampleTr: string;
   source: CardSource;
+  /** Distinguishes manual user cards from auto-generated AI concept practice sentences. */
+  origin?: 'manual' | 'ai_concept';
   createdAt?: number;
   /** Optional explicit thematic curriculum unit ID (e.g., 'u02_animals', 'u06_sports', 'u07_cinema'). */
   unitId?: string;
@@ -125,6 +127,10 @@ export interface FullBackupPayload {
   /** RoadmapState stored safely as record to avoid circular type imports */
   roadmapState: Record<string, unknown>;
   askedPageSentences?: string[];
+  roadmapHistory?: RoadmapLessonRecord[];
+  roadmapCoachInsight?: RoadmapCoachInsight | null;
+  cardOverrides?: Record<string, Card>;
+  remedialProgress?: Record<string, RemedialMasteryRecord>;
 }
 
 export interface ReviewEvent {
@@ -258,7 +264,28 @@ export type RoadmapKindStatMap = Partial<
   Record<LessonExerciseKind, { correct: number; wrong: number }>
 >;
 
-export const ACTIVE_ROADMAP_SESSION_VERSION = 5 as const;
+export const ACTIVE_ROADMAP_SESSION_VERSION = 6 as const;
+
+export interface ExerciseDraftState {
+  selectedChoice?: string | null;
+  placedTileIndices?: number[];
+  typedText?: string;
+  spotBugFound?: boolean;
+  spotSelectedFix?: string | null;
+  spotWrongTaps?: number;
+  spotSafeIndices?: number[];
+}
+
+export interface CheckedFeedbackSnapshot {
+  isCorrect: boolean;
+  skipped: boolean;
+  userAnswer: string;
+  explanationNote?: string;
+  aiApproved?: boolean;
+  aiProviderBadge?: string;
+  retryId?: string;
+  overridden?: boolean;
+}
 
 export interface RoadmapActiveSession {
   version: number;
@@ -275,6 +302,11 @@ export interface RoadmapActiveSession {
   strongWords: string[];
   byKindStats: RoadmapKindStatMap;
   readyToFinish?: boolean;
+  draft?: ExerciseDraftState;
+  checkedState?: CheckedFeedbackSnapshot;
+  tutorOpen?: boolean;
+  tutorHistory?: AiTutorChatTurn[];
+  tutorDraft?: string;
   updatedAt: number;
 }
 
@@ -302,6 +334,155 @@ export interface RoadmapCoachInsight {
   generatedAt: number;
   lessonCountAnalyzed: number;
   source: 'ai' | 'local';
+}
+
+export type WeakSkillId =
+  | 'was_vs_were'
+  | 'should_vs_have_to'
+  | 'used_to_habit'
+  | 'past_continuous'
+  | 'present_perfect'
+  | 'passive_voice'
+  | 'going_to_vs_will'
+  | 'conditionals_would'
+  | 'contrast_linkers'
+  | 'time_clauses'
+  | 'phrasal_verbs'
+  | 'prepositions_core'
+  | 'word_order_syntax'
+  | 'listening_gap'
+  | 'modal_possibility'
+  | 'infinitive_gerund'
+  | 'negation_questions'
+  | 'trouble_vocab';
+
+export interface RemedialBriefingExample {
+  en: string;
+  tr: string;
+  highlight: string;
+  isTrap?: boolean;
+  trapNoteTr?: string;
+  trapNoteEn?: string;
+}
+
+export interface RemedialBriefing {
+  headlineTr: string;
+  headlineEn: string;
+  goldenRuleTr: string;
+  goldenRuleEn: string;
+  mnemonicTr: string;
+  mnemonicEn: string;
+  examples: RemedialBriefingExample[];
+  personalNote?: string;
+  source: 'local' | 'ai';
+}
+
+export interface DiagnosedWeakness {
+  skillId: WeakSkillId;
+  titleTr: string;
+  titleEn: string;
+  subtitleTr: string;
+  subtitleEn: string;
+  severity: 'critical' | 'focus' | 'polish';
+  score: number;
+  errorCount: number;
+  evidenceExamples: Array<{
+    en: string;
+    userAnswer?: string;
+    expected?: string;
+    source: 'recall' | 'roadmap' | 'concept' | 'progress' | 'ai';
+  }>;
+  relatedConceptIds: string[];
+  relatedCardIds: string[];
+  aiReason?: string;
+  lastMasteredAt?: number;
+}
+
+export type RemedialExerciseKind =
+  | 'contrast_duel'
+  | 'spot_fix'
+  | 'scenario_pick'
+  | 'vocab_recall'
+  | 'cloze_blank'
+  | 'word_bank'
+  | 'free_translation';
+
+export interface RemedialExercise {
+  id: string;
+  kind: RemedialExerciseKind;
+  card: Card;
+  promptText: string;
+  promptSubtext: string;
+  postAnswerSubtext?: string;
+  explanationTr: string;
+  explanationEn: string;
+  audioText: string;
+  /** Used by contrast_duel, scenario_pick, cloze_blank */
+  choices?: string[];
+  correctChoice?: string;
+  /** Used by spot_fix: sentence split into clickable tokens with 1 buggy token index */
+  buggyTokens?: string[];
+  buggyTokenIndex?: number;
+  fixChoices?: string[];
+  correctFixToken?: string;
+  correctedSentence?: string;
+  /** Used by word_bank */
+  wordBankTiles?: string[];
+  targetTokens?: string[];
+  expectedAnswers: string[];
+  direction: 'en-to-tr' | 'tr-to-en' | 'en-audio';
+  isRetryRequeue?: boolean;
+}
+
+export interface RemedialLessonPlan {
+  skillId: WeakSkillId;
+  titleTr: string;
+  titleEn: string;
+  briefing: RemedialBriefing;
+  exercises: RemedialExercise[];
+  relatedConceptIds: string[];
+}
+
+export interface RemedialMasteryRecord {
+  skillId: WeakSkillId;
+  completions: number;
+  lastAccuracyPct: number;
+  lastCompletedAt: number;
+  bestAccuracyPct: number;
+}
+
+export const ACTIVE_REMEDIAL_SESSION_VERSION = 1;
+
+export interface RemedialActiveSession {
+  version: number;
+  stage: 'briefing' | 'lesson';
+  skillId: WeakSkillId;
+  plan: RemedialLessonPlan;
+  weakness: DiagnosedWeakness | null;
+  queue: RemedialExercise[];
+  currentIdx: number;
+  totalInitial: number;
+  firstTryCorrect: number;
+  combo: number;
+  maxCombo: number;
+  cheatSheetOpen: boolean;
+  readyToFinish?: boolean;
+  draft?: ExerciseDraftState;
+  checkedState?: CheckedFeedbackSnapshot;
+  tutorOpen?: boolean;
+  tutorHistory?: AiTutorChatTurn[];
+  tutorDraft?: string;
+  updatedAt: number;
+}
+
+export interface RemedialAiOverlayCache {
+  items: Array<{
+    skillId: WeakSkillId;
+    reason: string;
+    severity?: 'critical' | 'focus' | 'polish';
+    evidenceSample?: string;
+  }>;
+  updatedAt: number;
 }
 
 export interface ActivePrompt {
@@ -455,8 +636,50 @@ export type ExtensionMessage =
   | { type: 'FETCH_FALLBACK2_AI_MODELS' }
   | { type: 'GENERATE_AI_COACH_REPORT' }
   | { type: 'GENERATE_ROADMAP_COACH_BANNER'; language?: FeedbackLanguageMode }
+  | {
+      type: 'GENERATE_REMEDIAL_BRIEFING';
+      skillId: WeakSkillId;
+      titleTr: string;
+      titleEn: string;
+      evidence: Array<{ en: string; userAnswer?: string; expected?: string }>;
+      language?: FeedbackLanguageMode;
+    }
+  | {
+      type: 'DIAGNOSE_WEAKNESSES_AI';
+      language?: FeedbackLanguageMode;
+    }
+  | {
+      type: 'ASK_AI_TUTOR';
+      question: string;
+      context: AiTutorContext;
+      history?: AiTutorChatTurn[];
+      language?: FeedbackLanguageMode;
+    }
+  | {
+      type: 'RECORD_LISTENING_RESULT';
+      cardId?: string;
+      isCorrect: boolean;
+      accuracyPercent: number;
+    }
+  | { type: 'RECORD_PAGE_QUIZ_RESULT'; isCorrect: boolean }
+  | { type: 'RUN_STORAGE_HYGIENE' }
   | { type: 'GET_STATUS' }
   | { type: 'SETTINGS_UPDATED' };
+
+export interface AiTutorChatTurn {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+export interface AiTutorContext {
+  sentenceEn: string;
+  meaningTr?: string;
+  promptText?: string;
+  userAnswer?: string;
+  expectedAnswer?: string;
+  exerciseKind?: string;
+  existingExplanation?: string;
+}
 
 export interface StatusSnapshot {
   settings: ExtensionSettings;

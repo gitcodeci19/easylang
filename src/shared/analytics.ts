@@ -45,39 +45,41 @@ const TOPIC_KEYWORDS: Array<{ topic: TopicDomain; pattern: RegExp }> = [
   {
     topic: 'business',
     pattern:
-      /\b(business|company|office|market|money|bank|price|cost|profit|salary|wage|contract|trade|sell|buy|customer|client|manager|career|job|tax|budget|finance|economy|invest|firm|brand|deal|industry|workplace|şirket|ticaret|para|banka|maaş|fiyat|müşteri|sözleşme|ekonomi|iş)\b/i,
+      /\b(business|company|office|market|money|bank|price|cost|profit|salary|wage|contract|trade|sell|buy|customer|client|manager|career|job|tax|budget|finance|economy|invest|firm|brand|deal|industry|workplace|startup|freelance|remote|portfolio|deadline|meeting|email|shipping|cart|sale|promo|discount|store|shop|refund|payment|şirket|ticaret|para|banka|maaş|fiyat|müşteri|sözleşme|ekonomi|iş|kargo|indirim|bütçe|toplantı)\b/i,
   },
   {
     topic: 'tech',
     pattern:
-      /\b(computer|software|data|internet|network|digital|system|device|screen|code|program|robot|science|technology|machine|engine|electric|energy|signal|app|server|phone|battery|algorithm|bilgisayar|yazılım|veri|teknoloji|sistem|bilim|cihaz|enerji|ekran)\b/i,
+      /\b(computer|software|data|internet|network|digital|system|device|screen|code|coding|program|robot|science|technology|machine|engine|electric|energy|signal|app|server|phone|battery|algorithm|ai|gpu|laptop|keyboard|browser|ping|wifi|wi-fi|password|backup|cloud|encryption|latency|debug|bug|open-source|extension|gaming|esports|steam|discord|bilgisayar|yazılım|veri|teknoloji|sistem|bilim|cihaz|enerji|ekran|klavye|şifre|yapay zekâ)\b/i,
   },
   {
     topic: 'health',
     pattern:
-      /\b(health|doctor|hospital|medicine|pain|sick|disease|body|heart|brain|blood|sleep|muscle|skin|breath|injury|fever|diet|stress|mental|sağlık|doktor|hastane|ilaç|ağrı|hasta|vücut|kalp|uyku|tedavi)\b/i,
+      /\b(health|doctor|hospital|medicine|pain|sick|disease|body|heart|brain|blood|sleep|muscle|skin|breath|breathe|injury|fever|diet|stress|mental|posture|gym|workout|marathon|jog|stretch|caffeine|headache|shower|sağlık|doktor|hastane|ilaç|ağrı|hasta|vücut|kalp|uyku|tedavi|antrenman|spor|duruş)\b/i,
   },
   {
     topic: 'travel',
     pattern:
-      /\b(travel|trip|airport|flight|plane|train|bus|ticket|hotel|road|street|city|country|border|map|station|journey|drive|ship|luggage|yolculuk|seyahat|havalimanı|uçak|tren|bilet|otel|şehir|harita|istasyon)\b/i,
+      /\b(travel|trip|airport|flight|plane|train|bus|ticket|hotel|road|street|city|country|border|map|station|journey|drive|ship|luggage|passport|subway|metro|boarding|coast|island|beach|vacation|holiday|camp|camping|tokyo|europe|traffic|yolculuk|seyahat|havalimanı|uçak|tren|bilet|otel|şehir|harita|istasyon|pasaport|tatil|kamp)\b/i,
   },
   {
     topic: 'emotion',
     pattern:
-      /\b(feel|happy|sad|angry|fear|love|hate|hope|trust|agree|argue|promise|honest|proud|shame|worry|surprise|anxious|calm|kind|friend|smile|cry|duygu|mutlu|üzgün|kızgın|korku|sevgi|umut|güven|dürüst|endişe)\b/i,
+      /\b(feel|happy|sad|angry|fear|love|hate|hope|trust|agree|argue|promise|honest|proud|shame|worry|surprise|anxious|calm|kind|friend|smile|cry|music|rock|song|concert|movie|film|cinema|game|gta|spotify|podcast|episode|spoiler|laugh|excited|nervous|mood|burnout|hobby|enjoy|fun|duygu|mutlu|üzgün|kızgın|korku|sevgi|umut|güven|dürüst|endişe|müzik|film|konser|oyun|arkadaş)\b/i,
   },
   {
     topic: 'nature',
     pattern:
-      /\b(nature|weather|rain|snow|wind|sun|river|sea|ocean|mountain|forest|tree|plant|animal|earth|climate|environment|storm|sky|fire|water|doğa|hava|yağmur|rüzgar|deniz|orman|ağaç|hayvan|iklim|çevre)\b/i,
+      /\b(nature|weather|rain|snow|wind|sun|sunset|sunrise|river|sea|ocean|mountain|forest|tree|plant|animal|earth|climate|environment|storm|sky|fire|water|cat|dog|horse|bird|fish|lion|elephant|frog|snake|monkey|spider|bear|wolf|whale|sheep|cow|chicken|pig|pet|wildlife|habitat|nest|wing|tail|feather|fur|turtle|squirrel|owl|dolphin|parrot|doğa|hava|yağmur|rüzgar|deniz|orman|ağaç|hayvan|iklim|çevre|kedi|köpek|kuş|at)\b/i,
   },
   {
     topic: 'academic',
     pattern:
-      /\b(theory|concept|evidence|research|study|analysis|method|principle|factor|logic|reason|policy|law|history|culture|society|education|university|knowledge|abstract|significant|evaluate|teori|kavram|kanıt|araştırma|yöntem|ilke|tarih|kültür|toplum|eğitim|bilgi)\b/i,
+      /\b(theory|concept|evidence|research|study|analysis|method|methodology|principle|factor|logic|reason|policy|law|legal|court|judge|verdict|justice|ethics|moral|philosophy|constitution|copyright|privacy|autonomy|accountability|history|culture|society|education|university|knowledge|abstract|significant|evaluate|hypothesis|experiment|correlation|quantum|neuroplasticity|assignment|exam|course|tutorial|fluency|teori|kavram|kanıt|araştırma|yöntem|ilke|tarih|kültür|toplum|eğitim|bilgi|hukuk|adalet|felsefe)\b/i,
   },
 ];
+
+const topicCache = new WeakMap<Card, TopicDomain>();
 
 export function createInitialSkillProfile(): UserSkillProfile {
   return {
@@ -91,13 +93,18 @@ export function createInitialSkillProfile(): UserSkillProfile {
 }
 
 export function classifyCardTopic(card: Card): TopicDomain {
+  const cached = topicCache.get(card);
+  if (cached) return cached;
   const haystack = `${card.en} ${card.acceptedTr.join(' ')} ${card.exampleEn} ${card.exampleTr}`;
+  let resolved: TopicDomain = 'daily';
   for (const rule of TOPIC_KEYWORDS) {
     if (rule.pattern.test(haystack)) {
-      return rule.topic;
+      resolved = rule.topic;
+      break;
     }
   }
-  return 'daily';
+  topicCache.set(card, resolved);
+  return resolved;
 }
 
 export function normalizePosGroup(pos: string, type: Card['type']): PosGroup {

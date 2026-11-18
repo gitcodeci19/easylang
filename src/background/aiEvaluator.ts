@@ -16,18 +16,29 @@ import {
   saveRoadmapCoachInsight,
   setAiFailoverCooldown,
 } from '../shared/storage.ts';
+import { REMEDIAL_SKILL_ORDER } from '../shared/remedialCatalog.ts';
+import {
+  type AiDiagnosedOverlayItem,
+  isValidWeakSkillId,
+} from '../shared/weaknessDetector.ts';
 import type {
   AiConfig,
   AiProviderIndex,
+  AiTutorChatTurn,
+  AiTutorContext,
   Card,
+  CefrLevel,
   ConceptNote,
   ConceptWeakPointInput,
   FeedbackLanguageMode,
   PageAnswerEvaluation,
   PageTranslationDirection,
+  RemedialBriefingExample,
+  ReviewEvent,
   RoadmapCoachInsight,
   RoadmapLessonRecord,
   ValidatedPageChallenge,
+  WeakSkillId,
 } from '../shared/types';
 
 export const PRIMARY_FAILOVER_TIMEOUT_MS = 8_000;
@@ -589,13 +600,24 @@ export async function explainConceptWithAi(
  */
 export async function generateConceptPracticeCards(
   concept: ConceptNote,
-  aiConfig: AiConfig
+  aiConfig: AiConfig,
+  targetLevel: CefrLevel = 'B1'
 ): Promise<Card[]> {
   if (!hasConfiguredAiProvider(aiConfig)) return [];
 
+  const safeTargetLevel: CefrLevel =
+    targetLevel === 'A1' ||
+    targetLevel === 'A2' ||
+    targetLevel === 'B1' ||
+    targetLevel === 'B2' ||
+    targetLevel === 'C1'
+      ? targetLevel
+      : 'B1';
+
   const systemPrompt =
-    'Generate 2 short everyday English practice sentences using the target structure/word in different contexts along with natural Turkish translations. Return ONLY JSON: {"items": [{"en": "...", "tr": ["..."], "level": "A2"}]}';
+    `Generate 2 natural, modern everyday English practice sentences at CEFR level ${safeTargetLevel} using the target structure/word in different contexts along with natural Turkish translations. Return ONLY JSON: {"items": [{"en": "...", "tr": ["..."], "level": "${safeTargetLevel}"}]}`;
   const userPrompt = [
+    `Target CEFR level: ${safeTargetLevel}`,
     `Target structure/word: "${concept.focusToken}" (${concept.label})`,
     `Reference sentence (do not repeat): "${concept.sourceEn}"`,
     `Explanation: ${concept.explanation}`,
@@ -616,8 +638,8 @@ export async function generateConceptPracticeCards(
       const trArr = Array.isArray(item.tr)
         ? item.tr.map((t) => String(t).trim()).filter(Boolean)
         : [];
-      const lvlRaw = typeof item.level === 'string' ? item.level.trim().toUpperCase() : 'B1';
-      const level = (validLevels.has(lvlRaw) ? lvlRaw : 'B1') as Card['level'];
+      const lvlRaw = typeof item.level === 'string' ? item.level.trim().toUpperCase() : safeTargetLevel;
+      const level = (validLevels.has(lvlRaw) ? lvlRaw : safeTargetLevel) as Card['level'];
       if (!en || trArr.length === 0) continue;
       out.push({
         id: `u_concept_${stamp.toString(36)}_${i}`,
@@ -630,6 +652,7 @@ export async function generateConceptPracticeCards(
         exampleEn: '',
         exampleTr: '',
         source: 'user',
+        origin: 'ai_concept',
         createdAt: stamp + i,
       });
     }
@@ -1052,7 +1075,27 @@ export async function evaluateRoadmapAnswerWithAi(
       params.kind === 'word_bank'
         ? 'Turkish sentence built from word tiles (accept natural Turkish word order if accurate)'
         : 'Open Turkish translation in learning path';
-    return evaluateAnswerWithAi(params.card, params.userAnswer, aiConfig, { contextNote });
+    // When a word card is exercised via its example sentence (e.g. en-to-tr word_bank),
+    // evaluate against the actual prompted sentence & expected Turkish sentence instead of the lone headword.
+    const promptedText = params.promptText.trim();
+    const isExampleSentencePrompt =
+      params.card.type === 'word' &&
+      promptedText.length > 0 &&
+      promptedText.toLowerCase() !== params.card.en.trim().toLowerCase();
+    const effectiveCard: Card = isExampleSentencePrompt
+      ? {
+          ...params.card,
+          type: 'sentence',
+          en: promptedText,
+          acceptedTr:
+            params.expectedAnswers.length > 0
+              ? params.expectedAnswers
+              : params.card.exampleTr
+                ? [params.card.exampleTr]
+                : params.card.acceptedTr,
+        }
+      : params.card;
+    return evaluateAnswerWithAi(effectiveCard, params.userAnswer, aiConfig, { contextNote });
   }
 
   const feedbackLang = getFeedbackLanguageName(aiConfig);
@@ -1074,12 +1117,13 @@ export async function evaluateRoadmapAnswerWithAi(
         `Respond ONLY with valid JSON: {"isCorrect": boolean, "note": "1-2 concise sentences in ${feedbackLang}", "weakPoint": null}`,
       ].join(' ');
 
+  const audioTarget = params.promptText.trim() || params.expectedAnswers[0] || params.card.en;
   const userPrompt = [
     `Level: ${params.card.level} (${params.kind})`,
     isAudio
-      ? `Spoken English target: "${params.card.en}"`
+      ? `Spoken English target: "${audioTarget}"`
       : `Turkish prompt: "${params.promptText}"`,
-    `Reference English: ${params.expectedAnswers.slice(0, 3).join(' | ') || params.card.en}`,
+    `Reference English: ${params.expectedAnswers.slice(0, 3).join(' | ') || audioTarget}`,
     `User's English answer: "${params.userAnswer}"`,
   ].join('\n');
 
@@ -1109,4 +1153,296 @@ export async function evaluateRoadmapAnswerWithAi(
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, reason: 'error', errorMessage: msg };
   }
+}
+
+/**
+ * Generate a personalized Stage 0 AI briefing note and optional modern examples
+ * tailored to the learner's real mistakes for a specific remedial weakness workshop.
+ */
+export async function generateRemedialBriefingWithAi(
+  params: {
+    skillId: WeakSkillId;
+    titleTr: string;
+    titleEn: string;
+    evidence: Array<{ en: string; userAnswer?: string; expected?: string }>;
+    language?: FeedbackLanguageMode;
+  },
+  aiConfig: AiConfig
+): Promise<{
+  personalNote: string;
+  extraExamples: RemedialBriefingExample[];
+  providerIndex?: AiProviderIndex;
+} | null> {
+  if (!hasConfiguredAiProvider(aiConfig)) return null;
+
+  const effectiveLang =
+    params.language && params.language !== 'auto'
+      ? params.language
+      : aiConfig.feedbackLanguage ?? 'auto';
+  const langName = getAiLanguagePromptName(resolveSupportedLanguage(effectiveLang));
+
+  const evidenceLines =
+    params.evidence.length > 0
+      ? params.evidence
+          .slice(0, 5)
+          .map(
+            (e, idx) =>
+              `${idx + 1}. Target: "${e.en}"${e.expected ? ` | Expected: "${e.expected}"` : ''}${e.userAnswer ? ` | User wrote: "${e.userAnswer}"` : ''}`
+          )
+          .join('\n')
+      : 'No prior mistake logs — general introductory lesson.';
+
+  const systemPrompt = [
+    `You are a witty, crystal-clear English-to-Turkish private tutor starting a 1-on-1 remedial micro-lesson. Write explanations in natural ${langName}.`,
+    'Explain what this grammar/usage rule REALLY means before exercises begin, directly referencing the learner’s real past mistakes when provided so they instantly have an "aha!" moment.',
+    'Keep "personalNote" concise (2-3 punchy sentences, max 340 chars, zero fluff).',
+    'Provide 2 fresh, modern everyday English examples (gaming, music, streaming, coding, coffee, travel — not boring textbook lines!) illustrating the rule cleanly.',
+    `Respond ONLY with valid JSON: {"personalNote": "...", "extraExamples": [{"en": "...", "tr": "...", "highlight": "key token"}]}`,
+  ].join('\n');
+
+  const userPrompt = [
+    `Workshop: ${params.titleEn} (${params.titleTr}) [id=${params.skillId}]`,
+    `Learner’s real past mistake evidence:\n${evidenceLines}`,
+  ].join('\n');
+
+  try {
+    const { text, providerIndex } = await callChatCompletionWithSource(
+      aiConfig,
+      systemPrompt,
+      userPrompt,
+      14_000,
+      460
+    );
+    const parsed = extractJsonObject(text);
+    if (!parsed) return null;
+    const personalNote =
+      typeof parsed.personalNote === 'string' ? parsed.personalNote.trim().slice(0, 420) : '';
+    const extraExamples: RemedialBriefingExample[] = [];
+    if (Array.isArray(parsed.extraExamples)) {
+      for (const raw of parsed.extraExamples.slice(0, 2)) {
+        const obj = raw as Record<string, unknown> | null;
+        if (!obj || typeof obj !== 'object') continue;
+        const en = typeof obj.en === 'string' ? obj.en.trim() : '';
+        const tr = typeof obj.tr === 'string' ? obj.tr.trim() : '';
+        const highlight = typeof obj.highlight === 'string' ? obj.highlight.trim() : '';
+        if (en && tr) {
+          extraExamples.push({ en, tr, highlight });
+        }
+      }
+    }
+    if (!personalNote && extraExamples.length === 0) return null;
+    return { personalNote, extraExamples, providerIndex };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Perform an on-demand AI deep diagnostic scan across the user's recent Roadmap mistakes,
+ * Recall errors, and active concept notes to uncover subtle recurring grammar patterns
+ * (e.g., `was` vs `were`, `should` vs `have to`, passive voice, word order).
+ */
+export async function diagnoseWeaknessesWithAi(
+  params: {
+    roadmapHistory: RoadmapLessonRecord[];
+    reviewHistory: ReviewEvent[];
+    conceptNotes: ConceptNote[];
+    cardsById: Map<string, Card>;
+    resolvedSkillIds?: WeakSkillId[];
+    language?: FeedbackLanguageMode;
+  },
+  aiConfig: AiConfig
+): Promise<AiDiagnosedOverlayItem[]> {
+  if (!hasConfiguredAiProvider(aiConfig)) {
+    throw new Error('Enable AI and add an API key in Settings → AI Evaluation first.');
+  }
+
+  const resolvedSet = new Set<WeakSkillId>(params.resolvedSkillIds ?? []);
+  const remainingAllowedIds = REMEDIAL_SKILL_ORDER.filter((id) => !resolvedSet.has(id));
+  if (remainingAllowedIds.length === 0) {
+    return [];
+  }
+
+  const effectiveLang =
+    params.language && params.language !== 'auto'
+      ? params.language
+      : aiConfig.feedbackLanguage ?? 'auto';
+  const langName = getAiLanguagePromptName(resolveSupportedLanguage(effectiveLang));
+
+  // Collect up to 24 concrete recent mistake items
+  const mistakeLines: string[] = [];
+  for (const rec of params.roadmapHistory.slice(-15).reverse()) {
+    for (const m of rec.mistakes) {
+      mistakeLines.push(
+        `[Roadmap/${m.kind}] "${m.en}" | expected="${m.expected}" | user="${m.lastUserAnswer}" | misses=${m.wrongCount}`
+      );
+      if (mistakeLines.length >= 16) break;
+    }
+    if (mistakeLines.length >= 16) break;
+  }
+
+  for (const ev of params.reviewHistory.slice(-80).reverse()) {
+    if (ev.isCorrect) continue;
+    const card = params.cardsById.get(ev.cardId);
+    if (!card) continue;
+    mistakeLines.push(`[Recall/${card.type}/${card.level}] "${card.en}" (expected: ${card.acceptedTr[0] ?? ''})`);
+    if (mistakeLines.length >= 24) break;
+  }
+
+  const activeConceptLines = params.conceptNotes
+    .filter((c) => c.stage < 3 && c.masteredAt === null)
+    .slice(0, 8)
+    .map((c) => `[Concept] "${c.focusToken}" (${c.label}) from "${c.sourceEn}"`);
+
+  if (mistakeLines.length === 0 && activeConceptLines.length === 0) {
+    return [];
+  }
+
+  const allowedIds = remainingAllowedIds.join(', ');
+  const resolvedClause =
+    resolvedSet.size > 0
+      ? `The learner has ALREADY mastered these workshops with >=80% accuracy — DO NOT return or mention them: [${Array.from(resolvedSet).join(', ')}]. Focus strictly on remaining unmastered gaps.`
+      : '';
+  const systemPrompt = [
+    `You are an expert English diagnostic analyst reviewing a Turkish learner’s real error history. Write all "reason" explanations in concise, natural ${langName} (max 150 chars each).`,
+    `Map the learner’s REAL recurring blind spots strictly to these allowed skill IDs: [${allowedIds}].`,
+    ...(resolvedClause ? [resolvedClause] : []),
+    'Identify up to 5 highest-impact weaknesses (for instance: confusing should vs have to, was vs were, passive voice be+V3, word order syntax, missing listening function words, phrasal verbs, time clauses).',
+    'NEVER invent mistakes not present in the log.',
+    `Respond ONLY with valid JSON: {"weaknesses": [{"skillId": "one of allowed IDs", "severity": "critical" | "focus" | "polish", "reason": "sharp personal diagnosis in ${langName}", "evidenceSample": "short quoted example from the log"}]}`,
+  ].join('\n');
+
+  const userPrompt = [
+    'Recent Mistakes Log:',
+    ...mistakeLines,
+    ...(activeConceptLines.length > 0 ? ['', 'Active Concept Gaps:', ...activeConceptLines] : []),
+  ].join('\n');
+
+  const { text } = await callChatCompletionWithSource(
+    aiConfig,
+    systemPrompt,
+    userPrompt,
+    22_000,
+    650
+  );
+  const parsed = extractJsonObject(text);
+  if (!parsed || !Array.isArray(parsed.weaknesses)) return [];
+
+  const out: AiDiagnosedOverlayItem[] = [];
+  const seen = new Set<WeakSkillId>();
+  for (const raw of parsed.weaknesses) {
+    const obj = raw as Record<string, unknown> | null;
+    if (!obj || typeof obj !== 'object') continue;
+    const rawId = typeof obj.skillId === 'string' ? obj.skillId.trim() : '';
+    if (!isValidWeakSkillId(rawId) || resolvedSet.has(rawId) || seen.has(rawId)) continue;
+    seen.add(rawId);
+    const reason = typeof obj.reason === 'string' ? obj.reason.trim().slice(0, 200) : '';
+    if (!reason) continue;
+    const sevRaw = typeof obj.severity === 'string' ? obj.severity.trim() : 'focus';
+    const severity: AiDiagnosedOverlayItem['severity'] =
+      sevRaw === 'critical' || sevRaw === 'focus' || sevRaw === 'polish' ? sevRaw : 'focus';
+    const evidenceSample =
+      typeof obj.evidenceSample === 'string' && obj.evidenceSample.trim()
+        ? obj.evidenceSample.trim().slice(0, 120)
+        : undefined;
+    out.push({ skillId: rawId, reason, severity, evidenceSample });
+    if (out.length >= 5) break;
+  }
+
+  return out;
+}
+
+/**
+ * Answer a learner's on-the-spot question about the current exercise or sentence
+ * (e.g. "neden run kullanılıyor çünkü run koşmak?") with clear, concise logic,
+ * everyday bonus examples, and an optional suggested focus token to pin as a weak spot.
+ */
+export async function askAiTutorWithContext(
+  params: {
+    question: string;
+    context: AiTutorContext;
+    history?: AiTutorChatTurn[];
+    language?: FeedbackLanguageMode;
+  },
+  aiConfig: AiConfig
+): Promise<{
+  answer: string;
+  suggestedFocusToken?: string;
+  providerIndex?: AiProviderIndex;
+}> {
+  if (!hasConfiguredAiProvider(aiConfig)) {
+    throw new Error('Enable AI and add a free API key in Settings → AI Evaluation first.');
+  }
+
+  const question = params.question.trim().slice(0, 400);
+  if (!question) {
+    throw new Error('Question cannot be empty.');
+  }
+
+  const effectiveLang =
+    params.language && params.language !== 'auto'
+      ? params.language
+      : aiConfig.feedbackLanguage ?? 'auto';
+  const langName = getAiLanguagePromptName(resolveSupportedLanguage(effectiveLang));
+
+  const systemPrompt = [
+    `You are a friendly, sharp English-to-Turkish private tutor answering a learner's live question mid-lesson. Respond ONLY in clear, natural ${langName}.`,
+    'Address the learner’s EXACT question first (e.g. if they ask why "run" is used in "We\'ve run out of milk" when "run" means koşmak, explain clearly that "run out of" is a phrasal verb meaning "tükenmek/bitmek", and note any tense/V3 nuance like run-ran-run after "have").',
+    'Give 1-2 short, modern everyday examples when helpful.',
+    'Keep "answer" concise, structured, and easy to read inside a compact popup (max ~550 characters, plain text with short line breaks — no heavy markdown tables or walls of text).',
+    'Set "suggestedFocusToken" to the single English word/pattern worth remembering (e.g. "run out of", "were", "have to") or null.',
+    'Respond ONLY with valid JSON: {"answer": "...", "suggestedFocusToken": "short English phrase or null"}',
+  ].join('\n');
+
+  const historyBlock = (params.history ?? [])
+    .slice(-4)
+    .map((h) => `${h.role === 'user' ? 'Learner' : 'Tutor'}: ${h.text.slice(0, 240)}`)
+    .join('\n');
+
+  const ctx = params.context;
+  const userPrompt = [
+    `Current English target: "${ctx.sentenceEn}"`,
+    ctx.meaningTr ? `Turkish meaning: "${ctx.meaningTr}"` : '',
+    ctx.promptText && ctx.promptText !== ctx.sentenceEn ? `Exercise prompt: "${ctx.promptText}"` : '',
+    ctx.expectedAnswer && ctx.expectedAnswer !== ctx.sentenceEn
+      ? `Expected answer: "${ctx.expectedAnswer}"`
+      : '',
+    ctx.userAnswer ? `Learner's attempt: "${ctx.userAnswer}"` : '',
+    ctx.existingExplanation ? `Shown explanation: "${ctx.existingExplanation}"` : '',
+    historyBlock ? `Previous Q&A on this card:\n${historyBlock}` : '',
+    `Learner's question right now: "${question}"`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const { text, providerIndex } = await callChatCompletionWithSource(
+    aiConfig,
+    systemPrompt,
+    userPrompt,
+    22_000,
+    560
+  );
+
+  const parsed = extractJsonObject(text);
+  const rawAnswer =
+    parsed && typeof parsed.answer === 'string' && parsed.answer.trim()
+      ? parsed.answer.trim()
+      : text.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
+
+  if (!rawAnswer) {
+    throw new Error('AI returned an empty reply.');
+  }
+
+  const suggestedFocusToken =
+    parsed &&
+    typeof parsed.suggestedFocusToken === 'string' &&
+    parsed.suggestedFocusToken.trim().length >= 2
+      ? parsed.suggestedFocusToken.trim().slice(0, 48)
+      : undefined;
+
+  return {
+    answer: rawAnswer.slice(0, 950),
+    suggestedFocusToken,
+    providerIndex,
+  };
 }

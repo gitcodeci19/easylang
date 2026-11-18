@@ -1,3 +1,4 @@
+import { resolveSupportedLanguage } from '../shared/i18n';
 import {
   normalizePageSentenceKey,
   selectPageSentenceCandidates,
@@ -6,6 +7,7 @@ import {
 import {
   clearAskedPageSentencesSubset,
   getAskedPageSentences,
+  getSettings,
   markPageSentenceAsked,
 } from '../shared/storage';
 import type {
@@ -771,20 +773,27 @@ const PAGE_QUIZ_CSS = `
   }
 `;
 
-function mountLoadingPill(): HTMLElement {
+function mountLoadingPill(isTr: boolean): HTMLElement {
   document.getElementById(PAGE_QUIZ_HOST_ID)?.remove();
   const host = document.createElement('div');
   host.id = PAGE_QUIZ_HOST_ID;
   const shadow = host.attachShadow({ mode: 'closed' });
   const style = document.createElement('style');
   style.textContent = PAGE_QUIZ_CSS;
-  const pill = createEl('div', 'etr-pq-loading-pill', 'Challenge hazırlanıyor...');
+  const pill = createEl(
+    'div',
+    'etr-pq-loading-pill',
+    isTr ? 'Challenge hazırlanıyor...' : 'Preparing page challenge...'
+  );
   shadow.append(style, pill);
   (document.body ?? document.documentElement).appendChild(host);
   return host;
 }
 
-function getDirectionLabels(direction: PageTranslationDirection): {
+function getDirectionLabels(
+  direction: PageTranslationDirection,
+  isTr: boolean
+): {
   dirBadge: string;
   promptText: string;
   placeholder: string;
@@ -792,20 +801,25 @@ function getDirectionLabels(direction: PageTranslationDirection): {
   if (direction === 'en-to-tr') {
     return {
       dirBadge: 'EN → TR',
-      promptText: 'Sarı işaretli İngilizce cümleyi Türkçeye çevirin:',
-      placeholder: 'Türkçe çevirisini yazın...',
+      promptText: isTr
+        ? 'Sarı işaretli İngilizce cümleyi Türkçeye çevirin:'
+        : 'Translate the highlighted English sentence into Turkish:',
+      placeholder: isTr ? 'Türkçe çevirisini yazın...' : 'Type the Turkish translation...',
     };
   }
   return {
     dirBadge: 'TR → EN',
-    promptText: 'Sarı işaretli Türkçe cümleyi İngilizceye çevirin:',
-    placeholder: 'İngilizce çevirisini yazın...',
+    promptText: isTr
+      ? 'Sarı işaretli Türkçe cümleyi İngilizceye çevirin:'
+      : 'Translate the highlighted Turkish sentence into English:',
+    placeholder: isTr ? 'İngilizce çevirisini yazın...' : 'Type the English translation...',
   };
 }
 
 function renderAnchoredQuizBox(
   challenge: ValidatedPageChallenge,
-  marks: HTMLElement[]
+  marks: HTMLElement[],
+  isTr: boolean
 ): void {
   document.getElementById(PAGE_QUIZ_HOST_ID)?.remove();
 
@@ -819,7 +833,7 @@ function renderAnchoredQuizBox(
   const card = createEl('div', 'etr-pq-card');
   isolateKeyboardEvents(card);
 
-  const { dirBadge, promptText, placeholder } = getDirectionLabels(challenge.direction);
+  const { dirBadge, promptText, placeholder } = getDirectionLabels(challenge.direction, isTr);
 
   const head = createEl('div', 'etr-pq-head');
   const badges = createEl('div', 'etr-pq-badges');
@@ -827,9 +841,9 @@ function renderAnchoredQuizBox(
     createEl('span', 'etr-pq-badge', 'Challenge'),
     createEl('span', 'etr-pq-dir', dirBadge)
   );
-  const locateBtn = createEl('button', 'etr-pq-locate', '↘ Metne Git');
+  const locateBtn = createEl('button', 'etr-pq-locate', isTr ? '↘ Metne Git' : '↘ Locate Text');
   locateBtn.type = 'button';
-  locateBtn.title = 'İşaretli sarı metne odaklan';
+  locateBtn.title = isTr ? 'İşaretli sarı metne odaklan' : 'Scroll to highlighted sentence';
   locateBtn.addEventListener('click', () => {
     const firstMark = marks[0];
     if (firstMark) {
@@ -839,8 +853,8 @@ function renderAnchoredQuizBox(
   });
   const closeBtn = createEl('button', 'etr-pq-close');
   closeBtn.type = 'button';
-  closeBtn.title = 'Kapat';
-  closeBtn.setAttribute('aria-label', 'Kapat');
+  closeBtn.title = isTr ? 'Kapat' : 'Close';
+  closeBtn.setAttribute('aria-label', isTr ? 'Kapat' : 'Close');
   closeBtn.appendChild(buildCloseSvg());
   closeBtn.addEventListener('click', () => removePageHighlightQuiz());
   head.append(badges, locateBtn, closeBtn);
@@ -896,10 +910,10 @@ function renderAnchoredQuizBox(
   const textarea = createEl('textarea', 'etr-pq-textarea');
   textarea.placeholder = placeholder;
 
-  const submitBtn = createEl('button', 'etr-pq-btn etr-pq-btn-primary', 'Kontrol Et');
+  const submitBtn = createEl('button', 'etr-pq-btn etr-pq-btn-primary', isTr ? 'Kontrol Et' : 'Check');
   submitBtn.type = 'button';
 
-  const skipBtn = createEl('button', 'etr-pq-btn etr-pq-btn-ghost', 'Başka Cümle');
+  const skipBtn = createEl('button', 'etr-pq-btn etr-pq-btn-ghost', isTr ? 'Başka Cümle' : 'Another Sentence');
   skipBtn.type = 'button';
   skipBtn.addEventListener('click', () => {
     void launchPageHighlightQuiz();
@@ -1031,7 +1045,7 @@ function renderAnchoredQuizBox(
 
     submitBtn.disabled = true;
     skipBtn.disabled = true;
-    submitBtn.textContent = 'Kontrol ediliyor...';
+    submitBtn.textContent = isTr ? 'Kontrol ediliyor...' : 'Checking...';
 
     try {
       const response = await sendBgMessage<{
@@ -1049,12 +1063,16 @@ function renderAnchoredQuizBox(
       if (!response?.ok || !response.result) {
         submitBtn.disabled = false;
         skipBtn.disabled = false;
-        submitBtn.textContent = 'Kontrol Et';
-        renderToast(response?.error ?? 'AI kontrolü başarısız oldu.');
+        submitBtn.textContent = isTr ? 'Kontrol Et' : 'Check';
+        renderToast(response?.error ?? (isTr ? 'AI kontrolü başarısız oldu.' : 'AI check failed.'));
         return;
       }
 
       const evaluation = response.result;
+      void sendBgMessage({
+        type: 'RECORD_PAGE_QUIZ_RESULT',
+        isCorrect: evaluation.isCorrect,
+      }).catch(() => {});
       bodyContainer.replaceChildren();
 
       const resultBox = createEl(
@@ -1064,7 +1082,13 @@ function renderAnchoredQuizBox(
       const verdict = createEl(
         'div',
         'etr-pq-verdict',
-        evaluation.isCorrect ? '✓ Doğru çeviri' : '✕ Geliştirilebilir çeviri'
+        evaluation.isCorrect
+          ? isTr
+            ? '✓ Doğru çeviri · +5 XP'
+            : '✓ Accurate translation · +5 XP'
+          : isTr
+            ? '✕ Geliştirilebilir çeviri'
+            : '✕ Needs improvement'
       );
 
       const userBubble = createEl(
@@ -1075,20 +1099,30 @@ function renderAnchoredQuizBox(
         createEl(
           'span',
           'etr-pq-bubble-label',
-          evaluation.isCorrect ? '✓ SENİN CEVABIN' : '✕ SENİN CEVABIN'
+          evaluation.isCorrect
+            ? isTr
+              ? '✓ SENİN CEVABIN'
+              : '✓ YOUR ANSWER'
+            : isTr
+              ? '✕ SENİN CEVABIN'
+              : '✕ YOUR ANSWER'
         ),
         createEl('div', undefined, userAnswer)
       );
 
       const refBubble = createEl('div', 'etr-pq-bubble etr-pq-bubble-good');
       refBubble.append(
-        createEl('span', 'etr-pq-bubble-label', '✓ DOĞRU ANLAM / ÖRNEK ÇEVİRİ'),
+        createEl(
+          'span',
+          'etr-pq-bubble-label',
+          isTr ? '✓ DOĞRU ANLAM / ÖRNEK ÇEVİRİ' : '✓ REFERENCE TRANSLATION'
+        ),
         createEl('div', undefined, evaluation.referenceTranslation)
       );
 
       const aiBubble = createEl('div', 'etr-pq-bubble etr-pq-bubble-ai');
       aiBubble.append(
-        createEl('span', 'etr-pq-bubble-label', '✨ AI DEĞERLENDİRMESİ'),
+        createEl('span', 'etr-pq-bubble-label', isTr ? '✨ AI DEĞERLENDİRMESİ' : '✨ AI FEEDBACK'),
         createEl('div', undefined, evaluation.feedback)
       );
 
@@ -1097,18 +1131,18 @@ function renderAnchoredQuizBox(
       if (challenge.notes) {
         const noteBubble = createEl('div', 'etr-pq-bubble etr-pq-bubble-note');
         noteBubble.append(
-          createEl('span', 'etr-pq-bubble-label', '📌 İPUCU'),
+          createEl('span', 'etr-pq-bubble-label', isTr ? '📌 İPUCU' : '📌 HINT'),
           createEl('div', undefined, challenge.notes)
         );
         resultBox.append(noteBubble);
       }
 
       const nextRow = createEl('div', 'etr-pq-actions');
-      const doneBtn = createEl('button', 'etr-pq-btn etr-pq-btn-ghost', 'Kapat');
+      const doneBtn = createEl('button', 'etr-pq-btn etr-pq-btn-ghost', isTr ? 'Kapat' : 'Close');
       doneBtn.type = 'button';
       doneBtn.addEventListener('click', () => removePageHighlightQuiz());
 
-      const nextBtn = createEl('button', 'etr-pq-btn etr-pq-btn-next', 'Sonraki →');
+      const nextBtn = createEl('button', 'etr-pq-btn etr-pq-btn-next', isTr ? 'Sonraki →' : 'Next →');
       nextBtn.type = 'button';
       nextBtn.addEventListener('click', () => {
         void launchPageHighlightQuiz();
@@ -1121,9 +1155,9 @@ function renderAnchoredQuizBox(
     } catch (error) {
       submitBtn.disabled = false;
       skipBtn.disabled = false;
-      submitBtn.textContent = 'Kontrol Et';
+      submitBtn.textContent = isTr ? 'Kontrol Et' : 'Check';
       const msg = error instanceof Error ? error.message : String(error);
-      renderToast(`Hata: ${msg}`);
+      renderToast(isTr ? `Hata: ${msg}` : `Error: ${msg}`);
     }
   };
 
@@ -1153,6 +1187,9 @@ export async function launchPageHighlightQuiz(): Promise<void> {
     return;
   }
 
+  const settings = await getSettings();
+  const isTr = resolveSupportedLanguage(settings.uiLanguage ?? 'auto') === 'tr';
+
   const persistedAsked = await getAskedPageSentences();
   if (token !== currentRequestToken) return;
 
@@ -1177,17 +1214,25 @@ export async function launchPageHighlightQuiz(): Promise<void> {
       }
       await clearAskedPageSentencesSubset(pageKeys);
       if (token !== currentRequestToken) return;
-      renderToast('All sentences on this page were quizzed once — cycling fresh sentences.');
+      renderToast(
+        isTr
+          ? 'Bu sayfadaki tüm cümleler soruldu — yeni tur başlatılıyor.'
+          : 'All sentences on this page were quizzed once — cycling fresh sentences.'
+      );
       extraction = allPageCandidates;
     }
   }
 
   if (extraction.candidates.length === 0) {
-    renderToast('No suitable complete Turkish or English sentences were found on this page.');
+    renderToast(
+      isTr
+        ? 'Bu sayfada çeviriye uygun tam Türkçe veya İngilizce cümle bulunamadı.'
+        : 'No suitable complete Turkish or English sentences were found on this page.'
+    );
     return;
   }
 
-  mountLoadingPill();
+  mountLoadingPill(isTr);
 
   let verifiedChallenge: ValidatedPageChallenge | null = null;
   let lastError: string | undefined;
@@ -1275,11 +1320,11 @@ export async function launchPageHighlightQuiz(): Promise<void> {
     firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
     window.setTimeout(() => {
       if (token === currentRequestToken) {
-        renderAnchoredQuizBox(verifiedChallenge, marks);
+        renderAnchoredQuizBox(verifiedChallenge, marks, isTr);
       }
     }, 320);
     return;
   }
 
-  renderAnchoredQuizBox(verifiedChallenge, marks);
+  renderAnchoredQuizBox(verifiedChallenge, marks, isTr);
 }
