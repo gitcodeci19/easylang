@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { evaluateTurkishAnswer, levenshteinDistance, normalizeTurkish } from '../src/shared/matcher.ts';
+import {
+  evaluateEnglishAnswer,
+  evaluateTurkishAnswer,
+  levenshteinDistance,
+  normalizeTurkish,
+} from '../src/shared/matcher.ts';
 
 test('normalizeTurkish handles Turkish locale casing and punctuation', () => {
   assert.equal(normalizeTurkish('  İSTEKSİZ (çok), Gönülsüz! '), 'isteksiz gönülsüz');
@@ -39,4 +44,16 @@ test('levenshteinDistance computes expected edit counts', () => {
   assert.equal(levenshteinDistance('araba', 'arab'), 1);
   assert.equal(levenshteinDistance('kitap', 'defter'), 5);
   assert.equal(levenshteinDistance('abc', 'xyz'), 3);
+});
+
+test('evaluateTurkishAnswer accepts multi-synonym comma input and evaluateEnglishAnswer handles contractions and minor typos', () => {
+  const spaceMeanings = ['uzay', 'alan', 'yer', 'boşluk'];
+  assert.equal(evaluateTurkishAnswer('uzay', spaceMeanings, 'word').isCorrect, true);
+  assert.equal(evaluateTurkishAnswer('alan', spaceMeanings, 'word').isCorrect, true);
+  assert.equal(evaluateTurkishAnswer('uzay, alan', spaceMeanings, 'word').isCorrect, true);
+
+  assert.equal(evaluateEnglishAnswer("I don't know", ['I do not know'], 'sentence').isCorrect, true);
+  assert.equal(evaluateEnglishAnswer('to watch', ['watch'], 'word').isCorrect, true);
+  assert.equal(evaluateEnglishAnswer('spcae', ['space'], 'word').isCorrect, true);
+  assert.equal(evaluateEnglishAnswer('hello', ['goodbye'], 'word').isCorrect, false);
 });

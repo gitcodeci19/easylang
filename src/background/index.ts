@@ -3,6 +3,7 @@ import { isUrlBlocked, normalizeBlockedEntry, toChromeExcludeMatches } from '../
 import {
   deleteConceptNoteById,
   getAiConfig,
+  getRoadmapHistory,
   getOnboardingState,
   getPendingPrompt,
   getSettings,
@@ -18,6 +19,7 @@ import {
   evaluatePageTranslationWithAi,
   fetchModelsForSlot,
   generateAiCoachReport,
+  generateRoadmapCoachBanner,
   testProviderConnection,
   translateSelectionWithAi,
   validatePageSentenceCandidates,
@@ -25,6 +27,7 @@ import {
 import {
   buildCurrentAnalyticsReport,
   getStatusSnapshot,
+  handleEvaluateRoadmapExercise,
   handleFlagConceptGap,
   handleMarkDontKnow,
   handleOverrideCorrect,
@@ -426,8 +429,18 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         break;
       }
       case 'OVERRIDE_CORRECT': {
-        const result = await handleOverrideCorrect(message.cardId, Date.now(), message.card);
+        const result = await handleOverrideCorrect(
+          message.cardId,
+          Date.now(),
+          message.card,
+          message.source ?? 'recall'
+        );
         void syncActionBadge();
+        sendResponse({ ok: true, result });
+        break;
+      }
+      case 'EVALUATE_ROADMAP_EXERCISE': {
+        const result = await handleEvaluateRoadmapExercise(message, Date.now());
         sendResponse({ ok: true, result });
         break;
       }
@@ -516,6 +529,21 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
           reportData.conceptNotes
         );
         sendResponse({ ok: true, report });
+        break;
+      }
+      case 'GENERATE_ROADMAP_COACH_BANNER': {
+        const [aiConfig, settings, records] = await Promise.all([
+          getAiConfig(),
+          getSettings(),
+          getRoadmapHistory(),
+        ]);
+        const effectiveLang =
+          message.language ??
+          (settings.uiLanguage && settings.uiLanguage !== 'auto'
+            ? settings.uiLanguage
+            : aiConfig.feedbackLanguage ?? 'auto');
+        const insight = await generateRoadmapCoachBanner(records, aiConfig, effectiveLang);
+        sendResponse({ ok: true, insight });
         break;
       }
       case 'DISMISS_PROMPT': {

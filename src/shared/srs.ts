@@ -374,6 +374,52 @@ function cleanDictationWord(word: string): string {
     .replace(/['’]/g, '');
 }
 
+const CONTRACTION_EXPANSIONS: Record<string, string[]> = {
+  dont: ['do', 'not'],
+  doesnt: ['does', 'not'],
+  didnt: ['did', 'not'],
+  cant: ['can', 'not'],
+  cannot: ['can', 'not'],
+  wont: ['will', 'not'],
+  isnt: ['is', 'not'],
+  arent: ['are', 'not'],
+  wasnt: ['was', 'not'],
+  werent: ['were', 'not'],
+  havent: ['have', 'not'],
+  hasnt: ['has', 'not'],
+  im: ['i', 'am'],
+  youre: ['you', 'are'],
+  were: ['we', 'are'], // only applied when original had apostrophe
+  theyre: ['they', 'are'],
+  its: ['it', 'is'],
+  ive: ['i', 'have'],
+  youve: ['you', 'have'],
+  weve: ['we', 'have'],
+  theyve: ['they', 'have'],
+  ill: ['i', 'will'],
+  youll: ['you', 'will'],
+  well: ['we', 'will'],
+  theyll: ['they', 'will'],
+};
+
+function expandNormalizedTokens(rawWords: string[]): string[] {
+  const out: string[] = [];
+  for (const w of rawWords) {
+    const cleaned = cleanDictationWord(w);
+    const hasApostrophe = /['’]/.test(w);
+    if (cleaned === 'cannot') {
+      out.push('can', 'not');
+    } else if (hasApostrophe && CONTRACTION_EXPANSIONS[cleaned]) {
+      out.push(...CONTRACTION_EXPANSIONS[cleaned]!);
+    } else if (!hasApostrophe && (cleaned === 'dont' || cleaned === 'didnt' || cleaned === 'doesnt' || cleaned === 'cant' || cleaned === 'im' || cleaned === 'youre' || cleaned === 'theyre' || cleaned === 'ive' || cleaned === 'theyve')) {
+      out.push(...CONTRACTION_EXPANSIONS[cleaned]!);
+    } else {
+      out.push(cleaned);
+    }
+  }
+  return out;
+}
+
 /**
  * Grade an English listening dictation attempt word-by-word using Longest Common Subsequence (LCS)
  * alignment so skipped or inserted words in the middle never misalign matching words later in the sentence.
@@ -389,6 +435,16 @@ export function evaluateDictationAnswer(
   const n = actualRawWords.length;
   if (m === 0) {
     return { isCorrect: false, accuracyPercent: 0, tokens: [] };
+  }
+
+  const expNormalized = expandNormalizedTokens(expectedRawWords);
+  const actNormalized = expandNormalizedTokens(actualRawWords);
+  if (expNormalized.join(' ') === actNormalized.join(' ') && expNormalized.length > 0) {
+    return {
+      isCorrect: true,
+      accuracyPercent: 100,
+      tokens: expectedRawWords.map((w) => ({ expected: w, actual: w, matched: true })),
+    };
   }
 
   const expClean = expectedRawWords.map(cleanDictationWord);

@@ -23,6 +23,9 @@ import type {
   ExtensionSettings,
   FullBackupPayload,
   ReviewEvent,
+  RoadmapActiveSession,
+  RoadmapCoachInsight,
+  RoadmapLessonRecord,
   UserCardProgress,
   UserOnboardingState,
   UserSkillProfile,
@@ -88,10 +91,14 @@ const STORAGE_KEYS = {
   AI_FAILOVER_COOLDOWNS: 'aiFailoverCooldowns',
   PAGE_QUIZ_ASKED_SENTENCES: 'pageQuizAskedSentences',
   ROADMAP_STATE: 'roadmapState',
+  ROADMAP_ACTIVE_SESSION: 'roadmapActiveSession',
+  ROADMAP_HISTORY: 'roadmapHistory',
+  ROADMAP_COACH_INSIGHT: 'roadmapCoachInsight',
   ONBOARDING_STATE: 'onboardingState',
 } as const;
 
 const MAX_REVIEW_HISTORY = 1000;
+const MAX_ROADMAP_HISTORY = 200;
 const MAX_ASKED_PAGE_SENTENCES = 1000;
 
 const SESSION_KEYS = {
@@ -294,7 +301,12 @@ export async function resetAllProgress(): Promise<void> {
     [STORAGE_KEYS.CONCEPT_STATE]: createInitialConceptState(),
     [STORAGE_KEYS.DAILY_STATS]: createEmptyDailyStats(),
     [STORAGE_KEYS.ROADMAP_STATE]: createInitialRoadmapState(),
+    [STORAGE_KEYS.ROADMAP_HISTORY]: [],
   });
+  await chrome.storage.local.remove([
+    STORAGE_KEYS.ROADMAP_ACTIVE_SESSION,
+    STORAGE_KEYS.ROADMAP_COACH_INSIGHT,
+  ]);
 }
 
 export async function getRoadmapState(): Promise<RoadmapState> {
@@ -308,6 +320,47 @@ export async function saveRoadmapState(patch: Partial<RoadmapState>): Promise<Ro
   const next = normalizeRoadmapState({ ...current, ...patch });
   await chrome.storage.local.set({ [STORAGE_KEYS.ROADMAP_STATE]: next });
   return next;
+}
+
+export async function getActiveRoadmapSession(): Promise<RoadmapActiveSession | null> {
+  const res = await chrome.storage.local.get(STORAGE_KEYS.ROADMAP_ACTIVE_SESSION);
+  return (res[STORAGE_KEYS.ROADMAP_ACTIVE_SESSION] as RoadmapActiveSession | undefined) ?? null;
+}
+
+export async function saveActiveRoadmapSession(session: RoadmapActiveSession): Promise<void> {
+  await chrome.storage.local.set({ [STORAGE_KEYS.ROADMAP_ACTIVE_SESSION]: session });
+}
+
+export async function clearActiveRoadmapSession(): Promise<void> {
+  await chrome.storage.local.remove(STORAGE_KEYS.ROADMAP_ACTIVE_SESSION);
+}
+
+export async function getRoadmapHistory(): Promise<RoadmapLessonRecord[]> {
+  const res = await chrome.storage.local.get(STORAGE_KEYS.ROADMAP_HISTORY);
+  const raw = res[STORAGE_KEYS.ROADMAP_HISTORY];
+  return Array.isArray(raw) ? (raw as RoadmapLessonRecord[]) : [];
+}
+
+export async function appendRoadmapLessonRecord(
+  record: RoadmapLessonRecord
+): Promise<RoadmapLessonRecord[]> {
+  const current = await getRoadmapHistory();
+  const next = [...current, record];
+  const trimmed =
+    next.length > MAX_ROADMAP_HISTORY
+      ? next.slice(next.length - MAX_ROADMAP_HISTORY)
+      : next;
+  await chrome.storage.local.set({ [STORAGE_KEYS.ROADMAP_HISTORY]: trimmed });
+  return trimmed;
+}
+
+export async function getRoadmapCoachInsight(): Promise<RoadmapCoachInsight | null> {
+  const res = await chrome.storage.local.get(STORAGE_KEYS.ROADMAP_COACH_INSIGHT);
+  return (res[STORAGE_KEYS.ROADMAP_COACH_INSIGHT] as RoadmapCoachInsight | undefined) ?? null;
+}
+
+export async function saveRoadmapCoachInsight(insight: RoadmapCoachInsight): Promise<void> {
+  await chrome.storage.local.set({ [STORAGE_KEYS.ROADMAP_COACH_INSIGHT]: insight });
 }
 
 export async function getConceptState(): Promise<ConceptTrackerState> {

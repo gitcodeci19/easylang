@@ -1,9 +1,8 @@
 import { ratingToCefrProgress } from '../shared/analytics';
-import { getRoadmapCourseRank } from '../shared/curriculum';
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
 import { RoadmapController } from '../shared/roadmapView';
 import { isUrlBlocked } from '../shared/siteFilter';
-import { getAiConfig, getRoadmapState, getSettings, saveAiConfig, saveSettings } from '../shared/storage';
+import { getAiConfig, getSettings, saveAiConfig, saveSettings } from '../shared/storage';
 import type {
   ExtensionMessage,
   FeedbackLanguageMode,
@@ -15,7 +14,6 @@ const popupLangSelect = document.getElementById('popup-lang-select') as HTMLSele
 const countdownText = document.getElementById('countdown-text') as HTMLElement;
 const rankChip = document.getElementById('rank-chip') as HTMLElement;
 const miniTelemetry = document.getElementById('mini-telemetry') as HTMLElement;
-const hudXp = document.getElementById('hud-xp') as HTMLElement;
 
 const muteHourBtn = document.getElementById('mute-hour-btn') as HTMLButtonElement;
 const toggleBlockSiteBtn = document.getElementById('toggle-block-site-btn') as HTMLButtonElement;
@@ -66,9 +64,7 @@ let currentActiveTab: chrome.tabs.Tab | null = null;
 const roadmapController = new RoadmapController({
   container: roadmapMount,
   uiLanguage: 'auto',
-  onStateUpdated: (rmState) => {
-    const rank = getRoadmapCourseRank(rmState);
-    hudXp.textContent = `${rank.courseLevel} · ${rmState.xp} XP`;
+  onStateUpdated: () => {
     void fetchStatus();
   },
 });
@@ -161,13 +157,12 @@ function renderStatus(status: StatusSnapshot): void {
 }
 
 async function fetchStatus(): Promise<void> {
-  const [tabs, res, rmState, settings, ai] = await Promise.all([
+  const [tabs, res, settings, ai] = await Promise.all([
     chrome.tabs.query({ active: true, currentWindow: true }),
     chrome.runtime.sendMessage({ type: 'GET_STATUS' } satisfies ExtensionMessage) as Promise<{
       ok: boolean;
       status?: StatusSnapshot;
     }>,
-    getRoadmapState(),
     getSettings(),
     getAiConfig(),
   ]);
@@ -180,13 +175,6 @@ async function fetchStatus(): Promise<void> {
       : ai.feedbackLanguage && ai.feedbackLanguage !== 'auto'
         ? ai.feedbackLanguage
         : settings.uiLanguage ?? ai.feedbackLanguage ?? 'auto';
-  const isTr = resolveSupportedLanguage(effectiveLang) === 'tr';
-
-  const rmRank = getRoadmapCourseRank(rmState);
-  hudXp.textContent = `${rmRank.courseLevel} · ${rmState.xp} XP`;
-  hudXp.title = isTr
-    ? `Yol Haritası Kurs Seviyesi: ${rmRank.courseLevel} (${rmRank.completedNodesCount}/${rmRank.totalNodesCount} ders tamamlandı · ${rmState.xp} XP)`
-    : `Roadmap Course Rank: ${rmRank.courseLevel} (${rmRank.completedNodesCount}/${rmRank.totalNodesCount} lessons · ${rmState.xp} XP)`;
 
   if (res?.ok && res.status) {
     res.status.settings.uiLanguage = effectiveLang;

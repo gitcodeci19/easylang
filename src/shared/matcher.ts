@@ -82,6 +82,23 @@ export function levenshteinDistance(a: string, b: string): number {
   return prev[b.length] ?? 0;
 }
 
+/** Return true if two equal-length words differ only by a single adjacent letter swap (e.g. "spcae" vs "space"). */
+function isAdjacentTransposition(a: string, b: string): boolean {
+  if (a.length !== b.length || a.length < 4) return false;
+  let foundSwap = false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] === b[i]) continue;
+    if (foundSwap) return false;
+    if (i + 1 < a.length && a[i] === b[i + 1] && a[i + 1] === b[i]) {
+      foundSwap = true;
+      i += 1;
+    } else {
+      return false;
+    }
+  }
+  return foundSwap;
+}
+
 /** Allow small prefix matching for Turkish agglutinative suffixes (e.g., "gitmek" vs "gitme"). */
 function stemOverlapScore(userTokens: string[], targetTokens: string[]): number {
   const filteredUser = userTokens.filter((t) => !TR_STOP_WORDS.has(t));
@@ -132,6 +149,31 @@ export function evaluateTurkishAnswer(
     return { isCorrect: false, matchKind: 'none', matchedTranslation: null, similarity: 0 };
   }
 
+  // If the user typed multiple comma/slash-separated synonyms (e.g. "uzay, alan"), accept if any segment matches
+  if (/[,;/]/.test(rawTrimmed)) {
+    const segments = rawTrimmed
+      .split(/[,;/]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length >= 2);
+    if (segments.length > 1) {
+      for (const seg of segments) {
+        const segEval = evaluateSingleTurkishSegment(seg, acceptedAnswers, cardType);
+        if (segEval.isCorrect) return segEval;
+      }
+    }
+  }
+
+  return evaluateSingleTurkishSegment(rawTrimmed, acceptedAnswers, cardType);
+}
+
+function evaluateSingleTurkishSegment(
+  rawTrimmed: string,
+  acceptedAnswers: string[],
+  cardType: CardType
+): AnswerEvaluation {
+  const normUser = normalizeTurkish(rawTrimmed);
+  const foldedUser = foldTurkishDiacritics(rawTrimmed);
+
   let bestScore = 0;
   let bestTarget: string | null = null;
 
@@ -169,12 +211,12 @@ export function evaluateTurkishAnswer(
     }
 
     const allowedEdits = cardType === 'word' ? (maxLen >= 8 ? 2 : maxLen >= 4 ? 1 : 0) : Math.floor(maxLen * 0.18);
-    if (dist <= allowedEdits && similarity >= 0.78) {
+    if ((dist <= allowedEdits && similarity >= 0.78) || isAdjacentTransposition(foldedUser, foldedCand)) {
       return {
         isCorrect: true,
         matchKind: 'fuzzy',
         matchedTranslation: candidate,
-        similarity,
+        similarity: Math.max(similarity, 0.85),
       };
     }
 
@@ -195,6 +237,107 @@ export function evaluateTurkishAnswer(
           similarity: overlap,
         };
       }
+    }
+  }
+
+  return {
+    isCorrect: false,
+    matchKind: 'none',
+    matchedTranslation: bestTarget,
+    similarity: bestScore,
+  };
+}
+
+const EN_CONTRACTIONS: Array<[RegExp, string]> = [
+  [/\bcan't\b/gi, 'cannot'],
+  [/\bcan\s+not\b/gi, 'cannot'],
+  [/\bwon't\b/gi, 'will not'],
+  [/\bshan't\b/gi, 'shall not'],
+  [/([a-z])n't\b/gi, '$1 not'],
+  [/\bi'm\b/gi, 'i am'],
+  [/\byou're\b/gi, 'you are'],
+  [/\bwe're\b/gi, 'we are'],
+  [/\bthey're\b/gi, 'they are'],
+  [/\bi've\b/gi, 'i have'],
+  [/\byou've\b/gi, 'you have'],
+  [/\bwe've\b/gi, 'we have'],
+  [/\bthey've\b/gi, 'they have'],
+  [/\bi'll\b/gi, 'i will'],
+  [/\byou'll\b/gi, 'you will'],
+  [/\bhe'll\b/gi, 'he will'],
+  [/\bshe'll\b/gi, 'she will'],
+  [/\bit'll\b/gi, 'it will'],
+  [/\bwe'll\b/gi, 'we will'],
+  [/\bthey'll\b/gi, 'they will'],
+  [/\bit's\b/gi, 'it is'],
+  [/\bthat's\b/gi, 'that is'],
+  [/\bthere's\b/gi, 'there is'],
+  [/\bhere's\b/gi, 'here is'],
+  [/\bwhat's\b/gi, 'what is'],
+  [/\bwho's\b/gi, 'who is'],
+];
+
+/** Normalize English text (lowercase, expand contractions, strip punctuation). */
+export function normalizeEnglish(input: string): string {
+  let s = input.toLowerCase().replace(/[’`]/g, "'");
+  for (const [re, rep] of EN_CONTRACTIONS) {
+    s = s.replace(re, rep);
+  }
+  return s
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[.,!?;:"'()\[\]{}\-_/\\]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Evaluate a user's English translation locally (used ahead of AI check in TR->EN mode).
+ * Keeps fuzzy overlap threshold high (>= 0.85) so paraphrased answers escalate to AI cleanly.
+ */
+export function evaluateEnglishAnswer(
+  userInput: string,
+  acceptedEnglish: string[],
+  cardType: CardType
+): AnswerEvaluation {
+  const normUser = normalizeEnglish(userInput);
+  if (!normUser) {
+    return { isCorrect: false, matchKind: 'none', matchedTranslation: null, similarity: 0 };
+  }
+
+  let bestScore = 0;
+  let bestTarget: string | null = null;
+  const userWithoutTo = normUser.replace(/^to\s+/, '');
+
+  for (const cand of acceptedEnglish) {
+    const normCand = normalizeEnglish(cand);
+    if (!normCand) continue;
+
+    if (userInput.trim().toLowerCase() === cand.trim().toLowerCase()) {
+      return { isCorrect: true, matchKind: 'exact', matchedTranslation: cand, similarity: 1 };
+    }
+
+    const candWithoutTo = normCand.replace(/^to\s+/, '');
+    if (normUser === normCand || (cardType === 'word' && userWithoutTo === candWithoutTo)) {
+      return { isCorrect: true, matchKind: 'normalized', matchedTranslation: cand, similarity: 1 };
+    }
+
+    const maxLen = Math.max(normUser.length, normCand.length);
+    const dist = levenshteinDistance(normUser, normCand);
+    const sim = maxLen > 0 ? 1 - dist / maxLen : 0;
+    if (sim > bestScore) {
+      bestScore = sim;
+      bestTarget = cand;
+    }
+
+    if (
+      (cardType === 'word' && maxLen >= 5 && dist <= 1 && sim >= 0.8) ||
+      isAdjacentTransposition(normUser, normCand)
+    ) {
+      return { isCorrect: true, matchKind: 'fuzzy', matchedTranslation: cand, similarity: Math.max(sim, 0.85) };
+    }
+
+    if (cardType === 'sentence' && maxLen >= 10 && dist <= Math.min(2, Math.floor(maxLen * 0.08)) && sim >= 0.88) {
+      return { isCorrect: true, matchKind: 'fuzzy', matchedTranslation: cand, similarity: sim };
     }
   }
 

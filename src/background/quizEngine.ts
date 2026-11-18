@@ -12,7 +12,7 @@ import {
   upsertConceptNote,
 } from '../shared/concepts';
 import { getCardsForUnit } from '../shared/curriculum';
-import { evaluateTurkishAnswer } from '../shared/matcher';
+import { evaluateEnglishAnswer, evaluateTurkishAnswer } from '../shared/matcher';
 import {
   recordCorrectProgress,
   recordWrongProgress,
@@ -56,6 +56,7 @@ import type {
 } from '../shared/types';
 import {
   evaluateAnswerWithAi,
+  evaluateRoadmapAnswerWithAi,
   explainConceptWithAi,
   generateConceptPracticeCards,
   getConfiguredProviders,
@@ -556,13 +557,178 @@ export async function handleFlagConceptGap(
 }
 
 /**
+ * Grade a Duolingo-roadmap exercise (free typing EN->TR / TR->EN, word bank, or
+ * near-miss dictation) with fast local matching and seamless AI fallback for
+ * synonyms, typos, and flexible word order, without altering 20-minute Recall Elo.
+ */
+export async function handleEvaluateRoadmapExercise(
+  payload: {
+    card: Card;
+    direction: 'en-to-tr' | 'tr-to-en' | 'en-audio';
+    kind: 'word_bank' | 'audio_dictation' | 'free_translation';
+    promptText: string;
+    expectedAnswers: string[];
+    userAnswer: string;
+    localCorrect: boolean;
+    localScore: number;
+    recordProgress: boolean;
+  },
+  now: number = Date.now()
+): Promise<AnswerOutcomeResult> {
+  const [settings, aiConfig, progressMap, skillProfile] = await Promise.all([
+    getSettings(),
+    getAiConfig(),
+    getProgressMap(),
+    getSkillProfile(),
+  ]);
+
+  const { card, direction, kind, promptText, expectedAnswers, userAnswer, localCorrect, localScore } = payload;
+  let evaluation: AnswerEvaluation;
+
+  if (direction === 'en-to-tr') {
+    const trCandidates = Array.from(new Set([...expectedAnswers, ...card.acceptedTr].filter(Boolean)));
+    const localEval = evaluateTurkishAnswer(userAnswer, trCandidates, card.type);
+    const isStrongLocal =
+      localCorrect ||
+      localEval.matchKind === 'exact' ||
+      localEval.matchKind === 'normalized' ||
+      (kind === 'free_translation' && localEval.isCorrect && localEval.similarity >= 0.86);
+
+    evaluation = localCorrect
+      ? { isCorrect: true, matchKind: 'exact', matchedTranslation: expectedAnswers[0] ?? null, similarity: 1 }
+      : localEval;
+
+    if (!isStrongLocal && hasConfiguredAiProvider(aiConfig)) {
+      const aiRes = await evaluateRoadmapAnswerWithAi(
+        { card, direction, kind, promptText, expectedAnswers: trCandidates, userAnswer },
+        aiConfig
+      );
+      if (aiRes.ok) {
+        evaluation = {
+          isCorrect: aiRes.isCorrect,
+          matchKind: aiRes.isCorrect ? 'ai' : 'none',
+          matchedTranslation: aiRes.isCorrect ? userAnswer.trim() : evaluation.matchedTranslation,
+          similarity: aiRes.isCorrect ? 1 : evaluation.similarity,
+          aiNote: aiRes.note,
+          aiStatus: 'used',
+          aiProviderIndex: aiRes.providerIndex,
+          weakPoint: aiRes.weakPoint,
+        };
+      } else if (aiRes.reason === 'error') {
+        evaluation = {
+          ...evaluation,
+          aiStatus: 'error',
+          aiNote: `AI unavailable (${aiRes.errorMessage ?? 'unknown error'}) — local matcher applied.`,
+        };
+      }
+    } else if (!isStrongLocal && !hasConfiguredAiProvider(aiConfig)) {
+      evaluation = { ...evaluation, aiStatus: 'disabled' };
+    }
+  } else if (direction === 'tr-to-en') {
+    const enCandidates = Array.from(
+      new Set([...expectedAnswers, card.en, ...(card.exampleEn ? [card.exampleEn] : [])].filter(Boolean))
+    );
+    const localEn = evaluateEnglishAnswer(userAnswer, enCandidates, card.type);
+    const isStrongLocal =
+      localCorrect ||
+      localEn.matchKind === 'exact' ||
+      localEn.matchKind === 'normalized' ||
+      (kind === 'free_translation' && localEn.isCorrect && localEn.similarity >= 0.88);
+
+    evaluation = localCorrect
+      ? { isCorrect: true, matchKind: 'exact', matchedTranslation: expectedAnswers[0] ?? card.en, similarity: 1 }
+      : localEn;
+
+    if (!isStrongLocal && hasConfiguredAiProvider(aiConfig)) {
+      const aiRes = await evaluateRoadmapAnswerWithAi(
+        { card, direction, kind, promptText, expectedAnswers: enCandidates, userAnswer },
+        aiConfig
+      );
+      if (aiRes.ok) {
+        evaluation = {
+          isCorrect: aiRes.isCorrect,
+          matchKind: aiRes.isCorrect ? 'ai' : 'none',
+          matchedTranslation: aiRes.isCorrect ? userAnswer.trim() : evaluation.matchedTranslation,
+          similarity: aiRes.isCorrect ? 1 : evaluation.similarity,
+          aiNote: aiRes.note,
+          aiStatus: 'used',
+          aiProviderIndex: aiRes.providerIndex,
+        };
+      } else if (aiRes.reason === 'error') {
+        evaluation = {
+          ...evaluation,
+          aiStatus: 'error',
+          aiNote: `AI unavailable (${aiRes.errorMessage ?? 'unknown error'}) — local matcher applied.`,
+        };
+      }
+    } else if (!isStrongLocal && !hasConfiguredAiProvider(aiConfig)) {
+      evaluation = { ...evaluation, aiStatus: 'disabled' };
+    }
+  } else {
+    // audio_dictation near-miss escalation to AI for harmless contractions / punctuation / 1-char typo
+    evaluation = {
+      isCorrect: localCorrect,
+      matchKind: localCorrect ? 'exact' : 'none',
+      matchedTranslation: expectedAnswers[0] ?? card.en,
+      similarity: Math.max(0, Math.min(1, localScore / 100)),
+      aiStatus: hasConfiguredAiProvider(aiConfig) ? undefined : 'disabled',
+    };
+
+    if (!localCorrect && localScore >= 65 && hasConfiguredAiProvider(aiConfig)) {
+      const aiRes = await evaluateRoadmapAnswerWithAi(
+        { card, direction, kind, promptText, expectedAnswers, userAnswer },
+        aiConfig
+      );
+      if (aiRes.ok) {
+        evaluation = {
+          isCorrect: aiRes.isCorrect,
+          matchKind: aiRes.isCorrect ? 'ai' : 'none',
+          matchedTranslation: aiRes.isCorrect ? userAnswer.trim() : expectedAnswers[0] ?? card.en,
+          similarity: aiRes.isCorrect ? 1 : evaluation.similarity,
+          aiNote: aiRes.note,
+          aiStatus: 'used',
+          aiProviderIndex: aiRes.providerIndex,
+        };
+      }
+    }
+  }
+
+  const existing = progressMap[card.id] ?? null;
+  const outcome = evaluation.isCorrect
+    ? recordCorrectProgress(existing, card.id, now, 0)
+    : recordWrongProgress(existing, card.id, now, settings.retryDelayMinutes);
+
+  if (payload.recordProgress) {
+    await Promise.all([
+      saveProgressEntry(outcome.progress),
+      updateDailyStats((s) => ({
+        ...s,
+        correct: s.correct + (evaluation.isCorrect ? 1 : 0),
+        wrong: s.wrong + (evaluation.isCorrect ? 0 : 1),
+      })),
+    ]);
+  }
+
+  const cefr = ratingToCefrProgress(skillProfile.rating);
+  return {
+    evaluation,
+    updatedProgress: outcome.progress,
+    nextRepeatLabel: outcome.nextRepeatLabel,
+    ratingDelta: 0,
+    newRating: skillProfile.rating,
+    estimatedLevel: cefr.level,
+  };
+}
+
+/**
  * Undo the just-recorded wrong attempt (useful for Turkish sentence paraphrases)
  * and mark the card as correctly answered instead.
  */
 export async function handleOverrideCorrect(
   cardId: string,
   now: number = Date.now(),
-  cardOverride?: Card
+  cardOverride?: Card,
+  source: 'recall' | 'roadmap' = 'recall'
 ): Promise<AnswerOutcomeResult> {
   const [cards, progressMap, skillProfile, history] = await Promise.all([
     getAllCards(),
@@ -572,6 +738,7 @@ export async function handleOverrideCorrect(
   ]);
   const card = cardOverride ?? cards.find((c) => c.id === cardId);
   const current = progressMap[cardId] ?? null;
+  const isRoadmapSource = source === 'roadmap';
 
   // Roll back the wrong increment from moments ago before applying correct SRS
   const rolledBack = current
@@ -586,29 +753,32 @@ export async function handleOverrideCorrect(
   const outcome = recordCorrectProgress(rolledBack, cardId, now);
 
   // Restore ratingBefore from the last event for this card if available, then score as correct
-  const lastEvent = [...history].reverse().find((ev) => ev.cardId === cardId);
+  const lastEvent = isRoadmapSource ? undefined : [...history].reverse().find((ev) => ev.cardId === cardId);
   const baseProfile = {
     ...skillProfile,
     rating: lastEvent ? lastEvent.ratingBefore : skillProfile.rating,
-    totalAnswered: Math.max(0, skillProfile.totalAnswered - 1),
+    totalAnswered: isRoadmapSource ? skillProfile.totalAnswered : Math.max(0, skillProfile.totalAnswered - 1),
   };
 
-  const ratingUpdate = card
-    ? applyAnswerToSkillProfile(baseProfile, card, true, {
-        responseMs: lastEvent?.responseMs ?? 0,
-        isRetryAttempt: false,
-        now,
-      })
-    : { nextProfile: baseProfile, delta: 0 };
+  const ratingUpdate =
+    !isRoadmapSource && card
+      ? applyAnswerToSkillProfile(baseProfile, card, true, {
+          responseMs: lastEvent?.responseMs ?? 0,
+          isRetryAttempt: false,
+          now,
+        })
+      : { nextProfile: baseProfile, delta: 0 };
 
   await Promise.all([
     saveProgressEntry(outcome.progress),
-    saveSkillProfile(ratingUpdate.nextProfile),
-    replaceLastReviewEventForCard(cardId, (ev) => ({
-      ...ev,
-      isCorrect: true,
-      ratingAfter: ratingUpdate.nextProfile.rating,
-    })),
+    isRoadmapSource ? Promise.resolve() : saveSkillProfile(ratingUpdate.nextProfile),
+    isRoadmapSource
+      ? Promise.resolve()
+      : replaceLastReviewEventForCard(cardId, (ev) => ({
+          ...ev,
+          isCorrect: true,
+          ratingAfter: ratingUpdate.nextProfile.rating,
+        })),
     updateDailyStats((s) => ({
       ...s,
       wrong: Math.max(0, s.wrong - 1),

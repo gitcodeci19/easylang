@@ -210,6 +210,97 @@ export interface ConceptTrackerState {
   lastConceptPromptAtQuestion: number;
 }
 
+export type LessonExerciseKind =
+  | 'select_meaning'
+  | 'select_en'
+  | 'word_bank'
+  | 'cloze_blank'
+  | 'audio_dictation'
+  | 'free_translation';
+
+export interface LessonExercise {
+  id: string;
+  kind: LessonExerciseKind;
+  card: Card;
+  isNewWord: boolean;
+  promptText: string;
+  promptSubtext: string;
+  /** Optional contextual translation revealed ONLY after the user checks their answer (e.g. for cloze_blank). */
+  postAnswerSubtext?: string;
+  audioText: string;
+  /** Options for multiple-choice (`select_meaning`, `select_en`, `cloze_blank`) */
+  choices?: string[];
+  correctChoice?: string;
+  /** Shuffled word tiles for `word_bank` and `audio_dictation` */
+  wordBankTiles?: string[];
+  targetTokens?: string[];
+  /** Expected string(s) for grading */
+  expectedAnswers: string[];
+  direction: 'en-to-tr' | 'tr-to-en' | 'en-audio';
+  isRetryRequeue?: boolean;
+}
+
+export interface RoadmapMistakeItem {
+  cardId: string;
+  en: string;
+  expected: string;
+  kind: LessonExerciseKind;
+  direction: 'en-to-tr' | 'tr-to-en' | 'en-audio';
+  wrongCount: number;
+  repeatedWrong: boolean;
+  lastUserAnswer: string;
+}
+
+export type RoadmapKindStatMap = Partial<
+  Record<LessonExerciseKind, { correct: number; wrong: number }>
+>;
+
+export const ACTIVE_ROADMAP_SESSION_VERSION = 2 as const;
+
+export interface RoadmapActiveSession {
+  version: number;
+  unitId: string;
+  nodeIndex: number | 'jump_test';
+  stepIndex: number;
+  queue: LessonExercise[];
+  currentIdx: number;
+  firstTryCorrectCount: number;
+  totalInitial: number;
+  combo: number;
+  maxCombo: number;
+  mistakesMap: Record<string, RoadmapMistakeItem>;
+  strongWords: string[];
+  byKindStats: RoadmapKindStatMap;
+  readyToFinish?: boolean;
+  updatedAt: number;
+}
+
+export interface RoadmapLessonRecord {
+  id: string;
+  completedAt: number;
+  unitId: string;
+  unitTitleTr: string;
+  unitTitleEn: string;
+  nodeIndex: number | 'jump_test';
+  stepIndex: number;
+  accuracyPct: number;
+  xpEarned: number;
+  totalQuestions: number;
+  firstTryCorrect: number;
+  repeatedMistakeCount: number;
+  strongWords: string[];
+  mistakes: RoadmapMistakeItem[];
+  byKind: RoadmapKindStatMap;
+}
+
+export interface RoadmapCoachInsight {
+  status: 'great' | 'good' | 'focus';
+  message: string;
+  generatedAt: number;
+  lessonCountAnalyzed: number;
+  source: 'ai' | 'local';
+}
+
 export interface ActivePrompt {
   card: Card;
   progress: UserCardProgress | null;
@@ -315,7 +406,7 @@ export type ExtensionMessage =
       card?: Card;
       source?: 'recall' | 'roadmap';
     }
-  | { type: 'OVERRIDE_CORRECT'; cardId: string; card?: Card }
+  | { type: 'OVERRIDE_CORRECT'; cardId: string; card?: Card; source?: 'recall' | 'roadmap' }
   | { type: 'FLAG_CONCEPT_GAP'; cardId: string; focusToken: string; userQuestion?: string; card?: Card }
   | { type: 'DELETE_CONCEPT_NOTE'; conceptId: string }
   | { type: 'SNOOZE_PROMPT'; minutes: number }
@@ -340,6 +431,18 @@ export type ExtensionMessage =
       referenceTranslation: string;
       userAnswer: string;
     }
+  | {
+      type: 'EVALUATE_ROADMAP_EXERCISE';
+      card: Card;
+      direction: 'en-to-tr' | 'tr-to-en' | 'en-audio';
+      kind: 'word_bank' | 'audio_dictation' | 'free_translation';
+      promptText: string;
+      expectedAnswers: string[];
+      userAnswer: string;
+      localCorrect: boolean;
+      localScore: number;
+      recordProgress: boolean;
+    }
   | { type: 'TOGGLE_BLOCK_HOST'; host: string }
   | { type: 'TEST_AI_CONNECTION' }
   | { type: 'FETCH_AI_MODELS' }
@@ -348,6 +451,7 @@ export type ExtensionMessage =
   | { type: 'TEST_FALLBACK2_AI_CONNECTION' }
   | { type: 'FETCH_FALLBACK2_AI_MODELS' }
   | { type: 'GENERATE_AI_COACH_REPORT' }
+  | { type: 'GENERATE_ROADMAP_COACH_BANNER'; language?: FeedbackLanguageMode }
   | { type: 'GET_STATUS' }
   | { type: 'SETTINGS_UPDATED' };
 

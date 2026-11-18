@@ -25,6 +25,7 @@ from curated_enrichment import (
     CURATED_PHRASES_AND_VOCAB,
     CURATED_SENTENCES,
     MISSING_OXFORD_TRANSLATIONS,
+    PRIMARY_WORD_OVERRIDES,
 )
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -117,7 +118,73 @@ NOISY_TR_PATTERNS = (
     "anlamına gelen",
     "mahsus",
     "iltihabı",
+    "fahişe",
+    "ruhani meclis",
+    "makas göbeği",
+    "at tırnağının",
+    "birinci kânun",
+    "kompütör",
+    "kompüter",
+    "oynaşmak",
+    "vız gelir",
+    "muhatara",
+    "mary'nin eline",
+    "nedir bu ?",
+    "mübadele",
+    "trampa",
+    "süprüntü",
+    "külfetli",
+    "hande",
+    "kerime",
+    "zevç",
+    "mabut",
+    "ilâm",
+    "vekâlet",
+    "meblâğ",
+    "mâni",
+    "kâfi",
+    "âlâ",
+    "tediye",
+    "tesviye",
+    "münakalât",
+    "salâhiyet",
+    "nâmevcut",
+    "mükâleme",
+    "muhavere",
+    "teşkilât",
+    "rüsum",
+    "faik",
+    "iptida",
+    "şemsi ay",
+    "bir kadın ismi",
+    "quarrelsome",
+    "forestry",
+    "central",
+    "particular",
+    "catechism",
+    "centum",
+    "baglaç",
+    "baçlaç",
+    "domuz arabası",
+    "değiş tokuş takas",
+    "hastallk",
+    "müküfat",
+    "mobil ya",
+    "buzdolabu",
 )
+
+LATIN_BINOMIAL_RE = re.compile(r"^[A-Z][a-z]{2,}\s+[a-z]{3,}(?:\s+[a-z]{2,})?$")
+NON_BINOMIAL_FIRST_WORDS = frozenset({
+    "Amerikan", "İngiliz", "Ingiliz", "Fransız", "Fransiz", "Alman",
+    "İtalyan", "Italyan", "İspanyol", "Ispanyol", "Rus", "Çin", "Cin",
+    "Japon", "Yunan", "Latin", "Türk", "Turk", "Arap", "Osmanlı", "Osmanli",
+    "Avrupa", "Asya", "Afrika", "Hatay", "Adana", "Antep", "Roma", "Mısır",
+    "Misir", "Katolik", "Hıristiyan", "Ortodoks", "Allah", "Allahtan",
+    "Tanrı", "Noel", "Paskalya", "Mart", "Nisan", "Mayıs", "Haziran",
+    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık", "Pazar",
+    "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi",
+    "Gal", "Mors", "Mary", "John", "London", "Paris", "New", "York", "God", "Lord",
+})
 
 DOMAIN_TAG_RE = re.compile(
     r"^\((?:bot|bayt|den|huk|kim|mat|müh|fiz|tıp|ask|din|dilb|çoğ|k\.dili|anat|zool|jeol|müz|ekon)\.?[^)]*\)",
@@ -160,20 +227,38 @@ def download_cached(name: str, url: str) -> Path:
     return dest
 
 
+def normalize_ocr_turkish(text: str) -> str:
+    """Repair common Redhouse/FreeDict OCR glitches (I/1 confused with lowercase l)."""
+    fixed = re.sub(r"(?<=[a-zçğıöşüâîû])I", "l", text)
+    fixed = re.sub(r"(?<=[a-zçğıöşüâîû])1|1(?=[a-zçğıöşüâîû])", "l", fixed)
+    # Fix leading OCR capital I before lowercase vowels when not an expected proper noun
+    fixed = re.sub(r"\bI(?=[a-zçğıöşü]{2,})", "l", fixed)
+    return fixed
+
+
 def clean_tr_gloss(raw: str) -> list[tuple[str, bool]]:
     """Normalize a FreeDict Turkish translation into (clean_text, is_domain_tagged) pairs."""
-    text = raw.strip()
+    text = raw.replace("\u200b", "").strip()
     if not text:
         return []
+    text = normalize_ocr_turkish(text)
     lowered = text.lower()
     if any(pat in lowered for pat in NOISY_TR_PATTERNS):
+        return []
+
+    if (
+        LATIN_BINOMIAL_RE.match(text)
+        and text.split()[0] not in NON_BINOMIAL_FIRST_WORDS
+        and not any(ch in text for ch in "çğıöşüÇĞİÖŞÜ")
+        and not re.search(r"\b(etmek|olmak|vermek|almak)\b", lowered)
+    ):
         return []
 
     is_domain = bool(DOMAIN_TAG_RE.match(text))
     text = TAG_PREFIX_RE.sub("", text).strip()
     text = BRACKET_NOTE_RE.sub("", text).strip()
 
-    if "(" in text or ")" in text:
+    if "(" in text or ")" in text or "?" in text:
         return []
 
     sub_match = SUBENTRY_SPLIT_RE.search(text)
@@ -181,6 +266,8 @@ def clean_tr_gloss(raw: str) -> list[tuple[str, bool]]:
         text = text[: sub_match.start()].strip()
 
     text = PUNCT_END_RE.sub("", text).strip()
+    if ":" in text and len(text) <= 35 and not re.search(r"\d", text):
+        text = text.replace(":", ",")
     if not text or ":" in text or "." in text:
         return []
 
@@ -188,25 +275,41 @@ def clean_tr_gloss(raw: str) -> list[tuple[str, bool]]:
     results: list[tuple[str, bool]] = []
     for part in parts:
         part = PUNCT_END_RE.sub("", part).strip()
-        if not part:
+        if not part or part.startswith("-"):
+            continue
+        part = normalize_ocr_turkish(part)
+        part_lower = part.lower()
+        if any(pat in part_lower for pat in NOISY_TR_PATTERNS):
+            continue
+        if (
+            LATIN_BINOMIAL_RE.match(part)
+            and part.split()[0] not in NON_BINOMIAL_FIRST_WORDS
+            and not any(ch in part for ch in "çğıöşüÇĞİÖŞÜ")
+            and not re.search(r"\b(etmek|olmak|vermek|almak)\b", part_lower)
+        ):
             continue
         word_count = len(part.split())
         if word_count > 4 or len(part) > 40 or len(part) < 2:
             continue
-        if re.search(r"\b(the|and|with|from|into|somebody|something|one's)\b", part.lower()):
+        if re.search(
+            r"\b(the|and|with|from|into|somebody|something|one's|licence|you|may|can|his|theirs|gray|shew|aged|mania|swum|statuette)\b",
+            part_lower,
+        ):
+            continue
+        if re.search(r"\b(to|of|for|with|on|at)\s+ile\b", part_lower):
             continue
         results.append((part, is_domain))
     return results
 
 
-def parse_freedict(tei_path: Path) -> dict[str, list[tuple[str, bool]]]:
-    """Parse FreeDict eng-tur.tei into {english_headword_lower: [(tr_meaning, is_domain), ...]}."""
+def parse_freedict(tei_path: Path) -> dict[str, list[tuple[str, bool, int]]]:
+    """Parse FreeDict eng-tur.tei into {english_headword_lower: [(tr_meaning, is_domain, sense_idx), ...]}."""
     print("[parse] FreeDict eng-tur.tei...")
     ns = {"tei": "http://www.tei-c.org/ns/1.0"}
     tree = ET.parse(tei_path)
     root = tree.getroot()
 
-    translations: dict[str, list[tuple[str, bool]]] = defaultdict(list)
+    translations: dict[str, list[tuple[str, bool, int]]] = defaultdict(list)
     seen_per_word: dict[str, set[str]] = defaultdict(set)
 
     for entry in root.findall(".//tei:entry", ns):
@@ -217,36 +320,66 @@ def parse_freedict(tei_path: Path) -> dict[str, list[tuple[str, bool]]]:
         if not headword or len(headword) > 40:
             continue
 
-        for quote_el in entry.findall(".//tei:sense/tei:cit[@type='trans']/tei:quote", ns):
-            if not quote_el.text:
-                continue
-            for candidate, is_domain in clean_tr_gloss(quote_el.text):
-                key = candidate.casefold()
-                if key not in seen_per_word[headword]:
-                    seen_per_word[headword].add(key)
-                    translations[headword].append((candidate, is_domain))
+        senses = entry.findall("./tei:sense", ns)
+        for sense_idx, sense_el in enumerate(senses):
+            for quote_el in sense_el.findall("./tei:cit[@type='trans']/tei:quote", ns):
+                if not quote_el.text:
+                    continue
+                for candidate, is_domain in clean_tr_gloss(quote_el.text):
+                    key = candidate.casefold()
+                    if key == "ve" and headword != "and":
+                        continue
+                    if key not in seen_per_word[headword]:
+                        seen_per_word[headword].add(key)
+                        translations[headword].append((candidate, is_domain, sense_idx))
 
     print(f"[parse] FreeDict headwords with clean Turkish meanings: {len(translations)}")
     return dict(translations)
 
 
-def rank_meanings_for_pos(candidates: list[tuple[str, bool]], pos: str) -> list[str]:
-    """Prioritize non-jargon, POS-consistent, concise Turkish meanings."""
+def rank_meanings_for_pos(
+    candidates: list[tuple[str, bool, int]], pos: str, example_tr: str = ""
+) -> list[str]:
+    """Prioritize non-jargon, modern, primary-sense, POS- and example-consistent Turkish meanings."""
     pos_lower = pos.lower()
     wants_verb = "verb" in pos_lower and "adverb" not in pos_lower
+    example_lower = example_tr.casefold()
 
     def is_tr_infinitive(text: str) -> bool:
         last = text.split()[-1].casefold()
         return last.endswith(("mak", "mek"))
 
-    def sort_key(item: tuple[int, tuple[str, bool]]) -> tuple[int, int, int, int]:
-        idx, (text, is_domain) = item
+    def matches_example(text: str) -> bool:
+        if not example_lower:
+            return False
+        tokens = [t.casefold() for t in text.split() if len(t) >= 4]
+        return any(tok[: max(4, len(tok) - 2)] in example_lower for tok in tokens)
+
+    def sort_key(
+        item: tuple[int, tuple[str, bool, int]]
+    ) -> tuple[int, int, int, int, int, int, int]:
+        idx, (text, is_domain, sense_idx) = item
         inf = is_tr_infinitive(text)
         pos_mismatch = 1 if (wants_verb != inf) else 0
-        return (1 if is_domain else 0, pos_mismatch, len(text.split()), idx)
+        archaic_circumflex = 1 if re.search(r"[âîûÂÎÛ]", text) else 0
+        ex_miss = 0 if matches_example(text) else 1
+        sense_bucket = 0 if sense_idx == 0 else (1 if sense_idx == 1 else 2)
+        long_phrase = 1 if len(text.split()) >= 3 else 0
+        return (
+            1 if is_domain else 0,
+            pos_mismatch,
+            archaic_circumflex,
+            ex_miss,
+            sense_bucket,
+            long_phrase,
+            idx,
+        )
 
     ranked = sorted(enumerate(candidates), key=sort_key)
-    return [text for _, (text, _) in ranked][:6]
+    primary = [text for _, (text, is_domain, sense_idx) in ranked if not is_domain and sense_idx <= 1]
+    if primary:
+        return primary[:4]
+    return [text for _, (text, _, _) in ranked][:4]
 
 
 def parse_tatoeba(
@@ -296,10 +429,12 @@ def parse_tatoeba(
         tr_text = tur_sentences.get(tur_id)
         if not tr_text:
             continue
+        tr_text = re.sub(r",([^\s\d\"')\]])", r", \1", tr_text.replace("\u200b", "").strip())
         for eng_id in eng_ids[:1]:
             en_text = eng_sentences.get(eng_id)
             if not en_text:
                 continue
+            en_text = en_text.replace("\u200b", "").strip()
             en_words = en_text.split()
             if not (4 <= len(en_words) <= 12):
                 continue
@@ -375,21 +510,37 @@ def select_stratified_sentences(
     sentence_cards: list[dict[str, object]] = []
     seen_en: set[str] = set()
 
+    SENTENCE_TRANSLATION_OVERRIDES: dict[str, tuple[list[str], str | None]] = {
+        "i'll have to wing it.": (
+            [
+                "Doğaçlama yapmam gerekecek.",
+                "Hazırlıksız idare etmek zorunda kalacağım.",
+                "O an doğaçlama halletmem gerekecek.",
+            ],
+            "B2",
+        ),
+    }
+
     def add_sentence(en_text: str, tr_text: str, lvl: str) -> None:
-        key = en_text.strip().casefold()
+        clean_en = en_text.replace("\u200b", "").strip()
+        clean_tr = tr_text.replace("\u200b", "").strip()
+        key = clean_en.casefold()
         if not key or key in seen_en:
             return
         seen_en.add(key)
+        override = SENTENCE_TRANSLATION_OVERRIDES.get(key)
+        accepted_tr = list(override[0]) if override else [clean_tr]
+        final_lvl = override[1] if (override and override[1]) else lvl
         idx = len(sentence_cards) + 1
         sentence_cards.append(
             {
                 "id": f"s_{idx:04d}",
                 "type": "sentence",
-                "level": lvl,
+                "level": final_lvl,
                 "pos": "sentence",
-                "en": en_text.strip(),
+                "en": clean_en,
                 "phonetic": "",
-                "acceptedTr": [tr_text.strip()],
+                "acceptedTr": accepted_tr,
                 "exampleEn": "",
                 "exampleTr": "",
                 "source": "builtin",
@@ -450,9 +601,21 @@ def build_cards() -> dict[str, object]:
         if key in seen_words:
             continue
 
+        ex_pair = word_examples.get(key)
+        if not ex_pair:
+            # Try first token for multi-word headwords like 'according to', 'used to'
+            for part_tok in WORD_TOKEN_RE.findall(key):
+                if len(part_tok) >= 4 and part_tok in word_examples:
+                    ex_pair = word_examples[part_tok]
+                    break
+
         pos = str(entry.get("type") or "noun").strip()
-        raw_candidates = freedict.get(key, [])
-        tr_list = rank_meanings_for_pos(raw_candidates, pos) if raw_candidates else []
+        ex_tr_hint = ex_pair[1] if (ex_pair and not has_synthetic_or_proper_name(ex_pair[0])) else ""
+        if key in PRIMARY_WORD_OVERRIDES:
+            tr_list = list(PRIMARY_WORD_OVERRIDES[key])
+        else:
+            raw_candidates = freedict.get(key, [])
+            tr_list = rank_meanings_for_pos(raw_candidates, pos, ex_tr_hint) if raw_candidates else []
 
         # Use AI-curated translations when FreeDict lacks the Oxford 5000 word
         if not tr_list and key in MISSING_OXFORD_TRANSLATIONS:
@@ -462,14 +625,6 @@ def build_cards() -> dict[str, object]:
         if not tr_list:
             continue
         seen_words.add(key)
-
-        ex_pair = word_examples.get(key)
-        if not ex_pair:
-            # Try first token for multi-word headwords like 'according to', 'used to'
-            for part_tok in WORD_TOKEN_RE.findall(key):
-                if len(part_tok) >= 4 and part_tok in word_examples:
-                    ex_pair = word_examples[part_tok]
-                    break
 
         if ex_pair and not has_synthetic_or_proper_name(ex_pair[0]):
             example_en, example_tr = ex_pair

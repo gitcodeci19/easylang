@@ -1,4 +1,12 @@
-import type { Card, CefrLevel, UserCardProgress } from './types';
+import type {
+  Card,
+  CefrLevel,
+  LessonExercise,
+  LessonExerciseKind,
+  UserCardProgress,
+} from './types';
+
+export type { LessonExercise, LessonExerciseKind };
 
 export type RoadmapNodeKind = 'skill' | 'story' | 'duo_radio' | 'practice' | 'unit_review';
 
@@ -65,34 +73,6 @@ export interface RoadmapState {
   unlockedUnitIds: string[];
   /** 0 = active/locked, 1 = unit completed, 2 = legendary gold */
   unitCrownLevels: Record<string, number>;
-}
-
-export type LessonExerciseKind =
-  | 'select_meaning'
-  | 'select_en'
-  | 'word_bank'
-  | 'cloze_blank'
-  | 'audio_dictation'
-  | 'free_translation';
-
-export interface LessonExercise {
-  id: string;
-  kind: LessonExerciseKind;
-  card: Card;
-  isNewWord: boolean;
-  promptText: string;
-  promptSubtext: string;
-  audioText: string;
-  /** Options for multiple-choice (`select_meaning`, `select_en`, `cloze_blank`) */
-  choices?: string[];
-  correctChoice?: string;
-  /** Shuffled word tiles for `word_bank` and `audio_dictation` */
-  wordBankTiles?: string[];
-  targetTokens?: string[];
-  /** Expected string(s) for grading */
-  expectedAnswers: string[];
-  direction: 'en-to-tr' | 'tr-to-en' | 'en-audio';
-  isRetryRequeue?: boolean;
 }
 
 function makeStandardNodes(unitTitleTr: string, unitTitleEn: string): UnitNodeDefinition[] {
@@ -1401,10 +1381,30 @@ export function buildUnitLessonExercises(
   const shiftedExampleWords = deterministicShuffle(wordsWithExamples, unitSeed + 404);
   const orderedSentences: Card[] = [...explicitSents, ...extraSents, ...shiftedExampleWords];
 
-  const distractorPoolTr = unitCards
+  const distractorPoolTrWords = (rawWords.length >= 4 ? rawWords : allCards.filter((c) => c.type === 'word'))
     .map((c) => c.acceptedTr[0] ?? '')
     .filter((t) => t.length > 0);
+  const unitPureSentTr = rawPureSentences
+    .map((c) => c.acceptedTr[0] ?? '')
+    .filter((t) => t.length > 0);
+  const distractorPoolTrSentences =
+    unitPureSentTr.length >= 4
+      ? unitPureSentTr
+      : allCards
+          .filter((c) => c.type === 'sentence' && (c.acceptedTr[0] ?? '').length > 0)
+          .slice(0, 40)
+          .map((c) => c.acceptedTr[0] ?? '');
+
   const distractorPoolEnWords = rawWords.map((c) => c.en).filter((t) => t.length > 1);
+  const unitPureSentEn = rawPureSentences.map((c) => c.en).filter((t) => t.length > 1);
+  const distractorPoolEnSentences =
+    unitPureSentEn.length >= 4
+      ? unitPureSentEn
+      : allCards
+          .filter((c) => c.type === 'sentence' && c.en.length > 1)
+          .slice(0, 40)
+          .map((c) => c.en);
+
   const distractorPoolTrTokens = unitCards
     .flatMap((c) => (c.acceptedTr[0] ?? '').split(/\s+/))
     .map((t) => cleanToken(t))
@@ -1419,9 +1419,31 @@ export function buildUnitLessonExercises(
     return candidates.slice(0, count);
   };
 
+  const cardsShareMeaning = (a: Card, b: Card): boolean => {
+    const aSet = new Set(a.acceptedTr.map((t) => t.trim().toLowerCase()));
+    return b.acceptedTr.some((t) => aSet.has(t.trim().toLowerCase()));
+  };
+
   const makeSelectMeaning = (card: Card, idx: number, isReview = false): LessonExercise => {
     const correct = card.acceptedTr[0] ?? '';
-    const distractors = pickDistractors(correct, distractorPoolTr, 3, seed + idx * 13);
+    let trPool: string[];
+    if (card.type === 'sentence') {
+      trPool = distractorPoolTrSentences;
+    } else {
+      const samePosTr = rawWords
+        .filter((c) => c.id !== card.id && c.pos === card.pos && !cardsShareMeaning(card, c))
+        .map((c) => c.acceptedTr[0] ?? '')
+        .filter((t) => t.length > 0);
+      trPool =
+        samePosTr.length >= 4
+          ? samePosTr
+          : rawWords
+              .filter((c) => c.id !== card.id && !cardsShareMeaning(card, c))
+              .map((c) => c.acceptedTr[0] ?? '')
+              .filter((t) => t.length > 0);
+      if (trPool.length < 3) trPool = distractorPoolTrWords;
+    }
+    const distractors = pickDistractors(correct, trPool, 3, seed + idx * 13);
     const choices = deterministicShuffle([correct, ...distractors], seed + idx * 17);
     return {
       id: `ex_${unit.id}_${idx}_sel_tr`,
@@ -1440,16 +1462,38 @@ export function buildUnitLessonExercises(
 
   const makeSelectEn = (card: Card, idx: number, isReview = false): LessonExercise => {
     const correct = card.en;
-    const pool = card.type === 'word' ? distractorPoolEnWords : unitCards.map((c) => c.en);
+    let pool: string[];
+    if (card.type === 'sentence') {
+      pool = distractorPoolEnSentences;
+    } else {
+      const samePosEn = rawWords
+        .filter((c) => c.id !== card.id && c.pos === card.pos && !cardsShareMeaning(card, c))
+        .map((c) => c.en)
+        .filter((t) => t.length > 1);
+      const unitWordEn = rawWords
+        .filter((c) => c.id !== card.id && !cardsShareMeaning(card, c))
+        .map((c) => c.en)
+        .filter((t) => t.length > 1);
+      pool =
+        samePosEn.length >= 4
+          ? samePosEn
+          : unitWordEn.length >= 4
+            ? unitWordEn
+            : distractorPoolEnWords.length >= 4
+              ? distractorPoolEnWords
+              : allCards.filter((c) => c.type === 'word').slice(0, 40).map((c) => c.en);
+    }
     const distractors = pickDistractors(correct, pool, 3, seed + idx * 19);
     const choices = deterministicShuffle([correct, ...distractors], seed + idx * 23);
+    const promptText = card.acceptedTr[0] ?? card.exampleTr ?? '';
     return {
       id: `ex_${unit.id}_${idx}_sel_en`,
       kind: 'select_en',
       card,
       isNewWord: !isReview && !progressMap[card.id],
-      promptText: card.acceptedTr.slice(0, 2).join(', '),
-      promptSubtext: card.exampleTr || '',
+      promptText,
+      promptSubtext: '',
+      postAnswerSubtext: card.exampleTr || undefined,
       audioText: card.en,
       choices,
       correctChoice: correct,
@@ -1506,7 +1550,8 @@ export function buildUnitLessonExercises(
       card,
       isNewWord: false,
       promptText: maskedSentence,
-      promptSubtext: sentenceTr,
+      promptSubtext: '',
+      postAnswerSubtext: sentenceTr,
       audioText: sentenceEn,
       choices,
       correctChoice: targetWord,
@@ -1583,7 +1628,7 @@ export function buildUnitLessonExercises(
       card,
       isNewWord: false,
       promptText: sentenceTr,
-      promptSubtext: card.type === 'word' ? `Anahtar kelime: ${card.en}` : 'Cümleyi İngilizceye çevir',
+      promptSubtext: 'Cümleyi İngilizceye çevir',
       audioText: sentenceEn,
       wordBankTiles,
       targetTokens,
@@ -1636,17 +1681,34 @@ export function buildUnitLessonExercises(
     };
   };
 
-  const makeFreeTranslation = (card: Card, idx: number): LessonExercise => ({
-    id: `ex_${unit.id}_${idx}_free`,
-    kind: 'free_translation',
-    card,
-    isNewWord: false,
-    promptText: card.en,
-    promptSubtext: card.phonetic || '',
-    audioText: card.en,
-    expectedAnswers: card.acceptedTr,
-    direction: 'en-to-tr',
-  });
+  const makeFreeTranslation = (card: Card, idx: number, trToEn = false): LessonExercise => {
+    if (trToEn) {
+      const trPrompt = card.acceptedTr[0] ?? card.exampleTr ?? '';
+      return {
+        id: `ex_${unit.id}_${idx}_free_en`,
+        kind: 'free_translation',
+        card,
+        isNewWord: false,
+        promptText: trPrompt || card.en,
+        promptSubtext: card.type === 'word' && card.exampleTr ? `"${card.exampleTr}"` : '',
+        audioText: card.en,
+        expectedAnswers: [card.en],
+        direction: 'tr-to-en',
+      };
+    }
+
+    return {
+      id: `ex_${unit.id}_${idx}_free`,
+      kind: 'free_translation',
+      card,
+      isNewWord: false,
+      promptText: card.en,
+      promptSubtext: card.phonetic || '',
+      audioText: card.en,
+      expectedAnswers: card.acceptedTr,
+      direction: 'en-to-tr',
+    };
+  };
 
   // Compute unique lesson slot (0..14 across 5 nodes x 3 steps) so every step has a fresh cohort!
   const numericNode = typeof nodeIndex === 'number' ? nodeIndex : 4;
@@ -1762,7 +1824,7 @@ export function buildUnitLessonExercises(
       makeAudioDictation(ns1, 3),
       makeWordBank(ns2, 4, true),
       makeClozeBlank(rev1, 5),
-      makeFreeTranslation(nw1, 6),
+      makeFreeTranslation(nw1, 6, true),
       makeFreeTranslation(ns0, 7),
     ];
   }
@@ -1777,6 +1839,6 @@ export function buildUnitLessonExercises(
     makeAudioDictation(ns1, 4),
     makeWordBank(ns2, 5, false),
     makeFreeTranslation(rev1, 6),
-    makeFreeTranslation(nw2, 7),
+    makeFreeTranslation(nw2, 7, true),
   ];
 }

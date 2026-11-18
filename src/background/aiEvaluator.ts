@@ -5,9 +5,15 @@ import {
   type SupportedLanguageCode,
 } from '../shared/i18n.ts';
 import {
+  buildFallbackRoadmapCoachBanner,
+  LESSON_KIND_LABELS,
+  summarizeRecentRoadmapLessons,
+} from '../shared/roadmapCoach.ts';
+import {
   type AiFailoverCooldowns,
   clearAiFailoverCooldowns,
   getAiFailoverCooldowns,
+  saveRoadmapCoachInsight,
   setAiFailoverCooldown,
 } from '../shared/storage.ts';
 import type {
@@ -19,6 +25,8 @@ import type {
   FeedbackLanguageMode,
   PageAnswerEvaluation,
   PageTranslationDirection,
+  RoadmapCoachInsight,
+  RoadmapLessonRecord,
   ValidatedPageChallenge,
 } from '../shared/types';
 
@@ -477,7 +485,8 @@ export function sanitizeHallucinatedOmission(
 export async function evaluateAnswerWithAi(
   card: Card,
   userAnswer: string,
-  aiConfig: AiConfig
+  aiConfig: AiConfig,
+  options?: { contextNote?: string }
 ): Promise<AiEvalOutcome> {
   if (!hasConfiguredAiProvider(aiConfig)) {
     return { ok: false, reason: 'disabled' };
@@ -489,9 +498,10 @@ export async function evaluateAnswerWithAi(
 [Important Instructions]:
 1. Override any earlier language preference and write all "note", "weakPoint.label", and "weakPoint.explanation" feedback in clear, natural ${feedbackLang}.
 2. CRITICAL: Read every word of the User's answer carefully before writing your note. NEVER claim a word or detail (such as 'eve', a time word, or a pronoun) was omitted if that word or its root/synonym appears in the User's answer!
-3. If the user's translation is natural and accurate, set "isCorrect": true, set "weakPoint": null, and keep "note" brief and encouraging.
-4. When "isCorrect": false, ALWAYS populate "note" with 1-2 clear sentences explaining the exact mistake in the user's translation. Only populate "weakPoint" when there is a genuine, unmistakable grammar or vocabulary pattern to reinforce (e.g., translating Past Continuous "I was taking a walk" as Simple Past, missing "used to", or confusing a core verb).
-5. Write "weakPoint.explanation" as a timeless, standalone rule ONLY about "weakPoint.token" in ${feedbackLang}. NEVER mention other unrelated phrases from the current sentence (such as 'let me know') and NEVER refer to the user's specific wrong phrasing so it makes complete sense when shown on future cards.
+3. The "Reference Turkish meanings" list may be incomplete or omit common senses of polysemous words (e.g., "space" = "uzay / alan / boşluk / yer", "watch" = "izlemek / kol saati", "spring" = "ilkbahar / bahar / yay", "fall" = "düşmek / sonbahar", "bank" = "banka / kıyı", "light" = "ışık / hafif"). Judge against true English-Turkish meaning, and ALWAYS accept valid synonyms, standard dictionary senses, minor 1-2 letter spelling typos (or missing Turkish diacritics like s/ş, c/ç, g/ğ, i/ı, o/ö, u/ü), optional omitted pronouns, and natural Turkish word order as "isCorrect": true!
+4. If the user's translation is accurate (even via synonym or slight typo), set "isCorrect": true, set "weakPoint": null, and keep "note" brief and clear (mentioning any tiny typo gently).
+5. When "isCorrect": false, ALWAYS populate "note" with 1-2 clear sentences explaining the exact mistake in the user's translation. Only populate "weakPoint" when there is a genuine, unmistakable grammar or vocabulary pattern to reinforce (e.g., translating Past Continuous "I was taking a walk" as Simple Past, missing "used to", or confusing a core verb).
+6. Write "weakPoint.explanation" as a timeless, standalone rule ONLY about "weakPoint.token" in ${feedbackLang}. NEVER mention other unrelated phrases from the current sentence (such as 'let me know') and NEVER refer to the user's specific wrong phrasing so it makes complete sense when shown on future cards.
 JSON schema: {"isCorrect": boolean, "note": "brief explanation in ${feedbackLang}", "weakPoint": {"token": "relevant English token/pattern (e.g. was taking / used to / arrive)", "label": "short grammar title in ${feedbackLang}", "explanation": "concise standalone rule ONLY for token in ${feedbackLang}"} | null}`;
 
   const userPrompt = [
@@ -499,6 +509,7 @@ JSON schema: {"isCorrect": boolean, "note": "brief explanation in ${feedbackLang
     `English: ${card.en}`,
     `Reference Turkish meanings: ${card.acceptedTr.join(', ')}`,
     card.exampleEn && card.type === 'word' ? `Example sentence: ${card.exampleEn}` : '',
+    options?.contextNote ? `Exercise format: ${options.contextNote}` : '',
     `User's Turkish answer / note: "${userAnswer}"`,
   ]
     .filter(Boolean)
@@ -726,6 +737,120 @@ export async function testProviderConnection(
   return res;
 }
 
+/**
+ * Generate a concise 1-2 sentence micro-report from the last 5 Roadmap lessons
+ * explaining overall momentum and recurring errors / trouble areas.
+ */
+export async function generateRoadmapCoachBanner(
+  records: RoadmapLessonRecord[],
+  aiConfig: AiConfig,
+  uiLanguage?: FeedbackLanguageMode
+): Promise<RoadmapCoachInsight> {
+  const effectiveLang =
+    uiLanguage && uiLanguage !== 'auto'
+      ? uiLanguage
+      : aiConfig.feedbackLanguage ?? 'auto';
+  const lang = resolveSupportedLanguage(effectiveLang);
+  const langName = getAiLanguagePromptName(lang);
+  const fallback = buildFallbackRoadmapCoachBanner(records, lang);
+
+  if (!hasConfiguredAiProvider(aiConfig) || records.length === 0) {
+    await saveRoadmapCoachInsight(fallback);
+    return fallback;
+  }
+
+  const recent = records.slice(-5);
+  const summary = summarizeRecentRoadmapLessons(recent, 5);
+  const lessonLines = recent.map((rec, idx) => {
+    const missPreview =
+      rec.mistakes.length > 0
+        ? rec.mistakes
+            .slice(0, 4)
+            .map(
+              (m) =>
+                `${m.en}(${LESSON_KIND_LABELS[m.kind].en}${m.repeatedWrong ? ',repeated' : ''},misses=${m.wrongCount})`
+            )
+            .join('; ')
+        : 'none';
+    return `${idx + 1}. Unit "${rec.unitTitleEn}" (${rec.accuracyPct}%, repeatedMisses=${rec.repeatedMistakeCount}): mistakes=[${missPreview}]`;
+  });
+
+  const recurringWordsText =
+    summary.recurringWords.length > 0
+      ? summary.recurringWords
+          .map(
+            (w) =>
+              `"${w.en}" (expected "${w.expected}", missed ${w.wrongCount}x across ${w.repeatedLessons} lesson(s))`
+          )
+          .join('; ')
+      : 'None';
+
+  const weakKindsText =
+    summary.weakKinds.length > 0
+      ? summary.weakKinds
+          .map((wk) => `${LESSON_KIND_LABELS[wk.kind].en}: ${wk.accuracyPct}%`)
+          .join(', ')
+      : 'None';
+
+  const strongKindsText =
+    summary.strongKinds.length > 0
+      ? summary.strongKinds.map((k) => LESSON_KIND_LABELS[k].en).join(', ')
+      : 'General recall';
+
+  const systemPrompt = [
+    `You are a supportive language-coach banner inside a Duolingo-style vocabulary app. Write ONLY in ${langName}.`,
+    'Analyze ONLY the provided last-5-lesson metrics and mistakes.',
+    'Produce a single crisp 1-2 sentence micro-report (MAXIMUM 170 characters total!) that goes at the top-left of the Roadmap screen.',
+    'Examples of tone:',
+    lang === 'tr'
+      ? '- "İlerlemen çok iyi! Son 5 derste %94 doğrulukla harika gidiyorsun."\n- "İlerlemen iyi ancak dinle & yaz ve \'arrive\' kelimesinde sık takılıyorsun."'
+      : '- "Great progress! 94% accuracy over your last 5 lessons with steady flow."\n- "Good progress, though you frequently stumble on audio dictation and \'arrive\'."',
+    'Rules:',
+    '1) Never invent mistakes or words not listed in the stats.',
+    '2) Mention specific recurring missed words or weak exercise skills ONLY when present in the data; if none exist, praise momentum concisely.',
+    '3) Respond ONLY with JSON: {"status": "great" | "good" | "focus", "message": "..."}',
+  ].join('\n');
+
+  const userPrompt = [
+    `Last ${summary.lessonCount} lesson(s) average accuracy: ${summary.avgAccuracyPct}%`,
+    `Accuracy trend: ${summary.trend}`,
+    `Total repeated retry misses: ${summary.totalRepeatedMistakes}`,
+    `Weak exercise types: ${weakKindsText}`,
+    `Recurring missed words: ${recurringWordsText}`,
+    `Strong exercise types: ${strongKindsText}`,
+    `Lesson log:\n${lessonLines.join('\n')}`,
+  ].join('\n');
+
+  try {
+    const content = await callChatCompletion(aiConfig, systemPrompt, userPrompt, 10_000);
+    const parsed = extractJsonObject(content);
+    const rawMsg = typeof parsed?.message === 'string' ? parsed.message.trim() : '';
+    const rawStatus = typeof parsed?.status === 'string' ? parsed.status.trim() : '';
+    if (!rawMsg) {
+      await saveRoadmapCoachInsight(fallback);
+      return fallback;
+    }
+
+    const status: RoadmapCoachInsight['status'] =
+      rawStatus === 'great' || rawStatus === 'good' || rawStatus === 'focus'
+        ? rawStatus
+        : fallback.status;
+
+    const insight: RoadmapCoachInsight = {
+      status,
+      message: rawMsg.replace(/\s+/g, ' ').slice(0, 210),
+      generatedAt: Date.now(),
+      lessonCountAnalyzed: summary.lessonCount,
+      source: 'ai',
+    };
+    await saveRoadmapCoachInsight(insight);
+    return insight;
+  } catch {
+    await saveRoadmapCoachInsight(fallback);
+    return fallback;
+  }
+}
+
 export async function generateAiCoachReport(
   summary: AnalyticsSummary,
   aiConfig: AiConfig,
@@ -900,4 +1025,88 @@ export async function evaluatePageTranslationWithAi(
     referenceTranslation,
     providerIndex,
   };
+}
+
+/**
+ * Evaluate a Duolingo-roadmap exercise in either direction (`en-to-tr`, `tr-to-en`,
+ * or near-miss `en-audio` dictation), accepting valid synonyms, natural word-order
+ * variants in Word Bank, contractions, and minor typos.
+ */
+export async function evaluateRoadmapAnswerWithAi(
+  params: {
+    card: Card;
+    direction: 'en-to-tr' | 'tr-to-en' | 'en-audio';
+    kind: 'word_bank' | 'audio_dictation' | 'free_translation';
+    promptText: string;
+    expectedAnswers: string[];
+    userAnswer: string;
+  },
+  aiConfig: AiConfig
+): Promise<AiEvalOutcome> {
+  if (!hasConfiguredAiProvider(aiConfig)) {
+    return { ok: false, reason: 'disabled' };
+  }
+
+  if (params.direction === 'en-to-tr') {
+    const contextNote =
+      params.kind === 'word_bank'
+        ? 'Turkish sentence built from word tiles (accept natural Turkish word order if accurate)'
+        : 'Open Turkish translation in learning path';
+    return evaluateAnswerWithAi(params.card, params.userAnswer, aiConfig, { contextNote });
+  }
+
+  const feedbackLang = getFeedbackLanguageName(aiConfig);
+  const isAudio = params.direction === 'en-audio' || params.kind === 'audio_dictation';
+  const systemPrompt = isAudio
+    ? [
+        'You grade an English listening-dictation attempt for a language learner.',
+        `Write all "note" explanations in clear, natural ${feedbackLang}.`,
+        'Accept contraction variants (don\'t = do not, I\'m = I am), optional punctuation differences, and minor 1-character harmless typos if the spoken words match accurately.',
+        'Reject if core content words are missing, substituted, or wrong tense/meaning.',
+        `Respond ONLY with valid JSON: {"isCorrect": boolean, "note": "brief helpful feedback in ${feedbackLang}", "weakPoint": null}`,
+      ].join(' ')
+    : [
+        'You are an experienced Turkish-to-English language teacher.',
+        `Evaluate whether the learner's English answer accurately translates the Turkish prompt. Write all "note" feedback in clear, natural ${feedbackLang}.`,
+        params.kind === 'word_bank'
+          ? 'The user arranged English word tiles. Accept valid alternative English word orders (e.g. adverb placement) if grammatical and faithful in meaning.'
+          : 'Accept valid English synonyms (e.g., big/large, maybe/perhaps, kids/children, start/begin), contractions (don\'t = do not), natural phrasings, and minor 1-2 character spelling typos (note any typo gently). Reject opposite meanings, wrong tense/polarity, or wrong vocabulary.',
+        `Respond ONLY with valid JSON: {"isCorrect": boolean, "note": "1-2 concise sentences in ${feedbackLang}", "weakPoint": null}`,
+      ].join(' ');
+
+  const userPrompt = [
+    `Level: ${params.card.level} (${params.kind})`,
+    isAudio
+      ? `Spoken English target: "${params.card.en}"`
+      : `Turkish prompt: "${params.promptText}"`,
+    `Reference English: ${params.expectedAnswers.slice(0, 3).join(' | ') || params.card.en}`,
+    `User's English answer: "${params.userAnswer}"`,
+  ].join('\n');
+
+  try {
+    const { text: content, providerIndex } = await callChatCompletionWithSource(
+      aiConfig,
+      systemPrompt,
+      userPrompt,
+      25_000,
+      420
+    );
+    const parsed = extractJsonObject(content);
+    if (!parsed || typeof parsed.isCorrect !== 'boolean') {
+      const preview = content ? ` (Raw: "${content.slice(0, 70)}")` : ' (Empty response)';
+      return { ok: false, reason: 'error', errorMessage: `Model returned invalid JSON${preview}.` };
+    }
+    const rawNote = typeof parsed.note === 'string' ? parsed.note.trim() : undefined;
+    const sanitized = sanitizeHallucinatedOmission(params.userAnswer, rawNote, undefined);
+    return {
+      ok: true,
+      isCorrect: parsed.isCorrect,
+      note: sanitized.note,
+      weakPoint: undefined,
+      providerIndex,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, reason: 'error', errorMessage: msg };
+  }
 }

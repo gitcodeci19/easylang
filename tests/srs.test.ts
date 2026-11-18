@@ -238,3 +238,9 @@ test('buildSmartYouGlishQuery strips punctuation and proper nouns for high-hit Y
     "didn't know what to say"
   );
 });
+
+test('evaluateDictationAnswer treats standard English contractions and expanded forms as equivalent', () => {
+  const res = evaluateDictationAnswer("I don't want to wait.", 'I do not want to wait');
+  assert.equal(res.isCorrect, true);
+  assert.equal(res.accuracyPercent, 100);
+});
