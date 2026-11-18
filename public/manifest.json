@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EasyLang",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Learn English naturally while browsing — active-recall flashcards, page challenges, listening practice, and spaced repetition.",
   "permissions": [
     "alarms",
