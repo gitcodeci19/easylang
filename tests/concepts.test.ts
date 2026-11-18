@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   advanceConceptAfterAnswer,
   createInitialConceptState,
+  sanitizeConceptExplanationForCard,
   selectDueConceptAndCard,
   upsertConceptNote,
 } from '../src/shared/concepts.ts';
@@ -120,4 +121,15 @@ test('past continuous nuance ("I was taking a walk.") maps to canonical was/were
   );
   assert.ok(nextPick);
   assert.equal(nextPick.card.id, 'p2');
+});
+
+test('sanitizeConceptExplanationForCard drops sentences referencing stale phrases from an earlier source card', () => {
+  const explanation =
+    "'Arrive' fiili 'varmak' anlamına gelir, 'yaklaşmak' değildir. Ayrıca 'let me know' ifadesi Türkçede 'bana haber ver' şeklinde çevrilir.";
+  const cleaned = sanitizeConceptExplanationForCard(
+    explanation,
+    'Let me know as soon as you arrive at the terminal.',
+    "I didn't arrive until it was already too late."
+  );
+  assert.equal(cleaned, "'Arrive' fiili 'varmak' anlamına gelir, 'yaklaşmak' değildir.");
 });

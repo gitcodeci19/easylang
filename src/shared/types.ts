@@ -222,6 +222,8 @@ export interface ActivePrompt {
     focusToken: string;
     stage: ConceptStage;
     explanation: string;
+    sourceCardId?: string;
+    sourceEn?: string;
   };
 }
 

@@ -126,6 +126,8 @@ export async function prepareNextPrompt(now: number = Date.now()): Promise<Activ
           focusToken: conceptPick.concept.focusToken,
           stage: conceptPick.concept.stage,
           explanation: conceptPick.concept.explanation,
+          sourceCardId: conceptPick.concept.sourceCardId,
+          sourceEn: conceptPick.concept.sourceEn,
         },
       };
 

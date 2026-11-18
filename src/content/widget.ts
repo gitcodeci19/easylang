@@ -1,3 +1,4 @@
+import { sanitizeConceptExplanationForCard } from '../shared/concepts';
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
 import type {
   ActivePrompt,
@@ -438,20 +439,26 @@ export function renderRecallWidget(
 
     const conceptSlot = createEl('div');
     const renderConceptBanner = (
-      concept: Pick<ConceptNote, 'label' | 'explanation'>,
+      concept: Pick<ConceptNote, 'label' | 'explanation'> & { sourceEn?: string },
       progressText?: string,
       includeExplanation: boolean = true
     ): void => {
       conceptSlot.replaceChildren();
       const box = createEl('div', 'etr-concept-box');
       box.appendChild(createEl('div', 'etr-concept-title', concept.label));
-      if (includeExplanation && concept.explanation) {
-        box.appendChild(createEl('div', undefined, concept.explanation));
+      const cleanExplanation = includeExplanation
+        ? sanitizeConceptExplanationForCard(concept.explanation, concept.sourceEn, card.en)
+        : '';
+      if (cleanExplanation) {
+        box.appendChild(createEl('div', undefined, cleanExplanation));
       }
       let displayProgress = progressText;
       if (isTr && displayProgress) {
         const addedMatch = displayProgress.match(
           /^📌 "(.+)" added to focus list \(next check in (\d+) questions\)\.$/
+        );
+        const queuedMatch = displayProgress.match(
+          /^🔁 "(.+)" queued again \(next check in (\d+) questions\)\.$/
         );
         const stageMatch = displayProgress.match(
           /^🎯 "(.+)" cleared Stage (\d+) \(next check in (\d+) questions\)\.$/
@@ -462,6 +469,8 @@ export function renderRecallWidget(
         const masteredMatch = displayProgress.match(/^✅ "(.+)" mastered/i);
         if (addedMatch) {
           displayProgress = `📌 "${addedMatch[1]}" odak listesine eklendi (${addedMatch[2]} soru sonra tekrar).`;
+        } else if (queuedMatch) {
+          displayProgress = `🔁 "${queuedMatch[1]}" tekrar sıraya alındı (${queuedMatch[2]} soru sonra tekrar).`;
         } else if (stageFinalMatch) {
           displayProgress = `⏳ "${stageFinalMatch[1]}" ${stageFinalMatch[2]}. aşamayı geçti (${stageFinalMatch[3]} soru sonra son kalıcılık testi!).`;
         } else if (stageMatch) {

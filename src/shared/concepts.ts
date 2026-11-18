@@ -209,6 +209,41 @@ export function inferConceptSpec(
 }
 
 /**
+ * Strip stale sentences from a stored concept explanation when drilling on a
+ * different card (`cardEn` != `sourceEn`) if a sentence quotes an English phrase
+ * (>=3 chars) that appeared in `sourceEn` but does not appear in `cardEn`.
+ */
+export function sanitizeConceptExplanationForCard(
+  explanation: string,
+  sourceEn: string | undefined,
+  cardEn: string
+): string {
+  const clean = explanation.trim();
+  if (!clean || !sourceEn) return clean;
+
+  const normSource = sourceEn.trim().toLowerCase();
+  const normCard = cardEn.trim().toLowerCase();
+  if (!normSource || normSource === normCard) return clean;
+
+  const quoteRe = /['"’“]([a-zA-Z][a-zA-Z\s'-]{1,40})['"’”]/g;
+  const sentences = clean.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const kept = sentences.filter((sentence) => {
+    const quotes = Array.from(sentence.matchAll(quoteRe));
+    for (const m of quotes) {
+      const token = (m[1] ?? '').trim().toLowerCase();
+      if (token.length < 3) continue;
+      const tokenRe = new RegExp(`\\b${escapeRegex(token)}\\b`, 'i');
+      if (tokenRe.test(sourceEn) && !tokenRe.test(cardEn)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  return kept.join(' ').trim();
+}
+
+/**
  * Record or re-activate a weak-spot/grammar concept and schedule its first
  * non-consecutive check after CONCEPT_STAGE_GAPS[0] (2) questions.
  */

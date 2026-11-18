@@ -422,11 +422,17 @@ function inferWeakPointFromNoteIfOmitted(
 
 const OMISSION_CLAIM_RE =
   /(?:^|[^a-zçğıöşü])(atlanm[ıi]ş|eksik|unutulmuş|yazar?ken\s+atlan|omitted|missing|missed|left\s+out)(?:$|[^a-zçğıöşü])/i;
-const QUOTED_TOKEN_RE = /['"’“]([^'"’”]{2,25})['"’”]/g;
+const OMISSION_TOKEN_BEFORE_RE =
+  /['"’“]([^'"’”]{2,25})['"’”]\s*(?:[^\n.;,!?]{0,28}?)(?:atlanm[ıi]ş|eksik|unutulmuş|yazar?ken\s+atlan|omitted|missing|missed|left\s+out)(?:$|[^a-zçğıöşü])/gi;
+const OMISSION_TOKEN_AFTER_RE =
+  /(?:^|[^a-zçğıöşü])(?:omitted|missing|missed|left\s+out|atlanm[ıi]ş|eksik|unutulmuş)\s*(?:[^\n.;,!?]{0,16}?)['"’“]([^'"’”]{2,25})['"’”]/gi;
 
 /**
- * Guard against small-model hallucinations where the AI claims a Turkish word/detail
- * (e.g. `'eve'`) was omitted even though that word or its root is present in `userAnswer`.
+ * Guard against small-model hallucinations where the AI claims a specific quoted
+ * word/detail (e.g. `'eve' detayı atlanmış`) was omitted even though that word
+ * or its root is already present in `userAnswer`. Only inspects quoted tokens
+ * directly paired with an omission verb so valid contrastive feedback like
+ * `"Sen 'zaten' yazmışsın ama 'until' unutulmuş"` is preserved.
  */
 export function sanitizeHallucinatedOmission(
   userAnswer: string,
@@ -445,8 +451,11 @@ export function sanitizeHallucinatedOmission(
     .trim();
   const userWords = normUser.split(' ').filter(Boolean);
 
-  const matches = Array.from(combinedText.matchAll(QUOTED_TOKEN_RE));
-  for (const m of matches) {
+  const omissionTargets = [
+    ...Array.from(combinedText.matchAll(OMISSION_TOKEN_BEFORE_RE)),
+    ...Array.from(combinedText.matchAll(OMISSION_TOKEN_AFTER_RE)),
+  ];
+  for (const m of omissionTargets) {
     const quoted = (m[1] ?? '').toLocaleLowerCase('tr-TR').trim();
     if (!quoted || quoted.length < 2) continue;
     // Check if the quoted word or its 2-4 char Turkish root (e.g. 'ev' for 'eve') is already in userAnswer
@@ -481,9 +490,9 @@ export async function evaluateAnswerWithAi(
 1. Override any earlier language preference and write all "note", "weakPoint.label", and "weakPoint.explanation" feedback in clear, natural ${feedbackLang}.
 2. CRITICAL: Read every word of the User's answer carefully before writing your note. NEVER claim a word or detail (such as 'eve', a time word, or a pronoun) was omitted if that word or its root/synonym appears in the User's answer!
 3. If the user's translation is natural and accurate, set "isCorrect": true, set "weakPoint": null, and keep "note" brief and encouraging.
-4. Only populate "weakPoint" when there is a genuine, unmistakable grammar or tense error (e.g., translating Past Continuous "I was taking a walk" as Simple Past, or missing "used to").
-5. Write "weakPoint.explanation" as a timeless, neutral grammar rule in ${feedbackLang} so it makes sense when shown again on future cards.
-JSON schema: {"isCorrect": boolean, "note": "brief explanation in ${feedbackLang}", "weakPoint": {"token": "relevant English token/pattern (e.g. was taking / used to / to)", "label": "short grammar title in ${feedbackLang}", "explanation": "concise neutral rule explanation in ${feedbackLang}"} | null}`;
+4. When "isCorrect": false, ALWAYS populate "note" with 1-2 clear sentences explaining the exact mistake in the user's translation. Only populate "weakPoint" when there is a genuine, unmistakable grammar or vocabulary pattern to reinforce (e.g., translating Past Continuous "I was taking a walk" as Simple Past, missing "used to", or confusing a core verb).
+5. Write "weakPoint.explanation" as a timeless, standalone rule ONLY about "weakPoint.token" in ${feedbackLang}. NEVER mention other unrelated phrases from the current sentence (such as 'let me know') and NEVER refer to the user's specific wrong phrasing so it makes complete sense when shown on future cards.
+JSON schema: {"isCorrect": boolean, "note": "brief explanation in ${feedbackLang}", "weakPoint": {"token": "relevant English token/pattern (e.g. was taking / used to / arrive)", "label": "short grammar title in ${feedbackLang}", "explanation": "concise standalone rule ONLY for token in ${feedbackLang}"} | null}`;
 
   const userPrompt = [
     `Type: ${card.type === 'sentence' ? 'Sentence' : 'Word'} (${card.level})`,

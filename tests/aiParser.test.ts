@@ -112,4 +112,12 @@ test('sanitizeHallucinatedOmission strips hallucinated missing-word note and wea
   );
   assert.ok((genuine.note ?? '').includes('atlanmış'));
   assert.equal(genuine.weakPoint?.label, 'Yön ve Yer Belirtme');
+
+  // Valid contrastive feedback quoting a word the user DID write alongside a different missing word is preserved
+  const contrastive = sanitizeHallucinatedOmission(
+    'zaten ulaşamadan çok gecikmişti',
+    "Sen 'zaten' yazmışsın ama 'until' bağlacı eksik.",
+    undefined
+  );
+  assert.equal(contrastive.note, "Sen 'zaten' yazmışsın ama 'until' bağlacı eksik.");
 });
