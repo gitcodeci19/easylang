@@ -88,7 +88,7 @@ Groq, NVIDIA ve AMD gibi şirketler, geliştiricilerin kullanabilmesi için ücr
 
 ## 📦 Nasıl Kurulur? (Chrome / Edge / Brave)
 
-1. **[Releases](https://github.com/gitcodeci19/easylang/releases/latest)** sayfasından hazır `EasyLang-v1.0.4.zip` dosyasını indir ve bir klasöre çıkart.
+1. **[Releases](https://github.com/gitcodeci19/easylang/releases/latest)** sayfasından hazır `EasyLang-v1.0.5.zip` dosyasını indir ve bir klasöre çıkart.
 2. Tarayıcıda `chrome://extensions` adresini aç ve sağ üstten **Geliştirici modu**nu etkinleştir.
 3. **Paketlenmemiş öğe yükle** butonuna tıkla ve çıkarttığın klasörü seç.
 
