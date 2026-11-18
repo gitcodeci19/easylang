@@ -256,13 +256,16 @@ test('cleaned deck removes railway/Latin/archaic FreeDict artifacts from A1-B2 w
     }
   }
 
-  // If a missed sentence card is scheduled for spiral review in select_en,
+  // If a missed sentence card not already in the fresh cohort is scheduled for spiral review in select_en,
   // promptText must show a single clean sentence (not ".,") and all distractors must be sentences.
   const animalCardsPool = getCardsForUnit('u02_animals', deckCards);
+  const baselineStepCardIds = new Set(
+    buildUnitLessonExercises('u02_animals', 0, deckCards, {}, 77, 1).map((ex) => ex.card.id)
+  );
   const animalSentence =
-    animalCardsPool.find((c) => c.type === 'sentence' && c.acceptedTr.length > 1) ??
-    animalCardsPool.find((c) => c.type === 'sentence');
-  assert.ok(animalSentence, 'Expected an animal sentence card in u02_animals');
+    animalCardsPool.find((c) => c.type === 'sentence' && !baselineStepCardIds.has(c.id) && c.acceptedTr.length > 1) ??
+    animalCardsPool.find((c) => c.type === 'sentence' && !baselineStepCardIds.has(c.id));
+  assert.ok(animalSentence, 'Expected an animal sentence card in u02_animals outside baseline cohort');
   const reviewExercises = buildUnitLessonExercises(
     'u02_animals',
     0,
@@ -481,4 +484,28 @@ test('formatTextForEnglishTts expands awkward contractions like "we\'ve" and pic
     { lang: 'tr-TR', name: 'Microsoft Tolga - Turkish', localService: true },
   ] as unknown as SpeechSynthesisVoice[];
   assert.equal(pickBestEnglishVoice(trOnly), null);
+});
+
+test('multiple-choice answer positions are well-distributed for large Date.now()-style seeds', () => {
+  const positionCounts = new Map<number, number>([
+    [0, 0],
+    [1, 0],
+    [2, 0],
+    [3, 0],
+  ]);
+  const baseTimestamp = 1795029000000;
+  for (let offset = 0; offset < 25; offset += 1) {
+    const exercises = buildUnitLessonExercises('u02_animals', 0, deckCards, {}, baseTimestamp + offset * 137, 0);
+    for (const ex of exercises) {
+      if (ex.choices && ex.correctChoice && ex.choices.length === 4) {
+        const idx = ex.choices.indexOf(ex.correctChoice);
+        assert.ok(idx >= 0 && idx <= 3);
+        positionCounts.set(idx, (positionCounts.get(idx) ?? 0) + 1);
+      }
+    }
+  }
+  // Every answer slot 0..3 must be represented meaningfully instead of locking onto slot 3
+  for (const slot of [0, 1, 2, 3]) {
+    assert.ok((positionCounts.get(slot) ?? 0) >= 10, `Expected slot ${slot} to appear >= 10 times, got ${positionCounts.get(slot)}`);
+  }
 });

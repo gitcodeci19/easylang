@@ -1354,12 +1354,27 @@ export function getRoadmapCourseRank(state: RoadmapState): {
   };
 }
 
+function normalizeSeed32(seed: number): number {
+  const safe = Number.isFinite(seed) ? Math.trunc(seed) : 1;
+  // Combine upper and lower bits safely before mixing so timestamp seeds (e.g. Date.now()) do not lose LSB precision
+  const high = Math.floor(safe / 0x100000000) >>> 0;
+  const low = safe >>> 0;
+  let x = (low ^ Math.imul(high, 0x9e3779b1)) >>> 0;
+  x = Math.imul(x ^ (x >>> 16), 0x85ebca6b) >>> 0;
+  x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35) >>> 0;
+  return (x ^ (x >>> 16)) >>> 0 || 1;
+}
+
 function deterministicShuffle<T>(items: T[], seed: number): T[] {
   const arr = [...items];
-  let s = seed || 1;
+  let s = normalizeSeed32(seed);
   for (let i = arr.length - 1; i > 0; i -= 1) {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    const j = s % (i + 1);
+    // Mulberry32 PRNG avoids LCG low-bit cycles and float64 rounding bugs on large seeds
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    const rand = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    const j = Math.floor(rand * (i + 1));
     const tmp = arr[i]!;
     arr[i] = arr[j]!;
     arr[j] = tmp;

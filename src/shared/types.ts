@@ -258,7 +258,7 @@ export type RoadmapKindStatMap = Partial<
   Record<LessonExerciseKind, { correct: number; wrong: number }>
 >;
 
-export const ACTIVE_ROADMAP_SESSION_VERSION = 4 as const;
+export const ACTIVE_ROADMAP_SESSION_VERSION = 5 as const;
 
 export interface RoadmapActiveSession {
   version: number;
