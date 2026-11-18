@@ -1,6 +1,7 @@
 {
   "name": "easylang-extension",
   "version": "1.0.5",
+  "license": "GPL-3.0",
   "description": "EasyLang: Manifest V3 browser extension for active-recall English learning, CEFR guided lessons, live webpage translation challenges, and optional AI feedback.",
   "private": true,
   "type": "module",

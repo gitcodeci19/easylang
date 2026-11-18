@@ -11,6 +11,9 @@
   <a href="https://github.com/gitcodeci19/easylang/stargazers">
     <img src="https://img.shields.io/github/stars/gitcodeci19/easylang?style=for-the-badge&label=Y%C4%B1ld%C4%B1z&color=f59e0b" alt="GitHub Yıldız" />
   </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/github/license/gitcodeci19/easylang?style=for-the-badge&label=Lisans&color=3b82f6" alt="Lisans" />
+  </a>
 </p>
 
 ### 🚀 EKLENTİ NELER YAPABİLİYOR?
@@ -104,6 +107,11 @@ npm run build
 
 - API anahtarınız eklentinin yerel tarayıcı depolamasında saklanır.
 - Yapay zekâ istekleri, seçtiğiniz API sağlayıcısına gönderilir.
-- Kullanılan açık kaynaklar ve lisans bilgileri: [ATTRIBUTIONS.md](ATTRIBUTIONS.md)
+- Kullanılan açık kaynaklar ve veri lisansları: [ATTRIBUTIONS.md](ATTRIBUTIONS.md)
+- Proje lisansı: [GNU GPL-3.0](LICENSE)
 
 </details>
+
+---
+
+> **Not:** Bu açık kaynak proje bağımsız olarak geliştirilmektedir; `easylang.com` veya aynı/benzer ada sahip başka bir web sitesi, marka ya da hizmet ile resmi bir bağlantısı yoktur.

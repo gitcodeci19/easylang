@@ -12,6 +12,9 @@
   <a href="https://github.com/gitcodeci19/easylang/stargazers">
     <img src="https://img.shields.io/github/stars/gitcodeci19/easylang?style=for-the-badge&label=Stars&color=f59e0b" alt="GitHub Stars" />
   </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/github/license/gitcodeci19/easylang?style=for-the-badge&label=License&color=3b82f6" alt="License" />
+  </a>
 </p>
 
 **No need to pay for another language app.**
@@ -72,7 +75,8 @@ npm run build
 ```
 
 - Your progress and API keys stay strictly inside your browser.
-- Dataset credits: [ATTRIBUTIONS.md](ATTRIBUTIONS.md)
+- Dataset credits & attributions: [ATTRIBUTIONS.md](ATTRIBUTIONS.md)
+- License: [GNU GPL-3.0](LICENSE)
 
 </details>
 
@@ -88,3 +92,7 @@ https://github.com/user-attachments/assets/8c34cede-0d40-493f-ba9c-981a12020011
 
 - **Idea & Product Direction:** **Orange Head** ([@gitcodeci19](https://github.com/gitcodeci19))
 - **Code & Development:** **Antigravity** *(Google DeepMind AI)*
+
+---
+
+> **Notice:** This is an independent open-source project and is not affiliated with, endorsed by, or connected to `easylang.com` or any other website, brand, or service sharing a similar name.
