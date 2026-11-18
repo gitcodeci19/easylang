@@ -59,7 +59,7 @@ Track your Elo curve, accuracy, and **AI Study Coach** feedback — and connect 
 
 ## 📦 Install (Chrome / Edge / Brave)
 
-1. Download `EasyLang-v1.0.2.zip` from **[Releases](https://github.com/gitcodeci19/easylang/releases/latest)** and unzip it.
+1. Download `EasyLang-v1.0.3.zip` from **[Releases](https://github.com/gitcodeci19/easylang/releases/latest)** and unzip it.
 2. Open `chrome://extensions` and turn on **Developer mode** (top right).
 3. Click **Load unpacked** and select the unzipped folder.
 
