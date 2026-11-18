@@ -65,6 +65,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   levels: ['A1', 'A2', 'B1', 'B2', 'C1'],
   includeUserCards: true,
   autoSpeak: false,
+  ttsVoiceMode: 'hybrid',
   skipFullscreen: true,
   autoCloseCorrectSeconds: 0,
   quietHoursStart: null,

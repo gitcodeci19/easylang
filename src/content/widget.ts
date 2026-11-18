@@ -1,5 +1,6 @@
 import { sanitizeConceptExplanationForCard } from '../shared/concepts';
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
+import { speakEnglishText as speakEnglish } from '../shared/speech';
 import type {
   ActivePrompt,
   AnswerOutcomeResult,
@@ -20,15 +21,6 @@ export function removeRecallWidget(): void {
     escapeKeyHandler = null;
   }
   document.getElementById(HOST_ID)?.remove();
-}
-
-function speakEnglish(text: string): void {
-  if (typeof window.speechSynthesis === 'undefined') return;
-  window.speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = 'en-US';
-  utter.rate = 0.95;
-  window.speechSynthesis.speak(utter);
 }
 
 function sendBgMessage<T = unknown>(message: ExtensionMessage): Promise<T> {

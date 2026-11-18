@@ -20,6 +20,7 @@ import {
   buildFallbackRoadmapCoachBanner,
   isValidActiveRoadmapSession,
 } from './roadmapCoach';
+import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
 import { evaluateDictationAnswer } from './srs';
 import {
   appendRoadmapLessonRecord,
@@ -228,19 +229,6 @@ function getRoadmapLabels(langMode: FeedbackLanguageMode | undefined): {
       },
     },
   };
-}
-
-function speakEnglish(text: string, rate: number = 1.0): void {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  try {
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = 'en-US';
-    utter.rate = rate;
-    window.speechSynthesis.speak(utter);
-  } catch {
-    // Ignore speech synthesis errors
-  }
 }
 
 function getNodeIconSvg(kind: RoadmapNodeKind | 'jump_test' | 'chest', completed: boolean): string {
@@ -943,6 +931,7 @@ export class RoadmapController {
       exitBtn.textContent = '✕';
       exitBtn.title = L.closeBtn;
       exitBtn.addEventListener('click', () => {
+        cancelEnglishSpeech();
         void (async () => {
           await clearActiveRoadmapSession();
           await this.refresh({ skipAutoResume: true });
@@ -1016,6 +1005,14 @@ export class RoadmapController {
                     : L.instrFree;
       stage.appendChild(instr);
 
+      let autoPlayTimer: ReturnType<typeof setTimeout> | null = null;
+      const cancelAutoPlay = (): void => {
+        if (autoPlayTimer) {
+          clearTimeout(autoPlayTimer);
+          autoPlayTimer = null;
+        }
+      };
+
       const promptCard = document.createElement('div');
       promptCard.className = 'duo-ex-prompt-card';
 
@@ -1027,17 +1024,29 @@ export class RoadmapController {
         playNormal.type = 'button';
         playNormal.className = 'duo-audio-big-btn';
         playNormal.innerHTML = '🔊 <span>1.0x</span>';
-        playNormal.addEventListener('click', () => speakEnglish(ex.audioText, 1.0));
+        playNormal.addEventListener('click', () => {
+          cancelAutoPlay();
+          speakEnglish(ex.audioText, 1.0);
+        });
 
         const playSlow = document.createElement('button');
         playSlow.type = 'button';
         playSlow.className = 'duo-audio-slow-btn';
         playSlow.innerHTML = '<span>0.75x</span>';
-        playSlow.addEventListener('click', () => speakEnglish(ex.audioText, 0.72));
+        playSlow.addEventListener('click', () => {
+          cancelAutoPlay();
+          speakEnglish(ex.audioText, 0.72);
+        });
 
         audioRow.append(playNormal, playSlow);
         promptCard.appendChild(audioRow);
-        speakEnglish(ex.audioText, 1.0);
+        // Settle 220ms after popup/stage render so Chrome's cloud TTS stream does not clip opening words
+        autoPlayTimer = setTimeout(() => {
+          autoPlayTimer = null;
+          if (promptCard.isConnected) {
+            speakEnglish(ex.audioText, 1.0);
+          }
+        }, 220);
       } else {
         const promptMain = document.createElement('div');
         promptMain.className = 'duo-ex-prompt-main';
@@ -1050,7 +1059,10 @@ export class RoadmapController {
           spk.type = 'button';
           spk.className = 'duo-audio-mini-btn';
           spk.textContent = '🔊';
-          spk.addEventListener('click', () => speakEnglish(ex.audioText, 1.0));
+          spk.addEventListener('click', () => {
+            cancelAutoPlay();
+            speakEnglish(ex.audioText, 1.0);
+          });
           promptMain.appendChild(spk);
         }
 
@@ -1069,7 +1081,12 @@ export class RoadmapController {
         }
 
         if (allowQuestionAudio) {
-          speakEnglish(ex.audioText, 1.0);
+          autoPlayTimer = setTimeout(() => {
+            autoPlayTimer = null;
+            if (promptCard.isConnected) {
+              speakEnglish(ex.audioText, 1.0);
+            }
+          }, 220);
         }
       }
 
@@ -1195,7 +1212,7 @@ export class RoadmapController {
                 if (wbLocked) return;
                 usedIndices.push(idx);
                 if (ex.direction !== 'en-to-tr') {
-                  speakEnglish(word, 1.0);
+                  speakEnglish(word, 1.0, { isQuickTile: true });
                 }
                 renderWordBankState();
                 refreshCheckDisabled();
@@ -1454,7 +1471,9 @@ export class RoadmapController {
         if (ex.postAnswerSubtext) {
           const revealEl = document.createElement('div');
           revealEl.className = 'duo-fb-note';
-          revealEl.textContent = ex.postAnswerSubtext;
+          revealEl.textContent = isTr
+            ? `Anlamı: ${ex.postAnswerSubtext}`
+            : `Meaning: ${ex.postAnswerSubtext}`;
           fbText.appendChild(revealEl);
         }
 

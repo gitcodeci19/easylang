@@ -121,6 +121,7 @@ const aiCoachBtn = document.getElementById('ai-coach-btn') as HTMLButtonElement;
 const aiCoachOutput = document.getElementById('ai-coach-output') as HTMLElement;
 const skipFullscreenInput = document.getElementById('skipFullscreen') as HTMLInputElement;
 const autoSpeakInput = document.getElementById('autoSpeak') as HTMLInputElement;
+const ttsVoiceModeSelect = document.getElementById('ttsVoiceMode') as HTMLSelectElement;
 const autoTranslateInput = document.getElementById('autoTranslateContextMenu') as HTMLInputElement;
 const settingsSavedMsg = document.getElementById('settings-saved-msg') as HTMLElement;
 
@@ -468,6 +469,7 @@ async function loadSettingsIntoForm(): Promise<void> {
   includeUserCardsInput.checked = s.includeUserCards;
   skipFullscreenInput.checked = s.skipFullscreen;
   autoSpeakInput.checked = s.autoSpeak;
+  ttsVoiceModeSelect.value = s.ttsVoiceMode ?? 'hybrid';
   autoTranslateInput.checked = s.autoTranslateContextMenu;
 
   const boxes = Array.from(levelsGroup.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
@@ -1001,6 +1003,7 @@ settingsForm.addEventListener('submit', async (e) => {
     includeUserCards: includeUserCardsInput.checked,
     skipFullscreen: skipFullscreenInput.checked,
     autoSpeak: autoSpeakInput.checked,
+    ttsVoiceMode: (ttsVoiceModeSelect.value || 'hybrid') as 'hybrid' | 'natural' | 'local',
     autoTranslateContextMenu: autoTranslateInput.checked,
   });
 

@@ -39,6 +39,7 @@ export interface UserCardProgress {
 }
 
 export type ContentMode = 'mixed' | 'word' | 'sentence';
+export type TtsVoiceMode = 'hybrid' | 'natural' | 'local';
 
 export interface ExtensionSettings {
   enabled: boolean;
@@ -50,6 +51,8 @@ export interface ExtensionSettings {
   levels: CefrLevel[];
   includeUserCards: boolean;
   autoSpeak: boolean;
+  /** Voice quality profile ('hybrid': realistic natural voice for sentences, 0ms local voice for tile taps). */
+  ttsVoiceMode?: TtsVoiceMode;
   skipFullscreen: boolean;
   autoCloseCorrectSeconds: number;
   /** Quiet hours in 24h format (0-23). Disabled if null. */
@@ -255,7 +258,7 @@ export type RoadmapKindStatMap = Partial<
   Record<LessonExerciseKind, { correct: number; wrong: number }>
 >;
 
-export const ACTIVE_ROADMAP_SESSION_VERSION = 2 as const;
+export const ACTIVE_ROADMAP_SESSION_VERSION = 4 as const;
 
 export interface RoadmapActiveSession {
   version: number;

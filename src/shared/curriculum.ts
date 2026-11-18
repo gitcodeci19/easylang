@@ -955,22 +955,68 @@ export function getUnitById(unitId: string): CurriculumUnit {
   return CURRICULUM_UNITS.find((u) => u.id === unitId) ?? CURRICULUM_UNITS[0]!;
 }
 
+const CEFR_LEVEL_ORDER: readonly CefrLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
+const UNIT_TOPIC_EXCLUSIONS: Partial<Record<string, RegExp>> = {
+  u01_basics: /\bno one\b/i,
+  u02_animals: /\b(wing it|left wing|right wing|let the cat out of the bag)\b/i,
+  u03_food: /\b(boil down|grain of salt)\b/i,
+  u05_frequency: /\bwake-up call\b/i,
+  u06_sports: /\b(run into|run out|in the long run|supreme court|out of court|courtroom)\b/i,
+  u07_cinema: /\bshow up\b/i,
+  u09_shopping: /\bpay attention\b/i,
+  u11_health: /\bby heart\b/i,
+  u19_science_research: /\bsignificant other\b/i,
+  u20_law_philosophy: /\b(mother|father|sister|brother|son|daughter)-in-law\b|\btrial and error\b/i,
+};
+
+function matchesUnitTopic(unit: CurriculumUnit, card: Card): boolean {
+  // Match keywords against card.en only — checking exampleEn drags off-topic B2/C1 words
+  // (e.g., "inch" via "elephant", "mount" via "horse") into elementary units.
+  if (!unit.keywords.test(card.en)) {
+    return false;
+  }
+  const exclusion = UNIT_TOPIC_EXCLUSIONS[unit.id];
+  return !(exclusion && exclusion.test(card.en));
+}
+
+function getLevelsByDistance(targetLevel: CefrLevel): CefrLevel[][] {
+  const targetIdx = CEFR_LEVEL_ORDER.indexOf(targetLevel);
+  if (targetIdx < 0) return [[...CEFR_LEVEL_ORDER]];
+
+  const buckets: CefrLevel[][] = [];
+  for (let dist = 0; dist < CEFR_LEVEL_ORDER.length; dist += 1) {
+    const group: CefrLevel[] = [];
+    if (dist === 0) {
+      group.push(targetLevel);
+    } else {
+      if (targetIdx - dist >= 0) group.push(CEFR_LEVEL_ORDER[targetIdx - dist]!);
+      if (targetIdx + dist < CEFR_LEVEL_ORDER.length) group.push(CEFR_LEVEL_ORDER[targetIdx + dist]!);
+    }
+    if (group.length > 0) buckets.push(group);
+  }
+  return buckets;
+}
+
 /**
  * Retrieve the thematic card pool for a given CurriculumUnit.
  * Priority 1: Explicit `card.unitId === unit.id`
- * Priority 2: Cards matching `unit.keywords` at the unit's CEFR level
- * Priority 3: Cards matching `unit.keywords` at adjacent CEFR levels
- * Priority 4: Level fallback so a unit never has fewer than 24 cards
+ * Priority 2: Cards matching `unit.keywords` on `card.en` ordered by CEFR distance
+ * Priority 3: Same-level fallback only when a unit lacks enough words or sentences
  */
 export function getCardsForUnit(unitId: string, allCards: Card[]): Card[] {
   const unit = getUnitById(unitId);
   const seen = new Set<string>();
   const result: Card[] = [];
+  let wordCount = 0;
+  let sentenceCount = 0;
 
   const pushUnique = (c: Card): void => {
     if (!seen.has(c.id)) {
       seen.add(c.id);
       result.push(c);
+      if (c.type === 'word') wordCount += 1;
+      else sentenceCount += 1;
     }
   };
 
@@ -980,27 +1026,33 @@ export function getCardsForUnit(unitId: string, allCards: Card[]): Card[] {
     }
   }
 
-  for (const c of allCards) {
-    if (c.level === unit.level && unit.keywords.test(`${c.en} ${c.exampleEn}`)) {
-      pushUnique(c);
-    }
-  }
+  const levelBuckets = getLevelsByDistance(unit.level);
+  for (let dist = 0; dist < levelBuckets.length; dist += 1) {
+    const allowedLevels = new Set(levelBuckets[dist]);
+    const wantMoreWords = dist <= 1 || wordCount < 24;
+    const wantMoreSentences = dist === 0 || (dist === 1 && sentenceCount < 80) || (dist > 1 && sentenceCount < 30) || result.length < 60;
 
-  if (result.length < 75) {
+    if (!wantMoreWords && !wantMoreSentences) continue;
+
     for (const c of allCards) {
-      if (unit.keywords.test(`${c.en} ${c.exampleEn}`)) {
+      if (!allowedLevels.has(c.level) || !matchesUnitTopic(unit, c)) continue;
+      if (c.type === 'word') {
+        if (dist <= 1 || wordCount < 24) pushUnique(c);
+      } else if (dist === 0 || (dist === 1 && result.length < 130) || sentenceCount < 35 || result.length < 60) {
         pushUnique(c);
-        if (result.length >= 130) break;
       }
     }
   }
 
-  if (result.length < 60) {
+  if (wordCount < 16 || sentenceCount < 15) {
     for (const c of allCards) {
-      if (c.level === unit.level) {
+      if (c.level !== unit.level) continue;
+      if (c.type === 'word' && wordCount < 16) {
         pushUnique(c);
-        if (result.length >= 90) break;
+      } else if (c.type === 'sentence' && sentenceCount < 15) {
+        pushUnique(c);
       }
+      if (wordCount >= 16 && sentenceCount >= 15) break;
     }
   }
 
@@ -1672,7 +1724,8 @@ export function buildUnitLessonExercises(
       card,
       isNewWord: false,
       promptText: sentenceEn,
-      promptSubtext: meaningTr,
+      promptSubtext: '',
+      postAnswerSubtext: meaningTr,
       audioText: sentenceEn,
       wordBankTiles,
       targetTokens,
@@ -1704,6 +1757,7 @@ export function buildUnitLessonExercises(
       isNewWord: false,
       promptText: card.en,
       promptSubtext: card.phonetic || '',
+      postAnswerSubtext: card.acceptedTr[0] ?? undefined,
       audioText: card.en,
       expectedAnswers: card.acceptedTr,
       direction: 'en-to-tr',

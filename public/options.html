@@ -295,6 +295,15 @@
               </div>
 
               <div class="field">
+                <label for="ttsVoiceMode">Seslendirme Kalitesi (TTS)</label>
+                <select id="ttsVoiceMode" class="select-compact">
+                  <option value="hybrid">Hibrit: Cümlede Doğal, Taşlarda Hızlı (Önerilen)</option>
+                  <option value="natural">Her Yerde Doğal Ses (Google / Edge Natural)</option>
+                  <option value="local">Her Yerde Çevrimdışı Yerel Ses (0ms)</option>
+                </select>
+              </div>
+
+              <div class="field full-span">
                 <label data-i18n="lblCefrLevels">Aktif Seviyeler</label>
                 <div class="checkbox-row" id="levels-group">
                   <label class="chip-check"><input type="checkbox" value="A1" /><span>A1</span></label>

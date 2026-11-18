@@ -16,10 +16,15 @@ import {
   isValidActiveRoadmapSession,
   summarizeRecentRoadmapLessons,
 } from '../src/shared/roadmapCoach.ts';
-import type {
-  Card,
-  RoadmapActiveSession,
-  RoadmapLessonRecord,
+import {
+  formatTextForEnglishTts,
+  pickBestEnglishVoice,
+} from '../src/shared/speech.ts';
+import {
+  ACTIVE_ROADMAP_SESSION_VERSION,
+  type Card,
+  type RoadmapActiveSession,
+  type RoadmapLessonRecord,
 } from '../src/shared/types.ts';
 
 const deckCards = JSON.parse(
@@ -59,6 +64,23 @@ test('getCardsForUnit retrieves rich thematic cards for Animals, Sports, and Cin
   assert.ok(animalCards.some((c) => c.en === 'lion' || c.en === 'dolphin'));
   assert.ok(sportCards.some((c) => c.en === 'referee' || c.en === 'stadium'));
   assert.ok(cinemaCards.some((c) => c.en === 'director' || c.en === 'subtitles'));
+
+  // Regression: exampleEn mentions and idioms must not pull unrelated B2/C1 words into thematic units
+  const animalIds = new Set(animalCards.map((c) => c.id));
+  for (const leakedId of ['w_inch', 'w_mount', 's_0273']) {
+    assert.ok(!animalIds.has(leakedId), `u02_animals must not include ${leakedId}`);
+  }
+  assert.ok(!animalCards.some((c) => /\b(wing it|left wing|let the cat out of the bag)\b/i.test(c.en)));
+  assert.ok(!sportCards.some((c) => /\b(run out|in the long run)\b/i.test(c.en)));
+
+  const shoppingCards = getCardsForUnit('u09_shopping', deckCards);
+  assert.ok(!shoppingCards.some((c) => /\bpay attention\b/i.test(c.en)));
+
+  const healthCards = getCardsForUnit('u11_health', deckCards);
+  assert.ok(!healthCards.some((c) => /\bby heart\b/i.test(c.en)));
+
+  const lawCards = getCardsForUnit('u20_law_philosophy', deckCards);
+  assert.ok(!lawCards.some((c) => /\bmother-in-law\b/i.test(c.en)));
 });
 
 test('completeRoadmapNode awards XP, claims mid-unit chest, and unlocks next unit upon completion', () => {
@@ -219,13 +241,16 @@ test('cleaned deck removes railway/Latin/archaic FreeDict artifacts from A1-B2 w
   assert.equal(byId.get('w_despite')?.acceptedTr[0], '-e rağmen');
   assert.equal(byId.get('w_pale')?.acceptedTr[0], 'solgun');
 
-  // select_en & tr-to-en free_translation show a single meaning, and cloze_blank hides Turkish spoiler pre-check
-  const sampleExercises = buildUnitLessonExercises('u02_animals', 1, deckCards, {}, 17, 0);
+  // select_en & tr-to-en free_translation show a single meaning; cloze_blank & audio_dictation hide Turkish spoiler pre-check and reveal after
+  const sampleExercises = [
+    ...buildUnitLessonExercises('u02_animals', 1, deckCards, {}, 17, 0),
+    ...buildUnitLessonExercises('u02_animals', 2, deckCards, {}, 17, 0),
+  ];
   for (const ex of sampleExercises) {
     if (ex.kind === 'select_en' || (ex.kind === 'free_translation' && ex.direction === 'tr-to-en')) {
       assert.equal(ex.promptText, ex.card.acceptedTr[0] ?? ex.card.exampleTr ?? '');
     }
-    if (ex.kind === 'cloze_blank') {
+    if (ex.kind === 'cloze_blank' || ex.kind === 'audio_dictation') {
       assert.equal(ex.promptSubtext, '');
       assert.ok((ex.postAnswerSubtext ?? '').length > 0);
     }
@@ -233,13 +258,18 @@ test('cleaned deck removes railway/Latin/archaic FreeDict artifacts from A1-B2 w
 
   // If a missed sentence card is scheduled for spiral review in select_en,
   // promptText must show a single clean sentence (not ".,") and all distractors must be sentences.
+  const animalCardsPool = getCardsForUnit('u02_animals', deckCards);
+  const animalSentence =
+    animalCardsPool.find((c) => c.type === 'sentence' && c.acceptedTr.length > 1) ??
+    animalCardsPool.find((c) => c.type === 'sentence');
+  assert.ok(animalSentence, 'Expected an animal sentence card in u02_animals');
   const reviewExercises = buildUnitLessonExercises(
     'u02_animals',
     0,
     deckCards,
     {
-      [wingItSentence.id]: {
-        cardId: wingItSentence.id,
+      [animalSentence.id]: {
+        cardId: animalSentence.id,
         retryAt: null,
         retryCount: 0,
         nextDueAt: Date.now(),
@@ -254,11 +284,11 @@ test('cleaned deck removes railway/Latin/archaic FreeDict artifacts from A1-B2 w
     1
   );
   const matchedSentenceSelectEn = reviewExercises.find(
-    (ex) => ex.kind === 'select_en' && ex.card.id === wingItSentence.id
+    (ex) => ex.kind === 'select_en' && ex.card.id === animalSentence.id
   );
   assert.ok(matchedSentenceSelectEn, 'Expected missed sentence card in select_en spiral review');
   assert.ok(!matchedSentenceSelectEn.promptText.includes('.,'));
-  assert.equal(matchedSentenceSelectEn.promptText, wingItSentence.acceptedTr[0]);
+  assert.equal(matchedSentenceSelectEn.promptText, animalSentence.acceptedTr[0]);
   for (const ch of matchedSentenceSelectEn.choices ?? []) {
     assert.ok(ch.trim().split(/\s+/).length >= 2, `Expected sentence distractor, got "${ch}"`);
   }
@@ -378,7 +408,7 @@ test('summarizeRecentRoadmapLessons and buildFallbackRoadmapCoachBanner analyze 
 test('isValidActiveRoadmapSession validates interrupted sessions including readyToFinish boundary', () => {
   const sampleQueue = buildUnitLessonExercises('u01_basics', 0, deckCards, {}, 7, 0);
   const validMid: RoadmapActiveSession = {
-    version: 2,
+    version: ACTIVE_ROADMAP_SESSION_VERSION,
     unitId: 'u01_basics',
     nodeIndex: 0,
     stepIndex: 0,
@@ -414,4 +444,41 @@ test('isValidActiveRoadmapSession validates interrupted sessions including ready
   );
   assert.equal(isValidActiveRoadmapSession({ ...validMid, queue: [] }), false);
   assert.equal(isValidActiveRoadmapSession(null), false);
+});
+
+test('formatTextForEnglishTts expands awkward contractions like "we\'ve" and pickBestEnglishVoice avoids non-English voices', () => {
+  assert.equal(formatTextForEnglishTts("we've", true), 'we have');
+  assert.equal(formatTextForEnglishTts("We've been waiting.", true), 'We have been waiting.');
+  assert.equal(formatTextForEnglishTts("I've", true), 'I have');
+  assert.equal(formatTextForEnglishTts("i've finished", true), 'I have finished');
+  assert.equal(formatTextForEnglishTts("I'm ready.", false), 'I am ready.');
+
+  const mixedLocalAndCloud = [
+    { lang: 'tr-TR', name: 'Microsoft Tolga - Turkish', localService: true },
+    { lang: 'en-US', name: 'Google US English', localService: false },
+    { lang: 'en-US', name: 'Microsoft David - English (United States)', localService: true },
+  ] as unknown as SpeechSynthesisVoice[];
+
+  const pickedNatural = pickBestEnglishVoice(mixedLocalAndCloud, true);
+  assert.equal(pickedNatural?.lang, 'en-US');
+  assert.equal(pickedNatural?.name, 'Google US English');
+
+  const pickedLocal = pickBestEnglishVoice(mixedLocalAndCloud, false);
+  assert.equal(pickedLocal?.lang, 'en-US');
+  assert.equal(pickedLocal?.localService, true);
+
+  const cloudOnlyVoices = [
+    { lang: 'tr-TR', name: 'Microsoft Tolga - Turkish', localService: true },
+    { lang: 'en-GB', name: 'Google UK English Male', localService: false },
+    { lang: 'en-US', name: 'Google US English', localService: false },
+  ] as unknown as SpeechSynthesisVoice[];
+
+  const pickedCloudFallback = pickBestEnglishVoice(cloudOnlyVoices);
+  assert.equal(pickedCloudFallback?.lang, 'en-US');
+  assert.equal(pickedCloudFallback?.name, 'Google US English');
+
+  const trOnly = [
+    { lang: 'tr-TR', name: 'Microsoft Tolga - Turkish', localService: true },
+  ] as unknown as SpeechSynthesisVoice[];
+  assert.equal(pickBestEnglishVoice(trOnly), null);
 });

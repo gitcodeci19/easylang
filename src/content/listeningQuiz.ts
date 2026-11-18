@@ -1,4 +1,5 @@
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
+import { speakEnglishText as speakSentence } from '../shared/speech';
 import { evaluateDictationAnswer } from '../shared/srs';
 import type {
   ExtensionMessage,
@@ -33,15 +34,6 @@ function isolateKeyboardEvents(el: HTMLElement): void {
   el.addEventListener('keydown', stop);
   el.addEventListener('keyup', stop);
   el.addEventListener('keypress', stop);
-}
-
-function speakSentence(text: string, rate: number = 0.96): void {
-  if (typeof window.speechSynthesis === 'undefined') return;
-  window.speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = 'en-US';
-  utter.rate = rate;
-  window.speechSynthesis.speak(utter);
 }
 
 function restoreBlurredYouTubeCaptions(): void {
