@@ -19,6 +19,7 @@ import {
   saveActiveRemedialSession,
   saveConceptState,
   saveOpenGuidebookUnitId,
+  isAiApiConfigured,
   saveRoadmapState,
   saveRoadmapUiMode,
 } from './storage';
@@ -1081,13 +1082,18 @@ export function startRemedialLessonSession(
     });
     const shouldGlowRemTeach = hasRichTeachMeSkills(detectedRemSkills);
 
-    const openRemTeachMe = (): void => {
+    const openRemTeachMe = async (): Promise<void> => {
+      const isCheckedNow = Boolean(currentCheckedState);
+      const useAi = await isAiApiConfigured();
       openTeachMeDrawer({
         host: sessionEl,
         detectedSkills: detectedRemSkills,
         uiLanguage: ctx.uiLanguage,
         crimson: true,
-        sentenceHint: ex.promptText,
+        initialAiMode: useAi,
+        sentenceEn: remSampleText,
+        meaningTr: ex.card.acceptedTr.join(', '),
+        sentenceHint: isCheckedNow ? remSampleText : ex.promptText,
       });
     };
 
@@ -1096,9 +1102,9 @@ export function startRemedialLessonSession(
     teachRemBtn.className = `duo-teach-btn is-crimson${shouldGlowRemTeach ? ' is-glow' : ''}`;
     teachRemBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Teach';
     teachRemBtn.title = isTr
-      ? 'Bu sorudaki kuralları sesli ve yazılı dinle'
+      ? 'Bu sorudaki kuralları sesli ve yazılı dinle (API bağlıysa canlı AI + EMA)'
       : 'Listen & read rules in this drill';
-    teachRemBtn.addEventListener('click', openRemTeachMe);
+    teachRemBtn.addEventListener('click', () => void openRemTeachMe());
 
     const askRemTopBtn = document.createElement('button');
     askRemTopBtn.type = 'button';
@@ -1779,7 +1785,7 @@ export function startRemedialLessonSession(
       teachRemFbBtn.className = `duo-teach-mini-btn is-crimson${shouldGlowRemTeach ? ' is-glow' : ''}`;
       teachRemFbBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Rule';
       teachRemFbBtn.title = isTr ? 'Sesli ve yazılı kural anlatımını aç' : 'Open voice rule coach';
-      teachRemFbBtn.addEventListener('click', openRemTeachMe);
+      teachRemFbBtn.addEventListener('click', () => void openRemTeachMe());
       actionsWrap.appendChild(teachRemFbBtn);
 
       const askRemFbBtn = document.createElement('button');

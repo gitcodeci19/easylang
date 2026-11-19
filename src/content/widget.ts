@@ -1,7 +1,9 @@
 import { sanitizeConceptExplanationForCard } from '../shared/concepts';
 import { createGuideHelpButton, stopGuideAssistant } from '../shared/guideAssistant';
+import { renderHighlightedPhrase, renderHighlightedSentence } from '../shared/grammarHighlighter';
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
 import { speakEnglishText as speakEnglish } from '../shared/speech';
+import { isAiApiConfigured } from '../shared/storage';
 import { buildInlineTeachMePanel, stopActiveRuleAudio } from '../shared/teachMeDrawer';
 import { detectHelpSkillsForQuestion, hasRichTeachMeSkills } from '../shared/weaknessDetector';
 import type {
@@ -220,7 +222,7 @@ export function renderRecallWidget(
     );
     qTeachBtn.type = 'button';
     qTeachBtn.title = isTr
-      ? 'Bu cümledeki gramer kurallarını sesli ve yazılı dinle'
+      ? 'Bu cümledeki gramer kurallarını sesli ve yazılı dinle (API bağlıysa canlı AI + EMA)'
       : 'Listen & read grammar rules inside this sentence';
 
     const dontKnowBtn = createEl('button', 'etr-btn etr-btn-ghost', ui.dontKnow);
@@ -235,26 +237,41 @@ export function renderRecallWidget(
 
     const qTeachHost = createEl('div', 'etr-teach-host-question');
     qTeachHost.hidden = true;
-    let qTeachCtrl: { element: HTMLElement; dispose: () => void } | null = null;
-    const setQuestionTeachOpen = (open: boolean): void => {
+    let qTeachCtrl: ReturnType<typeof buildInlineTeachMePanel> | null = null;
+    const setQuestionTeachOpen = async (open: boolean): Promise<void> => {
       qTeachHost.hidden = !open;
       qTeachBtn.classList.toggle('is-open', open);
       if (open && !qTeachCtrl) {
+        const useAi = await isAiApiConfigured();
+        if (qTeachHost.hidden) return;
         qTeachCtrl = buildInlineTeachMePanel({
           detectedSkills: detectedCardSkills,
           isTr,
+          sentenceEn: card.en,
+          meaningTr: card.acceptedTr.join(', '),
+          uiLanguage: settings.uiLanguage,
+          initialAiMode: useAi,
           guideHost: wrap,
-          onClose: () => setQuestionTeachOpen(false),
+          onClose: () => void setQuestionTeachOpen(false),
+          onSkillChange: (skill) => renderHighlightedSentence(enEl, card.en, skill, 'etr-rule-glow'),
+          onFocusPhrase: (phrase) => renderHighlightedPhrase(enEl, card.en, phrase, 'etr-rule-glow is-ai'),
         });
         activeTeachCleanup = qTeachCtrl.dispose;
         qTeachHost.appendChild(qTeachCtrl.element);
+      } else if (open && qTeachCtrl) {
+        if (qTeachCtrl.isAiMode()) {
+          renderHighlightedPhrase(enEl, card.en, qTeachCtrl.getActiveFocusPhrase(), 'etr-rule-glow is-ai');
+        } else {
+          renderHighlightedSentence(enEl, card.en, qTeachCtrl.getSelectedSkill(), 'etr-rule-glow');
+        }
       } else if (!open) {
+        renderHighlightedSentence(enEl, card.en, null);
         stopActiveRuleAudio();
         stopGuideAssistant();
       }
     };
     qTeachBtn.addEventListener('click', () => {
-      setQuestionTeachOpen(qTeachHost.hidden);
+      void setQuestionTeachOpen(qTeachHost.hidden);
     });
     cardEl.appendChild(qTeachHost);
 
@@ -744,7 +761,7 @@ export function renderRecallWidget(
 
     const outcomeTeachHost = createEl('div', 'etr-teach-host-outcome');
     outcomeTeachHost.hidden = true;
-    let outcomeTeachCtrl: { element: HTMLElement; dispose: () => void } | null = null;
+    let outcomeTeachCtrl: ReturnType<typeof buildInlineTeachMePanel> | null = null;
 
     lowerDetails.append(repeatNote, conceptSlot, flagPanel, askAiPanel);
 
@@ -771,10 +788,10 @@ export function renderRecallWidget(
     );
     teachOutcomeBtn.type = 'button';
     teachOutcomeBtn.title = isTr
-      ? 'Bu cümledeki kuralları sesli ve yazılı dinle'
+      ? 'Bu cümledeki kuralları sesli ve yazılı dinle (API bağlıysa canlı AI + EMA)'
       : 'Listen & read rules in this sentence';
 
-    const setOutcomeTeachOpen = (open: boolean): void => {
+    const setOutcomeTeachOpen = async (open: boolean): Promise<void> => {
       outcomeTeachHost.hidden = !open;
       lowerDetails.hidden = open;
       teachOutcomeBtn.classList.toggle('is-open', open);
@@ -782,23 +799,36 @@ export function renderRecallWidget(
         flagPanel.hidden = true;
         askAiPanel.hidden = true;
         if (!outcomeTeachCtrl) {
+          const useAi = await isAiApiConfigured();
+          if (outcomeTeachHost.hidden) return;
           outcomeTeachCtrl = buildInlineTeachMePanel({
             detectedSkills: detectedCardSkills,
             isTr,
+            sentenceEn: card.en,
+            meaningTr: card.acceptedTr.join(', '),
+            uiLanguage: settings.uiLanguage,
+            initialAiMode: useAi,
             guideHost: wrap,
-            onClose: () => setOutcomeTeachOpen(false),
+            onClose: () => void setOutcomeTeachOpen(false),
+            onSkillChange: (skill) => renderHighlightedSentence(enEl, card.en, skill, 'etr-rule-glow'),
+            onFocusPhrase: (phrase) => renderHighlightedPhrase(enEl, card.en, phrase, 'etr-rule-glow is-ai'),
           });
           activeTeachCleanup = outcomeTeachCtrl.dispose;
           outcomeTeachHost.appendChild(outcomeTeachCtrl.element);
+        } else if (outcomeTeachCtrl.isAiMode()) {
+          renderHighlightedPhrase(enEl, card.en, outcomeTeachCtrl.getActiveFocusPhrase(), 'etr-rule-glow is-ai');
+        } else {
+          renderHighlightedSentence(enEl, card.en, outcomeTeachCtrl.getSelectedSkill(), 'etr-rule-glow');
         }
       } else {
+        renderHighlightedSentence(enEl, card.en, null);
         stopActiveRuleAudio();
         stopGuideAssistant();
       }
     };
 
     teachOutcomeBtn.addEventListener('click', () => {
-      setOutcomeTeachOpen(outcomeTeachHost.hidden);
+      void setOutcomeTeachOpen(outcomeTeachHost.hidden);
     });
 
     const askAiToggleBtn = createEl(

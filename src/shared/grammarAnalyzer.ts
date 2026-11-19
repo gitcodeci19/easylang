@@ -46,13 +46,13 @@ import type { ExtraGrammarRuleId, VoiceCoachRuleId, WeakSkillId } from './types'
  */
 
 // Participles used as passive/perfect V3 forms (`been` excluded from passive main participles).
-const UNAMBIGUOUS_PASSIVE_V3 =
+export const UNAMBIGUOUS_PASSIVE_V3 =
   '(?:done|seen|made|gone|taken|written|found|heard|known|got|gotten|had|given|told|said|built|sold|sent|held|paid|born|caught|hurt|left|kept|met|lost|won|bought|brought|thought|felt|chosen|broken|spoken|driven|eaten|fallen|flown|forgotten|grown|hidden|ridden|risen|shown|sung|sat|slept|spent|stood|stolen|swum|taught|thrown|understood|worn|woken|begun|drunk|beaten|drawn|fed|fought|forgiven|frozen|hung|laid|led|lent|lit|meant|proven|proved|rung|shaken|shot|sunk|slid|stuck|struck|sworn|swept|torn|wound)';
 
-const PASSIVE_V3_PATTERN =
+export const PASSIVE_V3_PATTERN =
   `(?:${UNAMBIGUOUS_PASSIVE_V3}|run|set|shut|put|read|cut|hit|let|cost|beat|quit|split|spread)`;
 
-const PERFECT_V3_PATTERN = `(?:been|${PASSIVE_V3_PATTERN})`;
+export const PERFECT_V3_PATTERN = `(?:been|${PASSIVE_V3_PATTERN})`;
 
 // Negative lookbehind/lookahead prevent contractions (`won't`) and hyphenated adjectives (`built-in`) matching V2 verbs.
 const IRREGULAR_V2_RE = new RegExp(
@@ -71,7 +71,7 @@ const LINKING_VERBS = new Set([
 
 const PHRASAL_OBJ = '(?:(?:it|them|him|her|me|us|that|this)\\s+)?';
 
-const PHRASAL_VERB_RE = new RegExp(
+export const PHRASAL_VERB_RE = new RegExp(
   [
     '\\b(?:get(?:s|ting)?|got|gotten)\\s+(?:off|on|up|rid\\s+of|along|back|through)\\b',
     '\\b(?:get(?:s|ting)?|got|gotten)\\s+over\\b(?!\\s+(?:there|here)\\b)',
@@ -109,7 +109,7 @@ const PHRASAL_VERB_RE = new RegExp(
 /* ==================== MORPHOSYNTACTIC HELPERS ==================== */
 
 /** Return true if `word` is the 3rd-person singular `-s/-es/-ies` inflection of a known English verb. */
-function isKnown3sgVerb(word: string): boolean {
+export function isKnown3sgVerb(word: string): boolean {
   if (word.length < 3 || !word.endsWith('s')) return false;
   if (word === 'has' || word === 'does' || word === 'goes') return true;
   if (SINGULAR_S_NOUNS.has(word) || FINITE_AUXILIARY_WORDS.has(word)) return false;
@@ -127,7 +127,7 @@ function isKnown3sgVerb(word: string): boolean {
  * Unlike `PARTICIPIAL_ADJECTIVES`, verbs like `finished`, `closed`, `organized` ARE valid active past verbs
  * when preceded by a subject rather than a linking verb (`be / get / feel / look / seem`).
  */
-function isActiveFinitePastVerb(word: string, prevWord = ''): boolean {
+export function isActiveFinitePastVerb(word: string, prevWord = ''): boolean {
   if (IRREGULAR_V2_SET.has(word)) {
     if (word === 'bit' && /^(?:a|one|every|little|tiny|small)$/.test(prevWord)) return false;
     if (word === 'shot' && /^(?:a|an|the|one|two|three|my|your|his|her|its|our|their|flu|long|good|best|last|first|final|only)$/.test(prevWord)) {
@@ -348,7 +348,7 @@ function countFinitePredicatesInSpan(span: string): number {
  * or fronted "After the stop the train accelerated quickly."), the single finite verb after the NP
  * belongs to the MAIN clause, not the prepositional phrase.
  */
-function isSubordinatorFollowedByFiniteClause(
+export function isSubordinatorFollowedByFiniteClause(
   en: string,
   subIndex: number,
   subLen: number

@@ -1,4 +1,10 @@
 import {
+  type AiGrammarCoachController,
+  createAiGrammarCoachView,
+  stopActiveTurkishCoachAudio,
+} from './aiGrammarCoachView';
+import { renderHighlightedPhrase, renderHighlightedSentence } from './grammarHighlighter';
+import {
   createGuideHelpButton,
   getActiveGuideAssistantId,
   registerBeforeGuidePlayHook,
@@ -21,8 +27,10 @@ registerBeforeGuidePlayHook(() => {
 
 /**
  * Stop any currently playing voiceover track cleanly across popup, options, or web widget.
+ * Pass `includeCoach = false` when EMA coach audio is about to replace playback itself,
+ * avoiding an async IPC stop race.
  */
-export function stopActiveRuleAudio(): void {
+export function stopActiveRuleAudio(includeCoach = true): void {
   if (activeRuleAudio) {
     try {
       activeRuleAudio.pause();
@@ -54,6 +62,9 @@ export function stopActiveRuleAudio(): void {
     const cb = activeRuleStopCallback;
     activeRuleStopCallback = null;
     cb();
+  }
+  if (includeCoach) {
+    stopActiveTurkishCoachAudio();
   }
 }
 
@@ -624,6 +635,10 @@ export interface OpenTeachMeDrawerOptions {
   uiLanguage: FeedbackLanguageMode;
   crimson?: boolean;
   sentenceHint?: string;
+  sentenceEn?: string;
+  meaningTr?: string;
+  initialAiMode?: boolean;
+  onSkillChange?: (skillId: VoiceCoachRuleId | null) => void;
 }
 
 /**
@@ -642,20 +657,42 @@ export function openTeachMeDrawer(options: OpenTeachMeDrawerOptions): void {
     options.detectedSkills.length > 0 ? options.detectedSkills : (['trouble_vocab'] as VoiceCoachRuleId[]);
   let selectedSkill: VoiceCoachRuleId = detected[0]!;
   let showAllCatalog = false;
+  let aiMode = Boolean(options.initialAiMode);
   let activePlayerDispose: (() => void) | null = null;
+  let activeAiCoachCtrl: AiGrammarCoachController | null = null;
 
   const overlay = document.createElement('div');
   overlay.className = `tm-overlay ${options.crimson ? 'is-crimson' : ''}`;
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
 
+  let ctxBar: HTMLElement | null = null;
+  const sentenceHintText = options.sentenceHint?.trim() ?? '';
+  const aiTargetSentence = (options.sentenceEn || sentenceHintText).trim();
+
+  const syncSentenceHighlight = (skill: VoiceCoachRuleId | null): void => {
+    if (ctxBar && sentenceHintText) {
+      renderHighlightedSentence(ctxBar, sentenceHintText, skill, 'tm-rule-glow');
+    }
+    options.onSkillChange?.(skill);
+  };
+
+  const syncAiPhraseHighlight = (phrase: string | null): void => {
+    if (ctxBar && sentenceHintText) {
+      renderHighlightedPhrase(ctxBar, sentenceHintText, phrase, 'tm-rule-glow is-ai');
+    }
+  };
+
   const closeDrawer = (): void => {
     document.removeEventListener('keydown', onEscKey);
     activePlayerDispose?.();
+    activeAiCoachCtrl?.dispose();
+    activeAiCoachCtrl = null;
     stopActiveRuleAudio();
     if (getActiveGuideAssistantId() === 'tour_teach_me') {
       stopGuideAssistant();
     }
+    syncSentenceHighlight(null);
     overlay.remove();
   };
 
@@ -707,10 +744,10 @@ export function openTeachMeDrawer(options: OpenTeachMeDrawerOptions): void {
   header.append(title, headerActions);
   panel.appendChild(header);
 
-  if (options.sentenceHint?.trim()) {
-    const ctxBar = document.createElement('div');
+  if (sentenceHintText) {
+    ctxBar = document.createElement('div');
     ctxBar.className = 'tm-ctx-strip';
-    ctxBar.textContent = options.sentenceHint.trim();
+    ctxBar.textContent = sentenceHintText;
     panel.appendChild(ctxBar);
   }
 
@@ -802,6 +839,7 @@ export function openTeachMeDrawer(options: OpenTeachMeDrawerOptions): void {
           selectedSkill = sid;
           renderPills();
           renderDetail(true);
+          syncSentenceHighlight(selectedSkill);
         });
         pillsWrap.appendChild(btn);
       }
@@ -826,6 +864,7 @@ export function openTeachMeDrawer(options: OpenTeachMeDrawerOptions): void {
         selectedSkill = sid;
         renderPills();
         renderDetail(true);
+        syncSentenceHighlight(selectedSkill);
       });
       pillsWrap.appendChild(pill);
     }
@@ -834,7 +873,32 @@ export function openTeachMeDrawer(options: OpenTeachMeDrawerOptions): void {
   const renderDetail = (autoPlayOnSwitch: boolean): void => {
     activePlayerDispose?.();
     activePlayerDispose = null;
+    activeAiCoachCtrl?.dispose();
+    activeAiCoachCtrl = null;
     detailScroll.replaceChildren();
+
+    pickerSec.hidden = aiMode;
+
+    if (aiMode) {
+      stopActiveRuleAudio();
+      activeAiCoachCtrl = createAiGrammarCoachView({
+        sentenceEn: aiTargetSentence,
+        meaningTr: options.meaningTr,
+        detectedSkills: detected,
+        uiLanguage: options.uiLanguage,
+        compact: false,
+        onBeforeAudioPlay: () => stopActiveRuleAudio(false),
+        onFocusPhrase: (phrase) => syncAiPhraseHighlight(phrase),
+        onFallbackOffline: () => {
+          aiMode = false;
+          renderPills();
+          syncSentenceHighlight(selectedSkill);
+          renderDetail(false);
+        },
+      });
+      detailScroll.appendChild(activeAiCoachCtrl.element);
+      return;
+    }
 
     const player = createRuleAudioPlayer({
       skillId: selectedSkill,
@@ -856,6 +920,9 @@ export function openTeachMeDrawer(options: OpenTeachMeDrawerOptions): void {
 
   renderPills();
   renderDetail(false);
+  if (!aiMode) {
+    syncSentenceHighlight(selectedSkill);
+  }
 
   overlay.appendChild(panel);
   options.host.appendChild(overlay);
@@ -863,19 +930,35 @@ export function openTeachMeDrawer(options: OpenTeachMeDrawerOptions): void {
 
 /**
  * Render an inline collapsible "🎧 Bana Öğret" panel inside a Shadow DOM host (used by Web Recall Widget)
- * so learners can list matching grammar rules, play ElevenLabs voiceovers, and read the explanation cleanly.
+ * so learners can list matching grammar rules, play ElevenLabs voiceovers, or switch to live AI + İlkiz mode.
  */
 export function buildInlineTeachMePanel(options: {
   detectedSkills: VoiceCoachRuleId[];
   isTr: boolean;
+  sentenceEn?: string;
+  meaningTr?: string;
+  uiLanguage?: FeedbackLanguageMode;
+  initialAiMode?: boolean;
   guideHost?: HTMLElement | ShadowRoot;
   onClose?: () => void;
-}): { element: HTMLElement; dispose: () => void } {
+  onSkillChange?: (skillId: VoiceCoachRuleId | null) => void;
+  onFocusPhrase?: (phrase: string | null) => void;
+  onAiModeChange?: (aiMode: boolean) => void;
+}): {
+  element: HTMLElement;
+  dispose: () => void;
+  getSelectedSkill: () => VoiceCoachRuleId;
+  isAiMode: () => boolean;
+  setAiMode: (enabled: boolean) => void;
+  getActiveFocusPhrase: () => string | null;
+} {
   const { isTr } = options;
   const detected =
     options.detectedSkills.length > 0 ? options.detectedSkills : (['trouble_vocab'] as VoiceCoachRuleId[]);
   let selectedSkill: VoiceCoachRuleId = detected[0]!;
+  let aiMode = Boolean(options.initialAiMode);
   let activeDispose: (() => void) | null = null;
+  let activeAiCoachCtrl: AiGrammarCoachController | null = null;
 
   const box = document.createElement('div');
   box.className = 'etr-teach-panel';
@@ -885,7 +968,6 @@ export function buildInlineTeachMePanel(options: {
 
   const head = document.createElement('div');
   head.className = 'etr-teach-head';
-  head.textContent = isTr ? '🎧 HANGİSİNDE TAKILDIN?' : '🎧 WHICH ONE TRIPPED YOU UP?';
 
   const headActions = document.createElement('div');
   headActions.className = 'etr-teach-head-actions';
@@ -922,7 +1004,36 @@ export function buildInlineTeachMePanel(options: {
   const renderSelected = (autoPlay: boolean): void => {
     activeDispose?.();
     activeDispose = null;
+    activeAiCoachCtrl?.dispose();
+    activeAiCoachCtrl = null;
     body.replaceChildren();
+
+    box.classList.toggle('is-ai-mode', aiMode);
+    head.textContent = aiMode
+      ? isTr
+        ? '✦ AI CANLI ÖĞRETMEN · EMA'
+        : '✦ AI LIVE TEACHER · EMA'
+      : isTr
+        ? '🎧 HANGİSİNDE TAKILDIN?'
+        : '🎧 WHICH ONE TRIPPED YOU UP?';
+    branchSlot.hidden = aiMode;
+    pills.hidden = aiMode;
+
+    if (aiMode) {
+      stopActiveRuleAudio();
+      activeAiCoachCtrl = createAiGrammarCoachView({
+        sentenceEn: options.sentenceEn ?? '',
+        meaningTr: options.meaningTr,
+        detectedSkills: detected,
+        uiLanguage: options.uiLanguage ?? (isTr ? 'tr' : 'en'),
+        compact: true,
+        onBeforeAudioPlay: () => stopActiveRuleAudio(false),
+        onFocusPhrase: (phrase) => options.onFocusPhrase?.(phrase),
+        onFallbackOffline: () => setAiMode(false),
+      });
+      body.appendChild(activeAiCoachCtrl.element);
+      return;
+    }
 
     const player = createRuleAudioPlayer({
       skillId: selectedSkill,
@@ -992,24 +1103,47 @@ export function buildInlineTeachMePanel(options: {
         selectedSkill = sid;
         renderPills();
         renderSelected(true);
+        options.onSkillChange?.(selectedSkill);
       });
       pills.appendChild(btn);
     }
   };
 
+  const setAiMode = (enabled: boolean): void => {
+    if (aiMode === enabled) return;
+    aiMode = enabled;
+    options.onAiModeChange?.(aiMode);
+    if (!aiMode) {
+      renderPills();
+      options.onSkillChange?.(selectedSkill);
+    }
+    renderSelected(false);
+  };
+
   renderPills();
   renderSelected(false);
+  if (!aiMode) {
+    options.onSkillChange?.(selectedSkill);
+  }
   box.append(headRow, branchSlot, pills, body);
 
   return {
     element: box,
+    getSelectedSkill: () => selectedSkill,
+    isAiMode: () => aiMode,
+    setAiMode,
+    getActiveFocusPhrase: () => activeAiCoachCtrl?.getActiveFocusPhrase() ?? null,
     dispose: () => {
       activeDispose?.();
       activeDispose = null;
+      activeAiCoachCtrl?.dispose();
+      activeAiCoachCtrl = null;
       stopActiveRuleAudio();
       if (getActiveGuideAssistantId() === 'tour_teach_me') {
         stopGuideAssistant();
       }
+      options.onSkillChange?.(null);
+      options.onFocusPhrase?.(null);
     },
   };
 }

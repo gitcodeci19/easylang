@@ -53,6 +53,7 @@ import {
   saveOpenGuidebookUnitId,
   saveRemedialAiOverlay,
   saveRoadmapCoachInsight,
+  isAiApiConfigured,
   saveRoadmapState,
   saveRoadmapUiMode,
 } from './storage';
@@ -1313,14 +1314,20 @@ export class RoadmapController {
       });
       const shouldGlowTeach = hasRichTeachMeSkills(detectedHelpSkills);
 
-      const openExerciseTeachMe = (): void => {
+      const openExerciseTeachMe = async (): Promise<void> => {
+        const isCheckedNow = Boolean(currentCheckedState);
+        const useAi = await isAiApiConfigured();
         openTeachMeDrawer({
           host: sessionEl,
           detectedSkills: detectedHelpSkills,
           uiLanguage: this.uiLanguage,
           crimson: false,
-          sentenceHint:
-            ex.direction === 'tr-to-en' || ex.kind === 'cloze_blank' || ex.kind === 'audio_dictation'
+          initialAiMode: useAi,
+          sentenceEn: sentenceCandidate,
+          meaningTr: ex.card.acceptedTr.join(', '),
+          sentenceHint: isCheckedNow
+            ? sentenceCandidate
+            : ex.direction === 'tr-to-en' || ex.kind === 'cloze_blank' || ex.kind === 'audio_dictation'
               ? ex.promptText
               : ex.card.en,
         });
@@ -1331,9 +1338,9 @@ export class RoadmapController {
       teachTopBtn.className = `duo-teach-btn${shouldGlowTeach ? ' is-glow' : ''}`;
       teachTopBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Teach';
       teachTopBtn.title = isTr
-        ? 'Bu sorudaki kuralları sesli ve yazılı dinle'
+        ? 'Bu sorudaki kuralları sesli ve yazılı dinle (API bağlıysa canlı AI + EMA)'
         : 'Listen & read rules in this question';
-      teachTopBtn.addEventListener('click', openExerciseTeachMe);
+      teachTopBtn.addEventListener('click', () => void openExerciseTeachMe());
 
       const askTopBtn = document.createElement('button');
       askTopBtn.type = 'button';
@@ -1745,7 +1752,7 @@ export class RoadmapController {
         teachFbBtn.className = `duo-teach-mini-btn${shouldGlowTeach ? ' is-glow' : ''}`;
         teachFbBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Rule';
         teachFbBtn.title = isTr ? 'Bu sorunun kurallarını sesli dinle' : 'Open voice rule coach';
-        teachFbBtn.addEventListener('click', openExerciseTeachMe);
+        teachFbBtn.addEventListener('click', () => void openExerciseTeachMe());
         actionsWrap.appendChild(teachFbBtn);
 
         const askFbBtn = document.createElement('button');

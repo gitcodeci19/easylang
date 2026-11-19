@@ -194,6 +194,33 @@ export async function getAiConfig(): Promise<AiConfig> {
   return { ...DEFAULT_AI_CONFIG, ...(raw ?? {}) };
 }
 
+/**
+ * Return true when AI is enabled and at least one provider slot (AI1/AI2/AI3)
+ * has a valid Base URL, API key, and model configured.
+ */
+export async function isAiApiConfigured(): Promise<boolean> {
+  try {
+    const cfg = await getAiConfig();
+    if (!cfg.enabled) return false;
+    const slot1 = Boolean(cfg.baseUrl?.trim() && cfg.apiKey?.trim() && cfg.model?.trim());
+    const slot2 = Boolean(
+      cfg.fallbackEnabled &&
+        cfg.fallbackBaseUrl?.trim() &&
+        cfg.fallbackApiKey?.trim() &&
+        cfg.fallbackModel?.trim()
+    );
+    const slot3 = Boolean(
+      cfg.fallback2Enabled &&
+        cfg.fallback2BaseUrl?.trim() &&
+        cfg.fallback2ApiKey?.trim() &&
+        cfg.fallback2Model?.trim()
+    );
+    return slot1 || slot2 || slot3;
+  } catch {
+    return false;
+  }
+}
+
 export async function saveAiConfig(partial: Partial<AiConfig>): Promise<AiConfig> {
   const current = await getAiConfig();
   const merged: AiConfig = { ...current, ...partial };

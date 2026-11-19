@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { splitBilingualCoachSegments } from '../src/shared/bilingualTtsSplit.ts';
+import {
+  buildEmaPieceInputs,
+  buildEmaTimeline,
+  chunkEmaText,
+  normalizeEmaTurkishText,
+  resampleLinear,
+  turkishIntToWords,
+} from '../src/shared/emaFrontend.ts';
 import {
   analyzeEnglishGrammarSkills,
   analyzeVoiceCoachRules,
@@ -7,6 +16,9 @@ import {
   matchesGrammarSkill,
   matchesVoiceCoachRule,
 } from '../src/shared/grammarAnalyzer.ts';
+import { findRuleHighlightSpans } from '../src/shared/grammarHighlighter.ts';
+import type { VoiceCoachRuleId } from '../src/shared/types.ts';
+import { VOICE_COACH_RULE_ORDER } from '../src/shared/voiceCoachCatalog.ts';
 import { detectHelpSkillsForQuestion, hasRichTeachMeSkills } from '../src/shared/weaknessDetector.ts';
 
 test('distinguishes time prepositions ("before an exam") from finite time clauses ("before you go")', () => {
@@ -237,4 +249,124 @@ test('hasRichTeachMeSkills only highlights Teach Me when 2+ substantive grammar 
     cardType: 'sentence',
   });
   assert.equal(hasRichTeachMeSkills(multiRule), true);
+});
+
+test('findRuleHighlightSpans pinpoints exact tokens across all 35 voice-coach rules', () => {
+  const texts = (sentence: string, ruleId: VoiceCoachRuleId): string[] =>
+    findRuleHighlightSpans(sentence, ruleId).map((s) => sentence.slice(s.start, s.end));
+
+  // Direct multi-rule switching on the same sentence
+  assert.deepEqual(texts('That was a very nice lunch.', 'was_vs_were'), ['was']);
+  assert.deepEqual(texts('That was a very nice lunch.', 'articles_a_an_the'), ['a']);
+
+  assert.deepEqual(texts('Drinking cold water after a hot walk feels awesome.', 'infinitive_gerund'), [
+    'Drinking',
+  ]);
+  assert.deepEqual(
+    texts('Drinking cold water after a hot walk feels awesome.', 'time_place_prepositions_extra'),
+    ['after']
+  );
+  assert.deepEqual(texts('Drinking cold water after a hot walk feels awesome.', 'time_clauses'), []);
+  assert.deepEqual(texts('Drinking cold water after a hot walk feels awesome.', 'simple_present'), [
+    'feels',
+  ]);
+
+  // Exhaustive coverage check across all 35 VoiceCoachRuleId entries
+  const samples: Record<VoiceCoachRuleId, { sentence: string; expectedSubstring: string }> = {
+    was_vs_were: { sentence: 'They were tired yesterday.', expectedSubstring: 'were' },
+    articles_a_an_the: { sentence: 'I saw an elephant at the zoo.', expectedSubstring: 'an' },
+    past_continuous: { sentence: 'She was reading when I called.', expectedSubstring: 'was reading' },
+    present_continuous: { sentence: 'We are learning English right now.', expectedSubstring: 'are learning' },
+    passive_voice: { sentence: 'The bridge was built in 1990.', expectedSubstring: 'was built' },
+    present_perfect: { sentence: 'I have never visited Japan.', expectedSubstring: 'have never visited' },
+    past_perfect: { sentence: 'She had already left before noon.', expectedSubstring: 'had already left' },
+    used_to_habit: { sentence: 'He used to play piano every day.', expectedSubstring: 'used to play' },
+    be_get_used_to: { sentence: 'I am getting used to waking up early.', expectedSubstring: 'getting used to' },
+    going_to_vs_will: { sentence: 'We are going to travel tomorrow.', expectedSubstring: 'are going to travel' },
+    should_vs_have_to: { sentence: 'You should wear a jacket today.', expectedSubstring: 'should wear' },
+    modal_possibility: { sentence: 'It might rain later tonight.', expectedSubstring: 'might rain' },
+    can_could_able: { sentence: 'You will be able to finish it.', expectedSubstring: 'able to finish' },
+    conditionals_would: { sentence: 'If I had time, I would join you.', expectedSubstring: 'If' },
+    contrast_linkers: { sentence: 'Although it rained, we went out.', expectedSubstring: 'Although' },
+    cause_effect_linkers: { sentence: 'We stayed home because it snowed.', expectedSubstring: 'because' },
+    time_clauses: { sentence: 'Call me before you leave.', expectedSubstring: 'before' },
+    time_place_prepositions_extra: { sentence: 'Rest during the break.', expectedSubstring: 'during' },
+    prepositions_core: { sentence: 'The meeting starts at noon.', expectedSubstring: 'at noon' },
+    phrasal_verbs: { sentence: 'Never give up on your dreams.', expectedSubstring: 'give up' },
+    infinitive_gerund: { sentence: 'She decided to leave early.', expectedSubstring: 'to leave' },
+    negation_questions: { sentence: "They didn't understand the rule.", expectedSubstring: "didn't" },
+    wh_questions: { sentence: 'Where did you buy this coat?', expectedSubstring: 'Where did' },
+    imperatives_lets: { sentence: "Let's take a short break.", expectedSubstring: "Let's take" },
+    comparatives_superlatives: { sentence: 'This route is faster than the highway.', expectedSubstring: 'faster than' },
+    relative_clauses: { sentence: 'The book that you lent me was great.', expectedSubstring: 'that' },
+    reflexives_reciprocals: { sentence: 'He taught himself to code.', expectedSubstring: 'himself' },
+    there_is_it_is: { sentence: 'There are three apples on the desk.', expectedSubstring: 'There are' },
+    reported_speech: { sentence: 'She told me that she was ready.', expectedSubstring: 'told me that' },
+    quantifiers_count: { sentence: 'We do not have much time left.', expectedSubstring: 'much' },
+    simple_past: { sentence: 'We walked to the station.', expectedSubstring: 'walked' },
+    simple_present: { sentence: 'He works in a hospital.', expectedSubstring: 'works' },
+    word_order_syntax: { sentence: 'She always arrives on time.', expectedSubstring: 'always' },
+    trouble_vocab: { sentence: 'That fancy restaurant looks cozy.', expectedSubstring: 'restaurant' },
+    listening_gap: { sentence: "We've been waiting for you.", expectedSubstring: "We've" },
+  };
+
+  assert.equal(Object.keys(samples).length, VOICE_COACH_RULE_ORDER.length);
+  for (const ruleId of VOICE_COACH_RULE_ORDER) {
+    const { sentence, expectedSubstring } = samples[ruleId];
+    const matched = texts(sentence, ruleId);
+    assert.ok(
+      matched.some((m) => m.toLowerCase().includes(expectedSubstring.toLowerCase())),
+      `Expected rule ${ruleId} to highlight "${expectedSubstring}" in "${sentence}", got ${JSON.stringify(matched)}`
+    );
+  }
+});
+
+test('splitBilingualCoachSegments routes Turkish prose to EMA and quoted English phrases (single or double quotes) to EN voice with word indices', () => {
+  const segs = splitBilingualCoachSegments(
+    'Bu cümlede "was" kelimesi tekil geçmiş zamanı anlatır; örneğin \'Let\'s go\' gibi. "hayır" veya "örnek" ise Türkçe kalır.'
+  );
+  assert.deepEqual(
+    segs.map(({ lang, text }) => ({ lang, text })),
+    [
+      { lang: 'tr', text: 'Bu cümlede' },
+      { lang: 'en', text: 'was' },
+      { lang: 'tr', text: 'kelimesi tekil geçmiş zamanı anlatır; örneğin' },
+      { lang: 'en', text: "Let's go" },
+      { lang: 'tr', text: 'gibi. hayır veya örnek ise Türkçe kalır.' },
+    ]
+  );
+  assert.equal(segs[0]!.startWordIdx, 0);
+  assert.equal(segs[1]!.startWordIdx, 2);
+  assert.equal(segs[1]!.endWordIdx, 3);
+});
+
+test('EMA Lightning Turkish frontend normalizes numbers/Turkish casing, builds valid timeline, and resamples cleanly', () => {
+  assert.equal(turkishIntToWords(0), 'sıfır');
+  assert.equal(turkishIntToWords(15), 'on beş');
+  assert.equal(turkishIntToWords(2026), 'iki bin yirmi altı');
+
+  const vocab = ['<pad>', '<unk>', ' ', ',', '.', '?', '!', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'r', 's', 't', 'u', 'v', 'y', 'z', 'ç', 'ö', 'ü', 'ğ', 'ı', 'ş'];
+  const norm = normalizeEmaTurkishText('İstanbul 2. tekil şahıs %50 V2 kullanılır', vocab);
+  assert.ok(norm.includes('istanbul'));
+  assert.ok(norm.includes('ikinci'));
+  assert.ok(norm.includes('yüzde elli'));
+  assert.ok(norm.includes('fiilin ikinci hali'));
+
+  const chunks = chunkEmaText(norm, 1.0);
+  assert.equal(chunks.length, 1);
+  assert.ok(chunks[0]!.text.endsWith('.'));
+
+  const stoi = new Map(vocab.map((ch, idx) => [ch, idx]));
+  const { ids, cw, wstart, length } = buildEmaPieceInputs('merhaba dünya.', stoi);
+  assert.equal(length, 'merhaba dünya.'.length);
+  assert.equal(ids.length, length);
+  const dur = new Float32Array(length).fill(1.5);
+  const tl = buildEmaTimeline(dur, cw, wstart, 1.0);
+  assert.ok(tl.frames > 0);
+  assert.equal(tl.fw.length, tl.frames);
+  assert.equal(tl.fg.length, tl.frames);
+  assert.equal(tl.cg.length, length);
+
+  const up = resampleLinear(new Float32Array([0, 1, 0]), 22050, 48000);
+  assert.ok(up.length >= 6);
 });

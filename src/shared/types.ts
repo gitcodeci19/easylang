@@ -52,6 +52,30 @@ export interface NeuralTtsStatus {
   error?: string;
 }
 
+export interface AiGrammarCoachItem {
+  ruleTitle: string;
+  /** Exact word/phrase inside the source English sentence to illuminate when selected. */
+  focusPhrase: string;
+  /** Crisp one-line takeaway shown above the synced spoken explanation. */
+  headlineTr: string;
+  /** Verbatim Turkish explanation displayed AND read aloud by EMA Lightning (quoted English uses "..."). */
+  explanationTr: string;
+  examples: Array<{ en: string; tr: string }>;
+}
+
+export interface AiGrammarCoachResult {
+  items: AiGrammarCoachItem[];
+  providerIndex?: AiProviderIndex;
+}
+
+export interface CoachPlaybackProgress {
+  requestId: string;
+  playing: boolean;
+  currentSec: number;
+  durationSec: number;
+  ended?: boolean;
+}
+
 export interface ExtensionSettings {
   enabled: boolean;
   /** Periodic trigger interval in minutes (default 20). */
@@ -698,7 +722,26 @@ export type ExtensionMessage =
   | { type: 'SPEAK_NEURAL_TTS'; text: string; rate?: number; reqId?: number }
   | { type: 'CANCEL_NEURAL_TTS' }
   | { type: 'PREPARE_NEURAL_TTS' }
-  | { type: 'GET_NEURAL_TTS_STATUS' };
+  | { type: 'GET_NEURAL_TTS_STATUS' }
+  | {
+      type: 'GENERATE_AI_GRAMMAR_COACH';
+      sentenceEn: string;
+      meaningTr?: string;
+      detectedRules?: string[];
+      language?: FeedbackLanguageMode;
+    }
+  | {
+      type: 'SPEAK_TURKISH_COACH';
+      text: string;
+      rate?: number;
+      requestId: string;
+    }
+  | {
+      type: 'CONTROL_TURKISH_COACH';
+      command: 'pause' | 'resume' | 'stop' | 'seek' | 'rate';
+      value?: number;
+      requestId?: string;
+    };
 
 export interface AiTutorChatTurn {
   role: 'user' | 'assistant';

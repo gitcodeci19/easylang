@@ -37,6 +37,7 @@ import {
   evaluatePageTranslationWithAi,
   fetchModelsForSlot,
   generateAiCoachReport,
+  generateAiGrammarCoach,
   generateRemedialBriefingWithAi,
   generateRoadmapCoachBanner,
   testProviderConnection,
@@ -485,12 +486,17 @@ async function ensureTtsOffscreenDocument(): Promise<void> {
   await offscreenCreatePromise;
 }
 
+let lastCoachTabId: number | null = null;
+
 async function sendToTtsOffscreen(payload: {
-  action: 'SPEAK' | 'CANCEL' | 'PREPARE' | 'STATUS';
+  action: 'SPEAK' | 'CANCEL' | 'PREPARE' | 'STATUS' | 'COACH_SPEAK' | 'COACH_CONTROL';
   text?: string;
   rate?: number;
+  requestId?: string;
+  command?: 'pause' | 'resume' | 'stop' | 'seek' | 'rate';
+  value?: number;
 }): Promise<Record<string, unknown>> {
-  if (payload.action === 'CANCEL') {
+  if (payload.action === 'CANCEL' || (payload.action === 'COACH_CONTROL' && payload.command === 'stop')) {
     if (!(await hasTtsOffscreenDocument())) {
       return { ok: true };
     }
@@ -504,7 +510,17 @@ async function sendToTtsOffscreen(payload: {
 }
 
 chrome.runtime.onMessage.addListener((message: ExtensionMessage & { target?: string }, sender, sendResponse) => {
-  if (message?.target === 'tts-offscreen' || (message as { type?: string })?.type === 'NEURAL_TTS_PROGRESS') {
+  const rawType = (message as { type?: string })?.type;
+  if (message?.target === 'tts-offscreen' || rawType === 'NEURAL_TTS_PROGRESS') {
+    return false;
+  }
+  if (rawType === 'COACH_TTS_PLAYBACK' || rawType === 'TURKISH_TTS_PROGRESS') {
+    // Forward offscreen İlkiz progress broadcasts to the content-script tab that initiated playback
+    if (lastCoachTabId !== null) {
+      void chrome.tabs.sendMessage(lastCoachTabId, message).catch(() => {
+        // Tab may have closed or navigated away
+      });
+    }
     return false;
   }
   (async () => {
@@ -897,6 +913,41 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage & { target?: str
       }
       case 'GET_NEURAL_TTS_STATUS': {
         const res = await sendToTtsOffscreen({ action: 'STATUS' });
+        sendResponse(res ?? { ok: false });
+        break;
+      }
+      case 'GENERATE_AI_GRAMMAR_COACH': {
+        const aiConfig = await getAiConfig();
+        const coach = await generateAiGrammarCoach(
+          {
+            sentenceEn: message.sentenceEn,
+            meaningTr: message.meaningTr,
+            detectedRules: message.detectedRules,
+            language: message.language,
+          },
+          aiConfig
+        );
+        sendResponse({ ok: true, coach });
+        break;
+      }
+      case 'SPEAK_TURKISH_COACH': {
+        lastCoachTabId = sender.tab?.id ?? null;
+        const res = await sendToTtsOffscreen({
+          action: 'COACH_SPEAK',
+          text: message.text,
+          rate: message.rate,
+          requestId: message.requestId,
+        });
+        sendResponse(res ?? { ok: false, error: 'No response from İlkiz TTS offscreen' });
+        break;
+      }
+      case 'CONTROL_TURKISH_COACH': {
+        const res = await sendToTtsOffscreen({
+          action: 'COACH_CONTROL',
+          command: message.command,
+          value: message.value,
+          requestId: message.requestId,
+        });
         sendResponse(res ?? { ok: false });
         break;
       }

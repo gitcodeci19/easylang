@@ -68,6 +68,10 @@ async function runBuild() {
         {
           name: 'emscripten-node-stub',
           setup(build) {
+            // Expose bundled Emscripten piper_phonemize ESM glue for multi-voice (EN + TR İlkiz) synthesis
+            build.onResolve({ filter: /^piper-phonemize$/ }, () => ({
+              path: path.join(rootDir, 'node_modules/@mintplex-labs/piper-tts-web/dist/piper-o91UDS6e.js'),
+            }));
             // Emscripten's piper_phonemize wrapper contains Node-only guarded branches for fs/path
             build.onResolve({ filter: /^(fs|path|crypto)$/ }, (args) => ({
               path: args.path,

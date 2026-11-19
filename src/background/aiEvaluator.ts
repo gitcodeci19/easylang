@@ -23,6 +23,8 @@ import {
 } from '../shared/weaknessDetector.ts';
 import type {
   AiConfig,
+  AiGrammarCoachItem,
+  AiGrammarCoachResult,
   AiProviderIndex,
   AiTutorChatTurn,
   AiTutorContext,
@@ -1443,6 +1445,108 @@ export async function askAiTutorWithContext(
   return {
     answer: rawAnswer.slice(0, 950),
     suggestedFocusToken,
+    providerIndex,
+  };
+}
+
+/**
+ * Generate independent, sentence-specific Turkish grammar lessons (1 to 3 distinct points),
+ * where each rule has its own verbatim displayed & spoken explanation (`explanationTr`),
+ * exact highlight target (`focusPhrase`), headline, and 2 tailored everyday examples.
+ */
+export async function generateAiGrammarCoach(
+  params: {
+    sentenceEn: string;
+    meaningTr?: string;
+    detectedRules?: string[];
+    language?: FeedbackLanguageMode;
+  },
+  aiConfig: AiConfig
+): Promise<AiGrammarCoachResult> {
+  if (!hasConfiguredAiProvider(aiConfig)) {
+    throw new Error('AI modu için Ayarlar → AI - API Ayarları bölümünden ücretsiz bir anahtar eklemelisin.');
+  }
+
+  const sentenceEn = params.sentenceEn.trim().slice(0, 320);
+  if (!sentenceEn) {
+    throw new Error('Açıklanacak İngilizce cümle bulunamadı.');
+  }
+
+  const ruleHints = (params.detectedRules ?? []).filter(Boolean).slice(0, 5);
+  const systemPrompt = [
+    'You are a sharp, calm Turkish English teacher creating independent mini voice-lessons for the EXACT grammar structures inside one English sentence.',
+    'Identify 1 to 3 DISTINCT, genuinely important grammar points present in this exact sentence (never invent structures that are not in the sentence).',
+    'Each item is selected and listened to SEPARATELY by the learner, so each item must stand completely on its own without referring to other items and without greetings like "Merhaba!".',
+    'For EACH item return:',
+    '- "ruleTitle": ultra-short 2-3 word Turkish tab title (e.g. "Let\'s + V1 Öneri", "instead of Yapısı", "was / Tekil Geçmiş").',
+    '- "focusPhrase": exact verbatim substring from the English sentence that this rule applies to so the UI highlights it (e.g. "Let\'s go", "instead of lunch", "was").',
+    '- "headlineTr": 1 punchy golden takeaway sentence (max 85 chars, e.g. "Let\'s + yalın fiil ile birlikte yapalım önerisi kur!").',
+    '- "explanationTr": 2-3 clear, natural, calm Turkish sentences that will BOTH be displayed on screen AND read aloud verbatim by our TTS voice. Write ONLY prose (NO bullet marks, NO markdown asterisks, NO emojis, NO parenthetical grammar codes like (V1)). CRITICAL: wrap EVERY English word or phrase inside straight double quotes "..." (e.g. "Let\'s go", "instead of") — NEVER single quotes — and DO NOT put Turkish words inside double quotes, so our bilingual TTS speaks English parts in English and Turkish parts in Turkish!',
+    '- "examples": 2 short, modern everyday examples fitting THIS specific rule: [{"en": "...", "tr": "..."}].',
+    'Respond ONLY with valid JSON:',
+    '{"items":[{"ruleTitle":"...","focusPhrase":"...","headlineTr":"...","explanationTr":"...","examples":[{"en":"...","tr":"..."}]}]}',
+  ].join('\n');
+
+  const userPrompt = [
+    `English sentence: "${sentenceEn}"`,
+    params.meaningTr ? `Turkish meaning: "${params.meaningTr}"` : '',
+    ruleHints.length > 0 ? `Detected grammar cues in this sentence: ${ruleHints.join(', ')}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const { text, providerIndex } = await callChatCompletionWithSource(
+    aiConfig,
+    systemPrompt,
+    userPrompt,
+    24_000,
+    920
+  );
+
+  const parsed = extractJsonObject(text);
+  if (!parsed || !Array.isArray(parsed.items)) {
+    throw new Error('AI gramer açıklaması beklenen biçimde dönmedi. Lütfen tekrar dene.');
+  }
+
+  const items: AiGrammarCoachItem[] = [];
+  for (const raw of parsed.items.slice(0, 3)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const obj = raw as Record<string, unknown>;
+    const ruleTitle = typeof obj.ruleTitle === 'string' ? obj.ruleTitle.trim().slice(0, 48) : '';
+    const focusPhrase = typeof obj.focusPhrase === 'string' ? obj.focusPhrase.trim().slice(0, 64) : '';
+    const headlineTr =
+      typeof obj.headlineTr === 'string' && obj.headlineTr.trim()
+        ? obj.headlineTr.trim().slice(0, 110)
+        : ruleTitle;
+    const explanationTr =
+      typeof obj.explanationTr === 'string'
+        ? obj.explanationTr
+            .replace(/[*#_`]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 460)
+        : '';
+    if (!ruleTitle || !explanationTr) continue;
+
+    const rawExamples = Array.isArray(obj.examples) ? obj.examples : [];
+    const examples: Array<{ en: string; tr: string }> = [];
+    for (const ex of rawExamples.slice(0, 2)) {
+      if (!ex || typeof ex !== 'object') continue;
+      const eObj = ex as Record<string, unknown>;
+      const en = typeof eObj.en === 'string' ? eObj.en.trim().slice(0, 160) : '';
+      const tr = typeof eObj.tr === 'string' ? eObj.tr.trim().slice(0, 180) : '';
+      if (en && tr) examples.push({ en, tr });
+    }
+
+    items.push({ ruleTitle, focusPhrase, headlineTr, explanationTr, examples });
+  }
+
+  if (items.length === 0) {
+    throw new Error('AI bu cümle için açıklama maddesi üretemedi.');
+  }
+
+  return {
+    items,
     providerIndex,
   };
 }
