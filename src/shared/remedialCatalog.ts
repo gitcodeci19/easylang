@@ -2107,3 +2107,46 @@ export const REMEDIAL_SKILL_ORDER: WeakSkillId[] = [
   'negation_questions',
   'trouble_vocab',
 ];
+
+/**
+ * Word-for-word transcripts of the bundled ElevenLabs Turkish voiceover MP3s
+ * so learners can read along verbatim while listening in any rule view.
+ */
+export const REMEDIAL_VOICE_TRANSCRIPTS: Record<WeakSkillId, string> = {
+  was_vs_were:
+    '"was" ve "were" aslında aynı anlama gelir, ikisi de geçmişte "idi" demektir. Tek bir kişiden ya da tek bir şeyden bahsediyorsan, örneğin "The concert was awesome" derken "was" kullanırsın. Çoğul öznelerde ve karşındaki tek bir kişi bile olsa "you" öznesinde her zaman "were" gelir, örneğin "We were waiting all night" veya "Why were you late?" cümlelerinde olduğu gibi. Unutma, "my friends was" değil, "my friends were" denir.',
+  should_vs_have_to:
+    'Aradaki fark çok net: "should" dost tavsiyesi, "have to" ise gerçek bir zorunluluktur. Yaparsan iyi olur dediğin önerilerde, örneğin "You should get some sleep" derken "should" kullanılır. Dıştan gelen bir kural veya mecburiyet varsa, "I have to finish this report" gibi, "have to" gerekir. Olumsuzda anlam tamamen ayrılır: "should not" yapmasan iyi olur demektir; "do not have to" ise yasak değil, yapmana gerek yok anlamına gelir.',
+  used_to_habit:
+    'Eskiden düzenli yaptığın ama artık bıraktığın alışkanlıklar için "used to" kalıbını kullanırız. Olumlu cümlede "I used to play guitar every night" şeklinde söylenir ve sonrasında fiil her zaman yalın hâliyle gelir. Olumsuz ve soru cümlelerinde ise "did" yardımcı fiili geçmiş zamanı zaten taşıdığı için "use to" biçimine döner, örneğin "She did not use to drink black coffee" veya "Did you use to live near the sea?" gibi.',
+  past_continuous:
+    'Geçmişte bir film sahnesi düşün: arka planda akıp giden olayda "was" ya da "were" ile birlikte fiil "listening" veya "playing" gibi devam hâlinde söylenir. Örneğin "I was listening to rock music when you called" dediğinde, dinleme eylemi o sırada sürüyordu, arama ise onu bölen kısa olay oldu. Kısacası "yapıyordum" anlamı için "was taking" veya "were playing" yapısını, aniden oldu anlamı içinse fiilin geçmiş hâlini kullanmalısın.',
+  present_perfect:
+    'Present Perfect, geçmiş ile şimdi arasında köprü kuran yapıdır ve "have" ya da "has" ile fiilin üçüncü hâliyle kurulur. Hayat deneyimlerinden, az önce olmuş sonuçlardan veya hâlâ devam eden sürelerden söz ediyorsan, örneğin "I have never been there" veya "My dog has been missing for three days" cümlelerindeki gibi kullanılır. Ancak cümlede "yesterday" veya "last night" gibi kesin bitmiş bir zaman varsa köprü kopmuştur, o zaman doğrudan sade geçmiş zaman tercih edilir.',
+  passive_voice:
+    'İngilizcede "We invited" biz davet ettik demektir; ama "We were invited" dediğinde biz davet edildik anlamına gelir. "am", "is", "are", "was", "were" yardımcı fiillerinden birinin ardından fiilin üçüncü hâlini gördüğünde cümleyi edilgen olarak çevirmelisin. Örneğin "The release date was delayed twice" cümlesinde çıkış tarihi kendi kendini ertelemedi, ertelendi. Yani özne işi yapan değil, o işten etkilenen taraftır.',
+  going_to_vs_will:
+    'Önceden planladıysan "going to", tam şu an karar verdiysen "will" kullanılır. Cebinde bir plan, bilet ya da niyet varsa veya gözünle gördüğün bir kanıt bulunuyorsa, örneğin "Look at those dark clouds, it is going to rain" derken olduğu gibi, "be going to" kalıbını tercih etmelisin. Ama konuşma anında bir karar alıyor, teklifte bulunuyor veya söz veriyorsan, mesela "I will help you!" cümlesindeki gibi, bu durumda "will" devreye girer.',
+  conditionals_would:
+    'Koşul cümlelerinde gerçek bir ihtimalden söz ediyorsan "will", hayalî bir varsayımdan söz ediyorsan "would" kullanılır. Örneğin "If I finish early, I will play" gerçek bir plan anlatır. Ama "If I were you, I would take that offer" veya "If I had more time, I would learn guitar" tamamen hayalî durumlardır. Tek altın yasağı unutma: "if" kelimesinin bulunduğu tarafa asla "would" konulmaz, "would" her zaman sonuç kısmında yer alır.',
+  contrast_linkers:
+    'Zıtlık anlatırken "although" ve "despite" ikisi de "rağmen" demektir ama arkasından gelen yapı farklıdır. "Although it was raining" gibi özne ve fiil içeren tam bir cümle kuruyorsan "although" seçersin. Sadece bir isim ya da "being tired" gibi bir ifade geliyorsa "despite" kullanılır ve sakın "despite of" deme, "of" sadece "in spite of" kalıbında vardır. Bir de "unless" kelimesine dikkat et: içinde zaten olumsuzluk taşır ve "yapmadıkça" anlamını verir, yanına ikinci bir "not" ekleme.',
+  time_clauses:
+    'Gelecekten bahsetsen bile "when", "as soon as" ve "until" gibi zaman bağlaçlarının hemen arkasına asla "will" konulmaz. Örneğin "Call me as soon as you get home" veya "Wait until the backup finishes" cümlelerinde bağlaçtan sonraki fiil hep geniş zamanda kalır; gelecek zaman gerekiyorsa "will" sadece ana cümlede durur. Ayrıca "He did not arrive until noon" kalıbının öğlene kadar gelmedi, yani ancak öğlen geldi anlamına geldiğini aklında tut.',
+  phrasal_verbs:
+    'İngilizcede tek bir edat, fiilin anlamını baştan sona değiştirir; bu yüzden bunları tek kelime gibi bütün olarak okumak gerekir. Örneğin "figure out" çözmek, "put off" ertelemek, "get off" otobüsten ya da trenden inmek, "cut the trip short" ise geziyi yarıda kesmek demektir. Kısa zamirlerde sıraya özellikle dikkat et: "figure out it" değil, zamiri araya alarak "figure it out" ve "turn it down" şeklinde söylemelisin.',
+  prepositions_core:
+    'Zaman edatlarını büyükten küçüğe ters bir piramit gibi düşünebilirsin. Aylar, yıllar, mevsimler ve sabah akşam gibi bölümler için "in", yani "in autumn" veya "in the morning" denir. Günler ve tarihler için "on", örneğin "on Friday". Tam saatler ve gece içinse "at", yani "at nine" ve "at night" kullanılır. Süre belirtirken toplam zamanı sayıyorsan "for two hours", başlangıç noktasını gösteriyorsan "since Monday" tercih etmelisin.',
+  word_order_syntax:
+    'Türkçede fiil cümlenin en sonunda oturur; ama İngilizcede fiil özneden hemen sonra gelir ve yerinden kıpırdamaz. Düz cümlede her zaman şu sırayı izle: önce özne, sonra fiil, ardından nesne, sonra yer ve en sonda zaman. Örneğin "I listen to rock music at home every evening" gibi. "very much" gibi ifadeleri asla fiille nesnenin arasına sokma, cümlenin sonuna at; bir de "never" ile "do not" kelimelerini aynı cümlede üst üste getirme.',
+  listening_gap:
+    'Hızlı İngilizce dinlerken zorlanmanın sebebi kulaklarının kaçırması değil, küçük yardımcı kelimelerin hızlıca yutulmasıdır. Anlamı taşıyan büyük kelimeler vurgulu söylenirken, aradaki "has", "been", "to", "a" ve "of" gibi köprü kelimeler çok alçak ve birleşik okunur. Bu yüzden dinledikten sonra cümlene iki saniye göz gezdir: İngilizcede fiilsiz cümle olmaz. "My dog missing" gibi eksik bir yapı görürsen aradaki "has been" parçasının yutulduğunu hemen fark edebilirsin.',
+  modal_possibility:
+    'Bir şeyin olma ihtimalinden söz ederken "may", "might" veya "could" kullanırız; örneğin "She might be stuck in traffic right now" gibi. Bazen "We may have to wait" kalıbındaki gibi iki yapı birleşir ve "beklemek zorunda kalabiliriz" anlamını verir. Eğer mantıken kesin öyledir diyorsan "must be", kesinlikle olamaz diyorsan ise "must not be" değil, her zaman "cannot be" demelisin. Ayrıca "He might comes" değil, "He might come" şeklinde ek koymadan ve "to" eklemeden yalın fiil kullanılır.',
+  infinitive_gerund:
+    'İki fiil yan yana geldiğinde, birinci fiilin türü ikincinin "to" ile mi yoksa devam hâliyle mi geleceğini belirler. Gelecek niyet ve karar bildiren "want", "decide", "hope" ve "wait" gibi fiillerden sonra "to" gelir, örneğin "I cannot wait to play" veya "We decided to start". Buna karşılık zevk veya süreç anlatan "enjoy", "avoid", "finish" fiillerinden sonra ve "for", "about", "before" gibi her edatın arkasından daima "listening" veya "helping" biçimi kullanılır; örneğin "I enjoy listening to music" ve "Thanks for helping me" gibi.',
+  negation_questions:
+    'İngilizce soru ve olumsuz cümlelerde tek bir kural her şeyi çözer: yardımcı fiil yükü sırtladığında ana fiil en yalın birinci hâline döner. Cümlede "did" ya da "did not" varsa geçmiş zaman yükünü o zaten almıştır; bu yüzden "I did not went" değil, "I did not go" ve "Did you see?" demelisin. Aynı kural "does" ve "does not" için de geçerlidir: "She does not drinks" değil, ekini düşürerek "She does not drink coffee" şeklinde kurmalısın.',
+  trouble_vocab:
+    'Bir kelimeye iki üç kez takıldıysan onu tek başına sözlük anlamıyla ezberlemeye çalışmak hafızada kalıcı olmaz. En etkili yöntem, kelimeyi mutlaka kısa ve canlı bir cümle içinde görmek ve telaffuzuyla birlikte kendi hayatından bir sahneye bağlamaktır. Örneğin "depart" hareket etmek, "announce" duyurmak, "ahead of schedule" ise planlanandan önde gitmek demektir. Her birini kendi cümlende bir kez sesli kurduğunda kalıcı olarak yerine oturur.',
+};

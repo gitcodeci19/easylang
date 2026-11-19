@@ -5,6 +5,14 @@ import {
 } from '../shared/analytics';
 import { getConceptStageSummary } from '../shared/concepts';
 import { getRoadmapCourseRank } from '../shared/curriculum';
+import {
+  ASSISTANT_GUIDE_LABELS,
+  type AssistantGuideId,
+  playGuideAssistant,
+  playGuideOnce,
+  stopGuideAssistant,
+  toggleGuideAssistant,
+} from '../shared/guideAssistant';
 import { resolveSupportedLanguage } from '../shared/i18n';
 import {
   applyB1PromotionDecision,
@@ -192,6 +200,7 @@ const nextPageBtn = document.getElementById('next-page-btn') as HTMLButtonElemen
 const pageIndicator = document.getElementById('page-indicator') as HTMLElement;
 
 function switchDashboardTab(target: string): void {
+  stopGuideAssistant();
   const validTarget = tabPanels[target] ? target : 'settings';
   for (const b of tabButtons) {
     b.classList.toggle('active', b.dataset.tab === validTarget);
@@ -307,16 +316,16 @@ function renderRatingSvgChart(
     .map(
       (c) =>
         `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="3.2" fill="${
-          c.isCorrect ? '#22c55e' : '#ef4444'
+          c.isCorrect ? '#10b981' : '#f43f5e'
         }"><title>${c.rating} ELO</title></circle>`
     )
     .join('');
 
   container.innerHTML = `
     <svg viewBox="0 0 ${width} ${height}" width="100%" height="140" role="img" aria-label="Rating Trajectory Chart">
-      <text x="${pad}" y="12" fill="#8b83a8" font-size="10">${Math.round(maxR)}</text>
-      <text x="${pad}" y="${height - 4}" fill="#8b83a8" font-size="10">${Math.round(minR)}</text>
-      <polyline fill="none" stroke="#a855f7" stroke-width="2.2" points="${pointsAttr}" />
+      <text x="${pad}" y="12" fill="#7a7a8c" font-size="10">${Math.round(maxR)}</text>
+      <text x="${pad}" y="${height - 4}" fill="#7a7a8c" font-size="10">${Math.round(minR)}</text>
+      <polyline fill="none" stroke="#8b5cf6" stroke-width="2.2" points="${pointsAttr}" />
       ${dotsSvg}
     </svg>
   `;
@@ -812,8 +821,46 @@ wireProviderPreset(
   aiFallback2ApiKeyInput
 );
 
+function syncDashboardGuideButtons(mode: FeedbackLanguageMode): void {
+  const isTr = resolveSupportedLanguage(mode) === 'tr';
+  document
+    .querySelectorAll<HTMLButtonElement>('.tab-guide-row .el-help-trigger[data-guide-id]')
+    .forEach((btn) => {
+      const gid = btn.dataset.guideId as AssistantGuideId | undefined;
+      if (!gid || !(gid in ASSISTANT_GUIDE_LABELS)) return;
+      const meta = ASSISTANT_GUIDE_LABELS[gid];
+      btn.title = isTr
+        ? `${meta.tr} (Sesli anlatım · Durdurmak için tekrar tıkla)`
+        : `${meta.en} (Voice guide · Click again to stop)`;
+      const lbl = btn.querySelector<HTMLElement>('.el-help-label');
+      if (lbl) {
+        lbl.textContent = isTr ? 'Bu ne işe yarıyor?' : 'How does this work?';
+      }
+    });
+}
+
+document
+  .querySelectorAll<HTMLButtonElement>('.tab-guide-row .el-help-trigger[data-guide-id]')
+  .forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const gid = btn.dataset.guideId as AssistantGuideId | undefined;
+      if (!gid || !(gid in ASSISTANT_GUIDE_LABELS)) return;
+      const lang = (topbarLangSelect.value || 'auto') as FeedbackLanguageMode;
+      toggleGuideAssistant(gid, {
+        isTr: resolveSupportedLanguage(lang) === 'tr',
+        triggerEl: btn,
+      });
+    });
+  });
+
+window.addEventListener('pagehide', () => stopGuideAssistant());
+window.addEventListener('beforeunload', () => stopGuideAssistant());
+
 function applyLanguageMode(mode: FeedbackLanguageMode): void {
   currentUi = applyDashboardTranslations(mode);
+  syncDashboardGuideButtons(mode);
   topbarLangSelect.value = mode;
   aiFeedbackLanguageSelect.value = mode;
   const revealed = aiApiKeyInput.type === 'text';
@@ -1476,12 +1523,12 @@ function applyDashOnboardingCopy(
   }
 }
 
-async function ensureDashboardOnboarding(): Promise<void> {
+async function ensureDashboardOnboarding(): Promise<boolean> {
   const onboarding = await getOnboardingState();
-  if (onboarding.completed) return;
+  if (onboarding.completed) return false;
 
   const overlay = document.getElementById('options-onboarding');
-  if (!overlay) return;
+  if (!overlay) return false;
 
   const stepChoice = document.getElementById('dash-ob-step-choice');
   const stepNew = document.getElementById('dash-ob-step-new');
@@ -1499,11 +1546,32 @@ async function ensureDashboardOnboarding(): Promise<void> {
   const errEl = document.getElementById('dash-ob-restore-error');
   const restoreBtn = document.getElementById('dash-ob-restore-btn');
   const skipBtn = document.getElementById('dash-ob-skip-btn');
+  const dashObGuideBtn = document.getElementById('dash-ob-guide-btn') as HTMLButtonElement | null;
+  const dashObGuideLabel = document.getElementById('dash-ob-guide-label');
 
   let selectedLang: FeedbackLanguageMode = resolveSupportedLanguage('auto');
   let selectedCurrent: CefrLevel = 'A1';
   let selectedTarget: CefrLevel = 'B1';
   let activeCopy = getOnboardingCopy('auto');
+  let activeStep: 'choice' | 'new' | 'ret' = 'choice';
+
+  const stepGuideMap: Record<'choice' | 'new' | 'ret', AssistantGuideId> = {
+    choice: 'welcome_onboarding',
+    new: 'onboarding_profile',
+    ret: 'onboarding_restore',
+  };
+
+  const syncDashObGuideLabel = (): void => {
+    const isTrOb = resolveSupportedLanguage(selectedLang) === 'tr';
+    if (dashObGuideLabel) {
+      dashObGuideLabel.textContent = isTrOb ? 'Sesli Anlatım' : 'Voice Guide';
+    }
+    if (dashObGuideBtn) {
+      dashObGuideBtn.title = isTrOb
+        ? 'Bu adımın sesli anlatımını dinle veya durdur'
+        : 'Play or stop voice guide for this step';
+    }
+  };
 
   if (langSelect && langSelect.options.length === 0) {
     for (const opt of DASH_OB_LANG_CHOICES) {
@@ -1523,19 +1591,40 @@ async function ensureDashboardOnboarding(): Promise<void> {
       btn.classList.toggle('is-active', btn.dataset.level === selectedTarget);
     });
     applyDashOnboardingCopy(activeCopy, selectedCurrent, selectedTarget);
+    syncDashObGuideLabel();
   };
 
   const showStep = (step: 'choice' | 'new' | 'ret'): void => {
+    activeStep = step;
     if (stepChoice) stepChoice.hidden = step !== 'choice';
     if (stepNew) stepNew.hidden = step !== 'new';
     if (stepRet) stepRet.hidden = step !== 'ret';
+    void playGuideAssistant(stepGuideMap[step], {
+      isTr: resolveSupportedLanguage(selectedLang) === 'tr',
+      triggerEl: dashObGuideBtn,
+      isAutoPlay: true,
+    });
   };
 
   syncPills();
-  showStep('choice');
   overlay.hidden = false;
+  showStep('choice');
 
   await new Promise<void>((resolve) => {
+    const finishOnboarding = (): void => {
+      stopGuideAssistant();
+      overlay.hidden = true;
+      resolve();
+    };
+
+    dashObGuideBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleGuideAssistant(stepGuideMap[activeStep], {
+        isTr: resolveSupportedLanguage(selectedLang) === 'tr',
+        triggerEl: dashObGuideBtn,
+      });
+    });
+
     chooseNewBtn?.addEventListener('click', () => showStep('new'));
     chooseRetBtn?.addEventListener('click', () => showStep('ret'));
     backNewBtn?.addEventListener('click', () => showStep('choice'));
@@ -1545,6 +1634,7 @@ async function ensureDashboardOnboarding(): Promise<void> {
       selectedLang = langSelect.value as FeedbackLanguageMode;
       activeCopy = getOnboardingCopy(selectedLang);
       applyDashOnboardingCopy(activeCopy, selectedCurrent, selectedTarget);
+      syncDashObGuideLabel();
     });
 
     curWrap?.addEventListener('click', (event) => {
@@ -1600,8 +1690,7 @@ async function ensureDashboardOnboarding(): Promise<void> {
           saveOnboardingState(plan.onboardingPatch),
         ]);
         await chrome.runtime.sendMessage({ type: 'SETTINGS_UPDATED' } satisfies ExtensionMessage);
-        overlay.hidden = true;
-        resolve();
+        finishOnboarding();
       })();
     });
 
@@ -1617,19 +1706,19 @@ async function ensureDashboardOnboarding(): Promise<void> {
           return;
         }
         await chrome.runtime.sendMessage({ type: 'SETTINGS_UPDATED' } satisfies ExtensionMessage);
-        overlay.hidden = true;
-        resolve();
+        finishOnboarding();
       })();
     });
 
     skipBtn?.addEventListener('click', () => {
       void (async () => {
         await saveOnboardingState({ completed: true, b1GateAccepted: true });
-        overlay.hidden = true;
-        resolve();
+        finishOnboarding();
       })();
     });
   });
+
+  return true;
 }
 
 resetProgressBtn.addEventListener('click', async () => {
@@ -1655,7 +1744,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 });
 
 async function initDashboard(): Promise<void> {
-  await ensureDashboardOnboarding();
+  const justCompletedOnboarding = await ensureDashboardOnboarding();
   const [settings, ai] = await Promise.all([getSettings(), getAiConfig()]);
   const initialLang: FeedbackLanguageMode =
     settings.uiLanguage && settings.uiLanguage !== 'auto'
@@ -1689,6 +1778,11 @@ async function initDashboard(): Promise<void> {
   const requestedTab = new URLSearchParams(window.location.search).get('tab');
   if (requestedTab && tabPanels[requestedTab]) {
     switchDashboardTab(requestedTab);
+  }
+  if (justCompletedOnboarding && requestedTab === 'roadmap') {
+    void playGuideOnce('tour_home_roadmap', {
+      isTr: resolveSupportedLanguage(initialLang) === 'tr',
+    });
   }
 }
 

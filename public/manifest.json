@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EasyLang",
-  "version": "1.0.7",
+  "version": "2.0.0",
   "description": "Learn English naturally while browsing — active-recall flashcards, page challenges, listening practice, and spaced repetition.",
   "permissions": [
     "alarms",
@@ -37,6 +37,12 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["audio/remedial/*.mp3", "audio/assistant/*.mp3"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "commands": {
     "trigger-question": {
       "suggested_key": {

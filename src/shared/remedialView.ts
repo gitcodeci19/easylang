@@ -1,8 +1,13 @@
 import { openAiTutorDrawer } from './aiTutorDrawer';
 import { advanceConceptAfterAnswer } from './concepts';
+import {
+  createGuideHelpButton,
+  getActiveGuideAssistantId,
+  stopGuideAssistant,
+} from './guideAssistant';
 import { resolveSupportedLanguage } from './i18n';
 import { evaluateEnglishAnswer, evaluateTurkishAnswer } from './matcher';
-import { REMEDIAL_SKILL_CATALOG } from './remedialCatalog';
+import { REMEDIAL_SKILL_CATALOG, REMEDIAL_VOICE_TRANSCRIPTS } from './remedialCatalog';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
 import {
   clearActiveRemedialSession,
@@ -17,6 +22,12 @@ import {
   saveRoadmapState,
   saveRoadmapUiMode,
 } from './storage';
+import {
+  createRuleAudioPlayer,
+  mountSyncedTranscript,
+  openTeachMeDrawer,
+  stopActiveRuleAudio,
+} from './teachMeDrawer';
 import {
   ACTIVE_REMEDIAL_SESSION_VERSION,
   type AiTutorChatTurn,
@@ -38,7 +49,9 @@ import {
 import {
   type AiDiagnosedOverlayItem,
   buildRemedialLessonPlan,
+  detectHelpSkillsForQuestion,
   getAllRemedialCatalogItems,
+  hasRichTeachMeSkills,
 } from './weaknessDetector';
 
 export interface RemedialViewContext {
@@ -76,6 +89,9 @@ export function createModeTabBar(params: {
   bar.className = 'duo-mode-tabs';
   bar.setAttribute('role', 'tablist');
 
+  const pathWrap = document.createElement('div');
+  pathWrap.className = 'duo-mode-tab-wrap';
+
   const pathTab = document.createElement('button');
   pathTab.type = 'button';
   pathTab.role = 'tab';
@@ -85,6 +101,16 @@ export function createModeTabBar(params: {
   pathTab.addEventListener('click', () => {
     if (params.activeMode !== 'path') params.onSelectMode('path');
   });
+
+  const pathHelpBtn = createGuideHelpButton('tour_home_roadmap', {
+    isTr: params.isTr,
+    variant: 'dot',
+    extraClass: 'duo-tab-help-btn',
+  });
+  pathWrap.append(pathTab, pathHelpBtn);
+
+  const remWrap = document.createElement('div');
+  remWrap.className = 'duo-mode-tab-wrap';
 
   const remTab = document.createElement('button');
   remTab.type = 'button';
@@ -107,7 +133,14 @@ export function createModeTabBar(params: {
     if (params.activeMode !== 'remedial') params.onSelectMode('remedial');
   });
 
-  bar.append(pathTab, remTab);
+  const remHelpBtn = createGuideHelpButton('tour_remedial_hub', {
+    isTr: params.isTr,
+    variant: 'dot',
+    extraClass: 'duo-tab-help-btn',
+  });
+  remWrap.append(remTab, remHelpBtn);
+
+  bar.append(pathWrap, remWrap);
   return bar;
 }
 
@@ -490,18 +523,20 @@ export function renderRemedialBriefing(
   backBtn.title = isTr ? 'Özel Derslere Dön' : 'Back to Remedial Studio';
   backBtn.addEventListener('click', () => {
     cancelEnglishSpeech();
+    stopActiveRuleAudio();
+    if (getActiveGuideAssistantId() === 'tour_remedial_briefing') {
+      stopGuideAssistant();
+    }
+    briefAudioPlayer.dispose();
     void clearActiveRemedialSession().finally(() => {
       renderRemedialHub(ctx);
     });
   });
 
-  const stageTag = document.createElement('span');
-  stageTag.className = 'rem-stage-pill';
-  stageTag.textContent = isTr ? '🔥 ÖN ANLATIM · DERS ÖNCESİ KOÇ' : '🔥 PRE-LESSON COACH';
-
+  const specIcon = REMEDIAL_SKILL_CATALOG[plan.skillId]?.icon ?? '🔥';
   const titleEl = document.createElement('div');
   titleEl.className = 'rem-brief-top-title';
-  titleEl.textContent = isTr ? plan.titleTr : plan.titleEn;
+  titleEl.textContent = `${specIcon} ${isTr ? plan.titleTr : plan.titleEn}`;
 
   const openBriefTutor = (): void => {
     briefTutorOpen = true;
@@ -533,6 +568,14 @@ export function renderRemedialBriefing(
     });
   };
 
+  const briefTopActions = document.createElement('div');
+  briefTopActions.className = 'rem-brief-top-actions';
+
+  const briefHelpBtn = createGuideHelpButton('tour_remedial_briefing', {
+    isTr,
+    variant: 'dot',
+  });
+
   const askBriefBtn = document.createElement('button');
   askBriefBtn.type = 'button';
   askBriefBtn.className = 'duo-ask-ai-btn is-crimson';
@@ -542,16 +585,30 @@ export function renderRemedialBriefing(
     : 'Ask the AI tutor any question about this rule';
   askBriefBtn.addEventListener('click', openBriefTutor);
 
-  topBar.append(backBtn, stageTag, titleEl, askBriefBtn);
+  briefTopActions.append(briefHelpBtn, askBriefBtn);
+  topBar.append(backBtn, titleEl, briefTopActions);
   root.appendChild(topBar);
 
   // Scrollable briefing body
   const body = document.createElement('div');
   body.className = 'duo-lesson-stage rem-brief-body';
 
-  // Headline + Golden Rule Card
+  // Unified Coach Card: integrated Audio Player + Headline + Verbatim Transcript + Mnemonic
+  const briefAudioPlayer = createRuleAudioPlayer({
+    skillId: plan.skillId,
+    isTr,
+    crimson: true,
+  });
+
   const ruleCard = document.createElement('div');
   ruleCard.className = 'rem-golden-rule';
+
+  const audioSlotWrap = document.createElement('div');
+  audioSlotWrap.className = 'rem-coach-audio-wrap';
+  audioSlotWrap.appendChild(briefAudioPlayer.element);
+
+  const ruleContent = document.createElement('div');
+  ruleContent.className = 'rem-coach-text-wrap';
 
   const headline = document.createElement('h3');
   headline.className = 'rem-brief-headline';
@@ -559,14 +616,43 @@ export function renderRemedialBriefing(
 
   const ruleText = document.createElement('p');
   ruleText.className = 'rem-brief-rule-text';
-  ruleText.textContent = isTr ? plan.briefing.goldenRuleTr : plan.briefing.goldenRuleEn;
+  const transcriptText = isTr
+    ? REMEDIAL_VOICE_TRANSCRIPTS[plan.skillId] || plan.briefing.goldenRuleTr
+    : plan.briefing.goldenRuleEn;
+  const briefTranscriptSync = mountSyncedTranscript(
+    ruleText,
+    plan.skillId,
+    transcriptText,
+    isTr,
+    (startMs) => {
+      briefAudioPlayer.seekToMs(startMs, true);
+    }
+  );
+  briefAudioPlayer.setOnTimeMs(briefTranscriptSync.update);
 
-  ruleCard.append(headline, ruleText);
+  ruleContent.append(headline, ruleText);
+  ruleCard.append(audioSlotWrap, ruleContent);
   body.appendChild(ruleCard);
 
-  // Live AI Personal Note slot (instant local preview + async AI upgrade!)
+  // Examples section + inline opt-in AI Note trigger on the same header row
+  const exHeaderRow = document.createElement('div');
+  exHeaderRow.className = 'rem-examples-header-row';
+
+  const exHeader = document.createElement('div');
+  exHeader.className = 'rem-section-label';
+  exHeader.textContent = isTr ? 'ÖRNEKLER & TUZAKLAR' : 'EXAMPLES & TRAPS';
+
+  const aiToggleBtn = document.createElement('button');
+  aiToggleBtn.type = 'button';
+  aiToggleBtn.className = 'rem-ai-toggle-pill';
+  aiToggleBtn.textContent = isTr ? '✨ AI Özel Notu ▾' : '✨ AI Coach Note ▾';
+
+  exHeaderRow.append(exHeader, aiToggleBtn);
+  body.appendChild(exHeaderRow);
+
   const aiSlot = document.createElement('div');
   aiSlot.className = 'rem-ai-note';
+  aiSlot.hidden = true;
   const aiSlotLabel = document.createElement('div');
   aiSlotLabel.className = 'rem-ai-note-lbl';
   const aiSlotBody = document.createElement('p');
@@ -582,22 +668,16 @@ export function renderRemedialBriefing(
     const firstEv = weakness.evidenceExamples[0]!;
     aiSlotLabel.textContent = isTr ? '🎯 Neden Bu Dersi Açtık?' : '🎯 Why This Lesson?';
     aiSlotBody.textContent = isTr
-      ? `Geçmişinde "${firstEv.en}" örneğinde takıldın. Aşağıdaki altın kuralı ve tuzakları 20 saniye incele — sonra 6 farklı oyunla kalıcı hale getireceğiz!`
-      : `You stumbled on "${firstEv.en}" earlier. Take 20 seconds to review the golden rule and traps below, then lock it in with interactive drills!`;
+      ? `Geçmişinde "${firstEv.en}" örneğinde takıldın. Yukarıdaki kuralı dinledikten sonra alıştırmalarla pekiştireceğiz.`
+      : `You stumbled on "${firstEv.en}" earlier. Review the rule above, then lock it in with interactive drills.`;
   } else {
     aiSlotLabel.textContent = isTr ? '🔥 Özel Ders Hazır' : '🔥 Workshop Ready';
     aiSlotBody.textContent = isTr
-      ? 'Önce kuralın mantığını ve tuzakları gör, ardından düello, hata dedektifi ve senaryo soruları ile pekiştir.'
-      : 'Review the core logic and traps first, then master them via duels, bug-hunting, and scenarios.';
+      ? 'Önce kuralı ve tuzakları gör, ardından alıştırmalarla pekiştir.'
+      : 'Review the core logic and traps first, then master them via interactive drills.';
   }
   aiSlot.append(aiSlotLabel, aiSlotBody);
   body.appendChild(aiSlot);
-
-  // Examples section
-  const exHeader = document.createElement('div');
-  exHeader.className = 'rem-section-label';
-  exHeader.textContent = isTr ? 'ÖRNEKLER & TUZAK KARŞILAŞTIRMASI' : 'EXAMPLES & TRAP COMPARISON';
-  body.appendChild(exHeader);
 
   const examplesList = document.createElement('div');
   examplesList.className = 'rem-examples-list';
@@ -606,52 +686,45 @@ export function renderRemedialBriefing(
     const card = document.createElement('div');
     card.className = `rem-example-card ${ex.isTrap ? 'is-trap' : 'is-good'} ${isAiExtra ? 'is-ai-extra' : ''}`;
 
-    const headRow = document.createElement('div');
-    headRow.className = 'rem-ex-head';
+    const topLine = document.createElement('div');
+    topLine.className = 'rem-ex-top-line';
 
     const tag = document.createElement('span');
     tag.className = `rem-ex-tag ${ex.isTrap ? 'is-trap' : 'is-good'}`;
-    tag.textContent = ex.isTrap
+    tag.textContent = ex.isTrap ? '✕' : isAiExtra ? '✨' : '✓';
+    tag.title = ex.isTrap
       ? isTr
-        ? '✕ TUZAK (YANLIŞ)'
-        : '✕ COMMON TRAP'
+        ? 'Yaygın Tuzak (Yanlış)'
+        : 'Common Trap'
       : isAiExtra
         ? isTr
-          ? '✨ AI ÖRNEĞİ'
-          : '✨ AI EXAMPLE'
+          ? 'AI Örneği'
+          : 'AI Example'
         : isTr
-          ? '✓ DOĞRU'
-          : '✓ CORRECT';
-
-    headRow.appendChild(tag);
-
-    if (!ex.isTrap) {
-      const spkBtn = document.createElement('button');
-      spkBtn.type = 'button';
-      spkBtn.className = 'duo-audio-mini-btn';
-      spkBtn.textContent = '🔊';
-      spkBtn.title = isTr ? 'Dinle' : 'Listen';
-      spkBtn.addEventListener('click', () => speakEnglish(ex.en, 1.0));
-      headRow.appendChild(spkBtn);
-    }
+          ? 'Doğru Kullanım'
+          : 'Correct';
 
     const enEl = document.createElement('div');
     enEl.className = 'rem-ex-en';
     appendHighlightedText(enEl, ex.en, ex.highlight);
 
-    const trEl = document.createElement('div');
-    trEl.className = 'rem-ex-tr';
-    trEl.textContent = ex.tr;
+    topLine.append(tag, enEl);
 
-    card.append(headRow, enEl, trEl);
-
-    if (ex.isTrap && (ex.trapNoteTr || ex.trapNoteEn)) {
-      const trapNote = document.createElement('div');
-      trapNote.className = 'rem-ex-trap-note';
-      trapNote.textContent = isTr ? ex.trapNoteTr ?? '' : ex.trapNoteEn ?? '';
-      card.appendChild(trapNote);
+    if (!ex.isTrap) {
+      const spkBtn = document.createElement('button');
+      spkBtn.type = 'button';
+      spkBtn.className = 'duo-audio-mini-btn rem-ex-spk';
+      spkBtn.textContent = '🔊';
+      spkBtn.title = isTr ? 'Dinle' : 'Listen';
+      spkBtn.addEventListener('click', () => speakEnglish(ex.en, 1.0));
+      topLine.appendChild(spkBtn);
     }
 
+    const trEl = document.createElement('div');
+    trEl.className = 'rem-ex-tr';
+    trEl.textContent = ex.isTrap ? (isTr ? ex.tr : ex.trapNoteEn || ex.tr) : ex.tr;
+
+    card.append(topLine, trEl);
     examplesList.appendChild(card);
   };
 
@@ -661,12 +734,6 @@ export function renderRemedialBriefing(
     appendExampleCard(plan.briefing.examples[i]!, i >= baseExampleCount);
   }
   body.appendChild(examplesList);
-
-  // Mnemonic Box
-  const mnemonicBox = document.createElement('div');
-  mnemonicBox.className = 'rem-mnemonic';
-  mnemonicBox.textContent = isTr ? plan.briefing.mnemonicTr : plan.briefing.mnemonicEn;
-  body.appendChild(mnemonicBox);
 
   root.appendChild(body);
 
@@ -686,6 +753,11 @@ export function renderRemedialBriefing(
   startBtn.textContent = isTr ? 'Anladım, Pratiğe Başla! →' : 'Got It, Start Drills! →';
   startBtn.addEventListener('click', () => {
     cancelEnglishSpeech();
+    stopActiveRuleAudio();
+    if (getActiveGuideAssistantId() === 'tour_remedial_briefing') {
+      stopGuideAssistant();
+    }
+    briefAudioPlayer.dispose();
     startRemedialLessonSession(ctx, plan, weakness);
   });
 
@@ -697,16 +769,32 @@ export function renderRemedialBriefing(
     openBriefTutor();
   }
 
-  // Fire optional async AI personalization without blocking UI (skip if already AI-enriched on resume)
-  if (ctx.aiActive && plan.briefing.source !== 'ai') {
-    let alive = true;
-    startBtn.addEventListener('click', () => {
-      alive = false;
-    });
-    backBtn.addEventListener('click', () => {
-      alive = false;
-    });
+  // Only fetch optional AI personal note when the user clicks the ✨ AI Özel Notu pill
+  let aiRequested = false;
+  let alive = true;
+  startBtn.addEventListener('click', () => {
+    alive = false;
+  });
+  backBtn.addEventListener('click', () => {
+    alive = false;
+  });
 
+  aiToggleBtn.addEventListener('click', () => {
+    const nextOpen = aiSlot.hidden;
+    aiSlot.hidden = !nextOpen;
+    aiToggleBtn.classList.toggle('is-open', nextOpen);
+    aiToggleBtn.textContent = nextOpen
+      ? isTr
+        ? '✨ AI Notunu Gizle ▴'
+        : '✨ Hide AI Note ▴'
+      : isTr
+        ? '✨ AI Özel Notu ▾'
+        : '✨ AI Coach Note ▾';
+
+    if (!nextOpen || aiRequested || !ctx.aiActive || plan.briefing.source === 'ai') {
+      return;
+    }
+    aiRequested = true;
     aiSlotLabel.textContent = isTr ? '✨ AI Koç kişiselleştiriyor...' : '✨ AI Coach personalizing...';
     void chrome.runtime
       .sendMessage({
@@ -756,7 +844,7 @@ export function renderRemedialBriefing(
         if (!alive || !root.isConnected) return;
         aiSlotLabel.textContent = isTr ? '🎯 Ders Özeti' : '🎯 Lesson Overview';
       });
-  }
+  });
 }
 
 function getExerciseBadgeInfo(
@@ -896,10 +984,12 @@ export function startRemedialLessonSession(
     cancelEnglishSpeech();
 
     if (currentIdx >= queue.length) {
+      stopActiveRuleAudio();
       persistLesson(true);
       void finishRemedialSession();
       return;
     }
+    stopActiveRuleAudio();
 
     currentDraft = restored?.draft ? { ...restored.draft } : {};
     currentCheckedState = restored?.checkedState ? { ...restored.checkedState } : undefined;
@@ -924,6 +1014,7 @@ export function startRemedialLessonSession(
     exitBtn.addEventListener('click', () => {
       detachKeys();
       cancelEnglishSpeech();
+      stopActiveRuleAudio();
       void clearActiveRemedialSession().finally(() => {
         renderRemedialHub(ctx);
       });
@@ -980,6 +1071,35 @@ export function startRemedialLessonSession(
       });
     };
 
+    const remSampleText =
+      ex.correctedSentence || ex.audioText || ex.expectedAnswers[0] || ex.promptText;
+    const detectedRemSkills = detectHelpSkillsForQuestion({
+      englishText: remSampleText,
+      cardType: ex.card.type,
+      exerciseKind: ex.kind,
+      primarySkillId: plan.skillId,
+    });
+    const shouldGlowRemTeach = hasRichTeachMeSkills(detectedRemSkills);
+
+    const openRemTeachMe = (): void => {
+      openTeachMeDrawer({
+        host: sessionEl,
+        detectedSkills: detectedRemSkills,
+        uiLanguage: ctx.uiLanguage,
+        crimson: true,
+        sentenceHint: ex.promptText,
+      });
+    };
+
+    const teachRemBtn = document.createElement('button');
+    teachRemBtn.type = 'button';
+    teachRemBtn.className = `duo-teach-btn is-crimson${shouldGlowRemTeach ? ' is-glow' : ''}`;
+    teachRemBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Teach';
+    teachRemBtn.title = isTr
+      ? 'Bu sorudaki kuralları sesli ve yazılı dinle'
+      : 'Listen & read rules in this drill';
+    teachRemBtn.addEventListener('click', openRemTeachMe);
+
     const askRemTopBtn = document.createElement('button');
     askRemTopBtn.type = 'button';
     askRemTopBtn.className = 'duo-ask-ai-btn is-crimson';
@@ -996,7 +1116,7 @@ export function startRemedialLessonSession(
         ? `${combo}x 🔥`
         : `${Math.min(currentIdx + 1, queue.length)}/${queue.length}`;
 
-    topBar.append(exitBtn, progTrack, rulePeekBtn, askRemTopBtn, comboEl);
+    topBar.append(exitBtn, progTrack, teachRemBtn, rulePeekBtn, askRemTopBtn, comboEl);
     sessionEl.appendChild(topBar);
 
     // Inline toggleable cheat-sheet drawer
@@ -1654,6 +1774,14 @@ export function startRemedialLessonSession(
         actionsWrap.appendChild(spk);
       }
 
+      const teachRemFbBtn = document.createElement('button');
+      teachRemFbBtn.type = 'button';
+      teachRemFbBtn.className = `duo-teach-mini-btn is-crimson${shouldGlowRemTeach ? ' is-glow' : ''}`;
+      teachRemFbBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Rule';
+      teachRemFbBtn.title = isTr ? 'Sesli ve yazılı kural anlatımını aç' : 'Open voice rule coach';
+      teachRemFbBtn.addEventListener('click', openRemTeachMe);
+      actionsWrap.appendChild(teachRemFbBtn);
+
       const askRemFbBtn = document.createElement('button');
       askRemFbBtn.type = 'button';
       askRemFbBtn.className = 'duo-ask-ai-mini-btn is-crimson';
@@ -1661,30 +1789,6 @@ export function startRemedialLessonSession(
       askRemFbBtn.title = isTr ? 'Yapay zekâya nedenini sor' : 'Ask AI tutor why';
       askRemFbBtn.addEventListener('click', openRemTutor);
       actionsWrap.appendChild(askRemFbBtn);
-
-      if (!snap.skipped && !effectiveCorrect && (ex.kind === 'free_translation' || ex.kind === 'word_bank')) {
-        const overrideBtn = document.createElement('button');
-        overrideBtn.type = 'button';
-        overrideBtn.className = 'duo-btn-secondary duo-btn-override';
-        overrideBtn.textContent = isTr ? '✓ Doğru Say' : '✓ Accept';
-        overrideBtn.addEventListener('click', () => {
-          overrideBtn.hidden = true;
-          if (snap.retryId && queue[queue.length - 1]?.id === snap.retryId) {
-            queue.pop();
-          }
-          if (!ex.isRetryRequeue) firstTryCorrect += 1;
-          combo += 1;
-          if (combo > maxCombo) maxCombo = combo;
-          snap.overridden = true;
-          currentCheckedState = { ...snap };
-          persistLesson(false);
-          footerBar.className = 'duo-lesson-footer is-correct';
-          titleEl.textContent = isTr ? '✓ Doğru kabul edildi' : '✓ Marked correct';
-          if (solRow) solRow.hidden = true;
-          nextBtn.className = 'duo-btn-continue ok';
-        });
-        actionsWrap.appendChild(overrideBtn);
-      }
 
       const nextBtn = document.createElement('button');
       nextBtn.type = 'button';

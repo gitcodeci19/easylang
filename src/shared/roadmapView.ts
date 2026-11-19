@@ -56,6 +56,7 @@ import {
   saveRoadmapState,
   saveRoadmapUiMode,
 } from './storage';
+import { openTeachMeDrawer, stopActiveRuleAudio } from './teachMeDrawer';
 import {
   ACTIVE_ROADMAP_SESSION_VERSION,
   type AiTutorChatTurn,
@@ -79,8 +80,10 @@ import {
 } from './types';
 import {
   type AiDiagnosedOverlayItem,
+  detectHelpSkillsForQuestion,
   diagnoseUserWeaknesses,
   getResolvedRemedialSkillIds,
+  hasRichTeachMeSkills,
 } from './weaknessDetector';
 
 export interface RoadmapViewOptions {
@@ -889,7 +892,7 @@ export class RoadmapController {
         ringSvg.setAttribute('class', 'duo-progress-ring');
         ringSvg.setAttribute('viewBox', '0 0 84 84');
         ringSvg.innerHTML = `
-          <circle cx="42" cy="42" r="36" fill="none" stroke="rgba(196,181,253,0.14)" stroke-width="4.5"/>
+          <circle cx="42" cy="42" r="36" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4.5"/>
           <circle cx="42" cy="42" r="36" fill="none" stroke="#8b5cf6" stroke-width="4.5"
             stroke-linecap="round" stroke-dasharray="226" stroke-dashoffset="${dashOffset}"
             transform="rotate(-90 42 42)"/>
@@ -1195,10 +1198,12 @@ export class RoadmapController {
       tutorDraft?: string;
     }): void => {
       if (currentIdx >= queue.length) {
+        stopActiveRuleAudio();
         persistActiveSession(currentIdx, true);
         void finishLesson();
         return;
       }
+      stopActiveRuleAudio();
 
       currentDraft = restored?.draft ? { ...restored.draft } : {};
       currentCheckedState = restored?.checkedState ? { ...restored.checkedState } : undefined;
@@ -1220,6 +1225,7 @@ export class RoadmapController {
       exitBtn.title = L.closeBtn;
       exitBtn.addEventListener('click', () => {
         cancelEnglishSpeech();
+        stopActiveRuleAudio();
         void (async () => {
           await clearActiveRoadmapSession();
           await this.refresh({ skipAutoResume: true });
@@ -1291,6 +1297,44 @@ export class RoadmapController {
         });
       };
 
+      const sentenceCandidate =
+        ex.audioText && ex.audioText.trim().split(/\s+/).length >= 3
+          ? ex.audioText
+          : ex.card.type === 'sentence'
+            ? ex.card.en
+            : ex.card.exampleEn && ex.kind !== 'select_meaning' && ex.kind !== 'select_en'
+              ? ex.card.exampleEn
+              : ex.card.en || ex.expectedAnswers[0] || ex.promptText;
+      const isSentencePrompt = sentenceCandidate.trim().split(/\s+/).length >= 3;
+      const detectedHelpSkills = detectHelpSkillsForQuestion({
+        englishText: sentenceCandidate,
+        cardType: isSentencePrompt ? 'sentence' : ex.card.type,
+        exerciseKind: ex.kind,
+      });
+      const shouldGlowTeach = hasRichTeachMeSkills(detectedHelpSkills);
+
+      const openExerciseTeachMe = (): void => {
+        openTeachMeDrawer({
+          host: sessionEl,
+          detectedSkills: detectedHelpSkills,
+          uiLanguage: this.uiLanguage,
+          crimson: false,
+          sentenceHint:
+            ex.direction === 'tr-to-en' || ex.kind === 'cloze_blank' || ex.kind === 'audio_dictation'
+              ? ex.promptText
+              : ex.card.en,
+        });
+      };
+
+      const teachTopBtn = document.createElement('button');
+      teachTopBtn.type = 'button';
+      teachTopBtn.className = `duo-teach-btn${shouldGlowTeach ? ' is-glow' : ''}`;
+      teachTopBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Teach';
+      teachTopBtn.title = isTr
+        ? 'Bu sorudaki kuralları sesli ve yazılı dinle'
+        : 'Listen & read rules in this question';
+      teachTopBtn.addEventListener('click', openExerciseTeachMe);
+
       const askTopBtn = document.createElement('button');
       askTopBtn.type = 'button';
       askTopBtn.className = 'duo-ask-ai-btn';
@@ -1300,7 +1344,7 @@ export class RoadmapController {
         : 'Ask the AI tutor any question about this exercise';
       askTopBtn.addEventListener('click', openExerciseTutor);
 
-      topBar.append(exitBtn, progTrack, askTopBtn, comboBadge);
+      topBar.append(exitBtn, progTrack, teachTopBtn, askTopBtn, comboBadge);
       sessionEl.appendChild(topBar);
 
       const stage = document.createElement('div');
@@ -1696,6 +1740,14 @@ export class RoadmapController {
           actionsWrap.appendChild(replaySpk);
         }
 
+        const teachFbBtn = document.createElement('button');
+        teachFbBtn.type = 'button';
+        teachFbBtn.className = `duo-teach-mini-btn${shouldGlowTeach ? ' is-glow' : ''}`;
+        teachFbBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Rule';
+        teachFbBtn.title = isTr ? 'Bu sorunun kurallarını sesli dinle' : 'Open voice rule coach';
+        teachFbBtn.addEventListener('click', openExerciseTeachMe);
+        actionsWrap.appendChild(teachFbBtn);
+
         const askFbBtn = document.createElement('button');
         askFbBtn.type = 'button';
         askFbBtn.className = 'duo-ask-ai-mini-btn';
@@ -1705,69 +1757,6 @@ export class RoadmapController {
           : 'Ask AI tutor why';
         askFbBtn.addEventListener('click', openExerciseTutor);
         actionsWrap.appendChild(askFbBtn);
-
-        const canOverride =
-          !snap.skipped &&
-          !effectiveCorrect &&
-          (ex.kind === 'free_translation' || ex.kind === 'word_bank' || ex.kind === 'audio_dictation');
-
-        if (canOverride) {
-          const overrideBtn = document.createElement('button');
-          overrideBtn.type = 'button';
-          overrideBtn.className = 'duo-btn-secondary duo-btn-override';
-          overrideBtn.textContent = L.overrideBtn;
-          overrideBtn.addEventListener('click', () => {
-            overrideBtn.disabled = true;
-            overrideBtn.hidden = true;
-            if (snap.retryId && queue[queue.length - 1]?.id === snap.retryId) {
-              queue.pop();
-            }
-            const prevKind = byKindStats[ex.kind] ?? { correct: 0, wrong: 0 };
-            byKindStats[ex.kind] = {
-              correct: prevKind.correct + 1,
-              wrong: Math.max(0, prevKind.wrong - 1),
-            };
-            const curMistake = mistakesMap[mistakeKey];
-            if (curMistake) {
-              if (curMistake.wrongCount <= 1) {
-                delete mistakesMap[mistakeKey];
-              } else {
-                const updatedCount = curMistake.wrongCount - 1;
-                mistakesMap[mistakeKey] = {
-                  ...curMistake,
-                  wrongCount: updatedCount,
-                  repeatedWrong: updatedCount >= 2,
-                };
-              }
-            }
-            if (ex.card.en) {
-              strongWordsSet.add(ex.card.en);
-            }
-            if (!ex.isRetryRequeue) {
-              firstTryCorrectCount += 1;
-            }
-            combo += 1;
-            if (combo > maxCombo) maxCombo = combo;
-            snap.overridden = true;
-            currentCheckedState = { ...snap };
-            persistActiveSession(currentIdx, false);
-            footerBar.className = 'duo-lesson-footer is-correct';
-            titleEl.textContent = L.overrideAcceptedTitle;
-            if (solRow) solRow.hidden = true;
-            nextBtn.className = 'duo-btn-continue ok';
-            if (!ex.isRetryRequeue) {
-              void chrome.runtime
-                .sendMessage({
-                  type: 'OVERRIDE_CORRECT',
-                  cardId: ex.card.id,
-                  card: ex.card,
-                  source: 'roadmap',
-                } satisfies ExtensionMessage)
-                .catch(() => {});
-            }
-          });
-          actionsWrap.appendChild(overrideBtn);
-        }
 
         const nextBtn = document.createElement('button');
         nextBtn.type = 'button';

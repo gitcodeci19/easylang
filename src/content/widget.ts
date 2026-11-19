@@ -1,6 +1,9 @@
 import { sanitizeConceptExplanationForCard } from '../shared/concepts';
+import { createGuideHelpButton, stopGuideAssistant } from '../shared/guideAssistant';
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
 import { speakEnglishText as speakEnglish } from '../shared/speech';
+import { buildInlineTeachMePanel, stopActiveRuleAudio } from '../shared/teachMeDrawer';
+import { detectHelpSkillsForQuestion, hasRichTeachMeSkills } from '../shared/weaknessDetector';
 import type {
   ActivePrompt,
   AnswerOutcomeResult,
@@ -14,12 +17,17 @@ const HOST_ID = 'en-tr-recall-shadow-host';
 const TOAST_HOST_ID = 'en-tr-recall-toast-host';
 
 let escapeKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+let activeTeachCleanup: (() => void) | null = null;
 
 export function removeRecallWidget(): void {
   if (escapeKeyHandler) {
     window.removeEventListener('keydown', escapeKeyHandler);
     escapeKeyHandler = null;
   }
+  activeTeachCleanup?.();
+  activeTeachCleanup = null;
+  stopActiveRuleAudio();
+  stopGuideAssistant();
   document.getElementById(HOST_ID)?.remove();
 }
 
@@ -109,6 +117,11 @@ export function renderRecallWidget(
 
   const wrap = createEl('div', 'etr-wrap');
   const cardEl = createEl('div', 'etr-card');
+  const detectedCardSkills = detectHelpSkillsForQuestion({
+    englishText: card.en,
+    cardType: card.type,
+  });
+  const shouldGlowTeach = hasRichTeachMeSkills(detectedCardSkills);
 
   const renderQuestionView = (): void => {
     cardEl.className = 'etr-card';
@@ -200,15 +213,50 @@ export function renderRecallWidget(
     });
 
     const actions = createEl('div', 'etr-actions');
+    const qTeachBtn = createEl(
+      'button',
+      `etr-btn etr-btn-teach${shouldGlowTeach ? ' is-glow' : ''}`,
+      isTr ? '🎧 Bana Öğret' : '🎧 Teach Me'
+    );
+    qTeachBtn.type = 'button';
+    qTeachBtn.title = isTr
+      ? 'Bu cümledeki gramer kurallarını sesli ve yazılı dinle'
+      : 'Listen & read grammar rules inside this sentence';
+
     const dontKnowBtn = createEl('button', 'etr-btn etr-btn-ghost', ui.dontKnow);
     dontKnowBtn.type = 'button';
 
     const submitBtn = createEl('button', 'etr-btn etr-btn-primary', ui.checkAnswer);
     submitBtn.type = 'submit';
 
-    actions.append(dontKnowBtn, submitBtn);
+    actions.append(qTeachBtn, dontKnowBtn, submitBtn);
     form.append(input, actions);
     cardEl.appendChild(form);
+
+    const qTeachHost = createEl('div', 'etr-teach-host-question');
+    qTeachHost.hidden = true;
+    let qTeachCtrl: { element: HTMLElement; dispose: () => void } | null = null;
+    const setQuestionTeachOpen = (open: boolean): void => {
+      qTeachHost.hidden = !open;
+      qTeachBtn.classList.toggle('is-open', open);
+      if (open && !qTeachCtrl) {
+        qTeachCtrl = buildInlineTeachMePanel({
+          detectedSkills: detectedCardSkills,
+          isTr,
+          guideHost: wrap,
+          onClose: () => setQuestionTeachOpen(false),
+        });
+        activeTeachCleanup = qTeachCtrl.dispose;
+        qTeachHost.appendChild(qTeachCtrl.element);
+      } else if (!open) {
+        stopActiveRuleAudio();
+        stopGuideAssistant();
+      }
+    };
+    qTeachBtn.addEventListener('click', () => {
+      setQuestionTeachOpen(qTeachHost.hidden);
+    });
+    cardEl.appendChild(qTeachHost);
 
     const errorLine = createEl('div', 'etr-repeat-note');
     errorLine.hidden = true;
@@ -280,6 +328,10 @@ export function renderRecallWidget(
   };
 
   const renderOutcomeView = (userAnswer: string, outcome: AnswerOutcomeResult): void => {
+    activeTeachCleanup?.();
+    activeTeachCleanup = null;
+    stopActiveRuleAudio();
+    stopGuideAssistant();
     const isCorrect = outcome.evaluation.isCorrect;
     cardEl.className = `etr-card ${isCorrect ? 'state-correct' : 'state-wrong'}`;
     cardEl.replaceChildren();
@@ -296,7 +348,7 @@ export function renderRecallWidget(
     badges.appendChild(createEl('span', 'etr-badge', card.level));
     if (outcome.evaluation.aiStatus === 'used' || outcome.evaluation.matchKind === 'ai') {
       const aiLabel = `AI${outcome.evaluation.aiProviderIndex ?? 1}`;
-      badges.appendChild(createEl('span', 'etr-badge', aiLabel));
+      badges.appendChild(createEl('span', 'etr-badge ai', aiLabel));
     } else if (outcome.evaluation.aiStatus === 'error') {
       badges.appendChild(createEl('span', 'etr-badge wrong', isTr ? 'AI Hatası' : 'AI Error'));
     }
@@ -343,15 +395,18 @@ export function renderRecallWidget(
       feedbackBox.appendChild(userBubble);
     }
 
-    const ansBubble = createEl('div', 'etr-bubble etr-bubble-good');
+    const ansBubble = createEl(
+      'div',
+      isCorrect ? 'etr-bubble etr-bubble-ref' : 'etr-bubble etr-bubble-good'
+    );
     ansBubble.appendChild(
       createEl(
         'span',
         'etr-bubble-label',
         isCorrect
           ? isTr
-            ? '✓ Kabul Edilen Anlamlar'
-            : '✓ Accepted Meanings'
+            ? 'Kabul Edilen Anlamlar'
+            : 'Accepted Meanings'
           : isTr
             ? '✓ Doğru Anlam'
             : '✓ Correct Meaning'
@@ -360,8 +415,15 @@ export function renderRecallWidget(
     ansBubble.appendChild(createEl('div', undefined, card.acceptedTr.join(', ')));
     feedbackBox.appendChild(ansBubble);
 
+    const lowerDetails = createEl('div', 'etr-lower-details');
+
     if (outcome.evaluation.aiNote) {
-      const aiBubble = createEl('div', 'etr-bubble etr-bubble-ai');
+      const aiBubble = createEl(
+        'div',
+        outcome.evaluation.aiStatus === 'error'
+          ? 'etr-bubble etr-bubble-bad'
+          : 'etr-bubble etr-bubble-ai'
+      );
       aiBubble.appendChild(
         createEl(
           'span',
@@ -376,7 +438,7 @@ export function renderRecallWidget(
         )
       );
       aiBubble.appendChild(createEl('div', undefined, outcome.evaluation.aiNote));
-      feedbackBox.appendChild(aiBubble);
+      lowerDetails.appendChild(aiBubble);
     } else if (!isCorrect && outcome.evaluation.aiStatus === 'disabled') {
       const aiHint = createEl('div', 'etr-bubble etr-bubble-muted');
       aiHint.appendChild(
@@ -395,7 +457,7 @@ export function renderRecallWidget(
             : 'AI evaluation is disabled (enable it under AI - API Keys for smart paraphrase checks).'
         )
       );
-      feedbackBox.appendChild(aiHint);
+      lowerDetails.appendChild(aiHint);
     }
 
     if (
@@ -408,7 +470,7 @@ export function renderRecallWidget(
       if (card.exampleTr) {
         exDiv.appendChild(createEl('div', 'etr-example-tr', card.exampleTr));
       }
-      feedbackBox.appendChild(exDiv);
+      lowerDetails.appendChild(exDiv);
     }
 
     const localizedRepeat = isTr
@@ -528,7 +590,7 @@ export function renderRecallWidget(
 
     const flagSubmitBtn = createEl(
       'button',
-      'etr-btn etr-btn-primary',
+      'etr-btn etr-btn-flag-solid',
       isTr ? 'Kaydet' : 'Save'
     );
     flagSubmitBtn.type = 'button';
@@ -593,12 +655,18 @@ export function renderRecallWidget(
     const askAiPanel = createEl('div', 'etr-flag-panel etr-ask-panel');
     askAiPanel.hidden = true;
 
+    const askAiHead = createEl('div', 'etr-ask-head');
     const askAiLabel = createEl(
       'span',
       'etr-label',
       isTr ? '✨ AI Öğretmene Sor (Neden böyle?):' : '✨ Ask AI Tutor:'
     );
-    askAiLabel.style.marginBottom = '5px';
+    const askAiHelpBtn = createGuideHelpButton('tour_ask_ai', {
+      isTr,
+      variant: 'dot',
+      host: wrap,
+    });
+    askAiHead.append(askAiLabel, askAiHelpBtn);
 
     const askAiHistory: Array<{ role: 'user' | 'assistant'; text: string }> = [];
     const askAiOutput = createEl('div', 'etr-ask-output');
@@ -613,7 +681,7 @@ export function renderRecallWidget(
 
     const askAiSendBtn = createEl(
       'button',
-      'etr-btn etr-btn-primary',
+      'etr-btn etr-btn-ai-solid',
       isTr ? 'Sor' : 'Ask'
     );
     askAiSendBtn.type = 'button';
@@ -672,9 +740,18 @@ export function renderRecallWidget(
 
     const askAiRow = createEl('div', 'etr-flag-row');
     askAiRow.append(askAiInput, askAiSendBtn);
-    askAiPanel.append(askAiLabel, askAiOutput, askAiRow);
+    askAiPanel.append(askAiHead, askAiOutput, askAiRow);
 
-    cardEl.append(header, enEl, feedbackBox, repeatNote, conceptSlot, flagPanel, askAiPanel);
+    const outcomeTeachHost = createEl('div', 'etr-teach-host-outcome');
+    outcomeTeachHost.hidden = true;
+    let outcomeTeachCtrl: { element: HTMLElement; dispose: () => void } | null = null;
+
+    lowerDetails.append(repeatNote, conceptSlot, flagPanel, askAiPanel);
+
+    const lowerStage = createEl('div', 'etr-lower-stage');
+    lowerStage.append(lowerDetails, outcomeTeachHost);
+
+    cardEl.append(header, enEl, feedbackBox, lowerStage);
 
     const footer = createEl('div', 'etr-outcome-footer');
     const nextBtn = createEl('button', 'etr-btn etr-btn-next', ui.nextQuestion);
@@ -686,34 +763,47 @@ export function renderRecallWidget(
     });
 
     const secondaryRow = createEl('div', 'etr-outcome-secondary');
-    if (!isCorrect && userAnswer) {
-      const overrideBtn = createEl(
-        'button',
-        'etr-btn etr-btn-ghost',
-        isTr ? '✓ Doğru Say' : '✓ Correct'
-      );
-      overrideBtn.type = 'button';
-      overrideBtn.title = isTr
-        ? 'Cevabım doğruydu, kabul et'
-        : 'Accept my translation';
-      overrideBtn.addEventListener('click', async () => {
-        overrideBtn.disabled = true;
-        overrideBtn.textContent = '...';
-        const res = await sendBgMessage<{ ok: boolean; result?: AnswerOutcomeResult }>({
-          type: 'OVERRIDE_CORRECT',
-          cardId: card.id,
-          card,
-        });
-        if (res?.ok && res.result) {
-          renderOutcomeView(userAnswer, res.result);
+
+    const teachOutcomeBtn = createEl(
+      'button',
+      `etr-btn etr-btn-teach${shouldGlowTeach ? ' is-glow' : ''}`,
+      isTr ? '🎧 Bana Öğret' : '🎧 Teach Me'
+    );
+    teachOutcomeBtn.type = 'button';
+    teachOutcomeBtn.title = isTr
+      ? 'Bu cümledeki kuralları sesli ve yazılı dinle'
+      : 'Listen & read rules in this sentence';
+
+    const setOutcomeTeachOpen = (open: boolean): void => {
+      outcomeTeachHost.hidden = !open;
+      lowerDetails.hidden = open;
+      teachOutcomeBtn.classList.toggle('is-open', open);
+      if (open) {
+        flagPanel.hidden = true;
+        askAiPanel.hidden = true;
+        if (!outcomeTeachCtrl) {
+          outcomeTeachCtrl = buildInlineTeachMePanel({
+            detectedSkills: detectedCardSkills,
+            isTr,
+            guideHost: wrap,
+            onClose: () => setOutcomeTeachOpen(false),
+          });
+          activeTeachCleanup = outcomeTeachCtrl.dispose;
+          outcomeTeachHost.appendChild(outcomeTeachCtrl.element);
         }
-      });
-      secondaryRow.appendChild(overrideBtn);
-    }
+      } else {
+        stopActiveRuleAudio();
+        stopGuideAssistant();
+      }
+    };
+
+    teachOutcomeBtn.addEventListener('click', () => {
+      setOutcomeTeachOpen(outcomeTeachHost.hidden);
+    });
 
     const askAiToggleBtn = createEl(
       'button',
-      'etr-btn etr-btn-ghost',
+      'etr-btn etr-btn-ai',
       isTr ? '💬 AI’a Sor' : '💬 Ask AI'
     );
     askAiToggleBtn.type = 'button';
@@ -721,14 +811,18 @@ export function renderRecallWidget(
       ? 'Bu cümle hakkında yapay zekâya soru sor'
       : 'Ask the AI tutor about this card';
     askAiToggleBtn.addEventListener('click', () => {
+      setOutcomeTeachOpen(false);
       flagPanel.hidden = true;
       askAiPanel.hidden = !askAiPanel.hidden;
-      if (!askAiPanel.hidden) askAiInput.focus();
+      if (!askAiPanel.hidden) {
+        askAiPanel.scrollIntoView({ block: 'nearest' });
+        askAiInput.focus();
+      }
     });
 
     const flagToggleBtn = createEl(
       'button',
-      'etr-btn etr-btn-ghost',
+      'etr-btn etr-btn-flag',
       isTr ? 'Takıldım' : 'Flag'
     );
     flagToggleBtn.type = 'button';
@@ -736,20 +830,16 @@ export function renderRecallWidget(
       ? 'Kelime veya gramer kuralını odak listesine ekle'
       : 'Pin word or grammar rule for review';
     flagToggleBtn.addEventListener('click', () => {
+      setOutcomeTeachOpen(false);
       askAiPanel.hidden = true;
       flagPanel.hidden = !flagPanel.hidden;
-      if (!flagPanel.hidden) flagInput.focus();
+      if (!flagPanel.hidden) {
+        flagPanel.scrollIntoView({ block: 'nearest' });
+        flagInput.focus();
+      }
     });
 
-    const closeNowBtn = createEl(
-      'button',
-      'etr-btn etr-btn-secondary',
-      ui.closeBtn
-    );
-    closeNowBtn.type = 'button';
-    closeNowBtn.addEventListener('click', removeRecallWidget);
-
-    secondaryRow.append(askAiToggleBtn, flagToggleBtn, closeNowBtn);
+    secondaryRow.append(teachOutcomeBtn, askAiToggleBtn, flagToggleBtn);
     footer.append(secondaryRow, nextBtn);
     cardEl.appendChild(footer);
   };

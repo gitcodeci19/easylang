@@ -476,12 +476,12 @@ const PAGE_QUIZ_CSS = `
   }
 
   .etr-pq-locate {
-    background: rgba(250, 204, 21, 0.14);
-    border: 1px solid rgba(250, 204, 21, 0.42);
-    color: #fde047;
-    height: 22px;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.34);
+    color: #fcd34d;
+    height: 24px;
     padding: 0 7px;
-    border-radius: 5px;
+    border-radius: 6px;
     cursor: pointer;
     font: inherit;
     font-size: 10.5px;
@@ -491,26 +491,24 @@ const PAGE_QUIZ_CSS = `
     gap: 3px;
     margin-left: auto;
     margin-right: 4px;
+    transition: background 0.12s, border-color 0.12s;
   }
 
   .etr-pq-locate:hover {
-    background: rgba(250, 204, 21, 0.25);
+    background: rgba(245, 158, 11, 0.22);
+    border-color: #fbbf24;
   }
 
   .etr-pq-card {
     position: fixed;
     z-index: 2147483647;
-    width: min(392px, calc(100vw - 24px));
-    background-color: #0b0914;
-    background-image:
-      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(139, 92, 246, 0.14), transparent 70%),
-      radial-gradient(rgba(196, 181, 253, 0.04) 1px, transparent 0);
-    background-size: 100% 100%, 12px 12px;
+    width: min(388px, calc(100vw - 24px));
+    background: #111117;
     color: #f4f4f6;
-    border: 1px solid rgba(196, 181, 253, 0.16);
-    border-radius: 11px;
-    padding: 13px 14px;
-    box-shadow: 0 18px 42px rgba(7, 4, 18, 0.74), inset 0 1px 0 rgba(233, 213, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 12px 14px;
+    box-shadow: 0 20px 44px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.05);
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -526,7 +524,7 @@ const PAGE_QUIZ_CSS = `
     left: 0;
     right: 0;
     height: 2px;
-    background: linear-gradient(90deg, #a855f7, #7c3aed);
+    background: #f59e0b;
   }
 
   .etr-pq-head {
@@ -551,10 +549,10 @@ const PAGE_QUIZ_CSS = `
     font-size: 10px;
     font-weight: 700;
     padding: 3px 6px;
-    border-radius: 4px;
-    background: rgba(245, 158, 11, 0.14);
-    color: #fbbf24;
-    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 5px;
+    background: rgba(245, 158, 11, 0.13);
+    color: #fcd34d;
+    border: 1px solid rgba(245, 158, 11, 0.32);
     letter-spacing: 0.02em;
   }
 
@@ -563,57 +561,59 @@ const PAGE_QUIZ_CSS = `
     font-size: 10px;
     font-weight: 700;
     padding: 3px 6px;
-    border-radius: 4px;
-    background: #17171c;
-    color: #a1a1aa;
+    border-radius: 5px;
+    background: #1a1a23;
+    color: #a1a1b2;
     border: 1px solid rgba(255, 255, 255, 0.09);
   }
 
   .etr-pq-close {
-    background: rgba(244, 63, 94, 0.12);
-    border: 1px solid rgba(244, 63, 94, 0.36);
-    color: #fda4af;
-    width: 26px;
-    height: 26px;
-    border-radius: 7px;
+    background: #181821;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: #9090a2;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
     cursor: pointer;
     padding: 0;
     line-height: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.14s, color 0.14s, border-color 0.14s;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
   }
 
   .etr-pq-close:hover {
-    background: rgba(244, 63, 94, 0.28);
-    border-color: rgba(244, 63, 94, 0.72);
-    color: #ffffff;
+    background: rgba(225, 29, 72, 0.22);
+    border-color: rgba(244, 63, 94, 0.5);
+    color: #ffe4e6;
   }
 
   .etr-pq-prompt {
     font-size: 11.5px;
-    color: #a1a1aa;
+    color: #9e9eb0;
   }
 
   .etr-pq-textarea {
     width: 100%;
-    min-height: 54px;
+    min-height: 52px;
     max-height: 130px;
     resize: vertical;
-    background: #120f1e;
+    background: #0c0c11;
     color: #f4f4f6;
-    border: 1px solid rgba(196, 181, 253, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 7px;
     padding: 8px 10px;
     font: inherit;
     font-size: 13px;
     line-height: 1.4;
     outline: none;
+    transition: border-color 0.14s, box-shadow 0.14s;
   }
 
   .etr-pq-textarea:focus {
-    border-color: #a855f7;
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.18);
   }
 
   .etr-pq-actions {
@@ -624,9 +624,9 @@ const PAGE_QUIZ_CSS = `
   }
 
   .etr-pq-btn {
-    border: 1px solid rgba(196, 181, 253, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 6px;
-    height: 29px;
+    height: 28px;
     padding: 0 11px;
     font: inherit;
     font-size: 11.5px;
@@ -635,49 +635,50 @@ const PAGE_QUIZ_CSS = `
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.08s ease, background-color 0.14s ease, opacity 0.14s ease;
+    transition: transform 0.08s ease, background-color 0.12s ease, opacity 0.12s ease;
   }
 
   .etr-pq-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.48;
     cursor: wait;
   }
 
   .etr-pq-btn-primary,
   .etr-pq-btn-next {
-    background: linear-gradient(135deg, #9333ea, #7c3aed);
-    color: #ffffff;
-    border-color: rgba(196, 181, 253, 0.35);
-    font-weight: 700;
+    background: #f59e0b;
+    color: #111117;
+    border-color: rgba(253, 224, 71, 0.4);
+    font-weight: 800;
   }
 
   .etr-pq-btn-primary:hover:not(:disabled),
   .etr-pq-btn-next:hover:not(:disabled) {
-    background: linear-gradient(135deg, #a855f7, #8b5cf6);
+    background: #fbbf24;
   }
 
   .etr-pq-btn-ghost {
-    background: #131317;
-    color: #a1a1aa;
+    background: #181821;
+    color: #a4a4b4;
     border-color: rgba(255, 255, 255, 0.09);
   }
 
   .etr-pq-btn-ghost:hover:not(:disabled) {
-    background: #1f1f26;
+    background: #22222e;
     color: #f4f4f6;
+    border-color: rgba(255, 255, 255, 0.18);
   }
 
   .etr-pq-result {
-    border-radius: 9px;
-    padding: 4px 0 2px;
+    border-radius: 8px;
+    padding: 2px 0;
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    gap: 6px;
   }
 
   .etr-pq-verdict {
     font-weight: 800;
-    font-size: 12.5px;
+    font-size: 12px;
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -687,47 +688,53 @@ const PAGE_QUIZ_CSS = `
   }
 
   .etr-pq-result.ok .etr-pq-verdict {
-    background: rgba(16, 185, 129, 0.16);
+    background: rgba(16, 185, 129, 0.13);
     color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.36);
+    border: 1px solid rgba(16, 185, 129, 0.32);
   }
+
   .etr-pq-result.bad .etr-pq-verdict {
-    background: rgba(244, 63, 94, 0.16);
+    background: rgba(225, 29, 72, 0.14);
     color: #fb7185;
-    border: 1px solid rgba(244, 63, 94, 0.36);
+    border: 1px solid rgba(225, 29, 72, 0.34);
   }
 
   .etr-pq-bubble {
-    border-radius: 9px;
-    padding: 8px 10px;
+    border-radius: 8px;
+    padding: 7px 10px;
     font-size: 12.5px;
-    line-height: 1.44;
+    line-height: 1.42;
     border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left-width: 3px;
+    background: #171720;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
   }
 
   .etr-pq-bubble-label {
-    font-size: 10px;
+    font-size: 9.5px;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.055em;
   }
 
+  /* Sky/Cyan AI Evaluation — consistent across all EasyLang surfaces */
   .etr-pq-bubble-ai {
-    background: rgba(245, 158, 11, 0.13);
-    border-color: rgba(245, 158, 11, 0.45);
-    color: #fef3c7;
+    background: rgba(14, 165, 233, 0.09);
+    border-color: rgba(14, 165, 233, 0.24);
+    border-left-color: #0ea5e9;
+    color: #e0f2fe;
   }
 
   .etr-pq-bubble-ai .etr-pq-bubble-label {
-    color: #fbbf24;
+    color: #38bdf8;
   }
 
   .etr-pq-bubble-bad {
-    background: rgba(244, 63, 94, 0.13);
-    border-color: rgba(244, 63, 94, 0.42);
+    background: rgba(225, 29, 72, 0.09);
+    border-color: rgba(225, 29, 72, 0.22);
+    border-left-color: #e11d48;
     color: #ffe4e6;
   }
 
@@ -736,8 +743,9 @@ const PAGE_QUIZ_CSS = `
   }
 
   .etr-pq-bubble-good {
-    background: rgba(16, 185, 129, 0.13);
-    border-color: rgba(16, 185, 129, 0.42);
+    background: rgba(16, 185, 129, 0.09);
+    border-color: rgba(16, 185, 129, 0.24);
+    border-left-color: #10b981;
     color: #ecfdf5;
     font-weight: 600;
   }
@@ -746,15 +754,27 @@ const PAGE_QUIZ_CSS = `
     color: #34d399;
   }
 
+  .etr-pq-bubble-ref {
+    background: #16161f;
+    border-color: rgba(255, 255, 255, 0.08);
+    border-left-color: rgba(255, 255, 255, 0.22);
+    color: #e4e4ec;
+  }
+
+  .etr-pq-bubble-ref .etr-pq-bubble-label {
+    color: #8e8ea2;
+  }
+
   .etr-pq-bubble-note {
-    background: rgba(139, 92, 246, 0.11);
-    border-color: rgba(139, 92, 246, 0.32);
-    color: #ddd6fe;
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.22);
+    border-left-color: #f59e0b;
+    color: #fef3c7;
     font-size: 11.5px;
   }
 
   .etr-pq-bubble-note .etr-pq-bubble-label {
-    color: #c4b5fd;
+    color: #fcd34d;
   }
 
   .etr-pq-loading-pill {
@@ -762,14 +782,14 @@ const PAGE_QUIZ_CSS = `
     top: 14px;
     right: 14px;
     z-index: 2147483647;
-    background: #09090b;
-    color: #fbbf24;
-    border: 1px solid rgba(245, 158, 11, 0.4);
-    border-radius: 7px;
+    background: #111117;
+    color: #fcd34d;
+    border: 1px solid rgba(245, 158, 11, 0.36);
+    border-radius: 8px;
     padding: 7px 12px;
     font-size: 11.5px;
     font-weight: 600;
-    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.65);
   }
 `;
 
@@ -1110,12 +1130,23 @@ function renderAnchoredQuizBox(
         createEl('div', undefined, userAnswer)
       );
 
-      const refBubble = createEl('div', 'etr-pq-bubble etr-pq-bubble-good');
+      const refBubble = createEl(
+        'div',
+        evaluation.isCorrect
+          ? 'etr-pq-bubble etr-pq-bubble-ref'
+          : 'etr-pq-bubble etr-pq-bubble-good'
+      );
       refBubble.append(
         createEl(
           'span',
           'etr-pq-bubble-label',
-          isTr ? '✓ DOĞRU ANLAM / ÖRNEK ÇEVİRİ' : '✓ REFERENCE TRANSLATION'
+          evaluation.isCorrect
+            ? isTr
+              ? 'ÖRNEK ÇEVİRİ'
+              : 'REFERENCE TRANSLATION'
+            : isTr
+              ? '✓ DOĞRU ANLAM / ÖRNEK ÇEVİRİ'
+              : '✓ REFERENCE TRANSLATION'
         ),
         createEl('div', undefined, evaluation.referenceTranslation)
       );

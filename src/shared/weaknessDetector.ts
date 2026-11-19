@@ -1,8 +1,14 @@
 import {
+  analyzeEnglishGrammarSkills,
+  analyzeVoiceCoachRules,
+  matchesGrammarSkill,
+} from './grammarAnalyzer.ts';
+import {
   REMEDIAL_SKILL_CATALOG,
   REMEDIAL_SKILL_ORDER,
   type RemedialSkillSpec,
 } from './remedialCatalog.ts';
+import { isValidVoiceCoachRuleId } from './voiceCoachCatalog.ts';
 import type {
   Card,
   ConceptTrackerState,
@@ -16,6 +22,7 @@ import type {
   ReviewEvent,
   RoadmapLessonRecord,
   UserCardProgress,
+  VoiceCoachRuleId,
   WeakSkillId,
 } from './types';
 
@@ -169,7 +176,7 @@ export function detectAnswerConfusionSkills(params: {
   }
 
   // 3. Passive voice (be + V3) confusion
-  if (REMEDIAL_SKILL_CATALOG.passive_voice.sentencePattern.test(en)) {
+  if (matchesGrammarSkill('passive_voice', en)) {
     // Check if passive English sentence missed passive Turkish suffix (-ıldı/-ildi/-ulur/-ilir/-edildi)
     const missingTrPassive =
       lowUser.length > 0 &&
@@ -200,10 +207,10 @@ export function detectAnswerConfusionSkills(params: {
 
   // 5B. Omitted Present Perfect auxiliary (e.g. "My dog missing" vs "My dog has been missing")
   if (
-    REMEDIAL_SKILL_CATALOG.present_perfect.sentencePattern.test(en) &&
+    matchesGrammarSkill('present_perfect', en) &&
     isEnglishUserAttempt &&
     userAns.length > 0 &&
-    !REMEDIAL_SKILL_CATALOG.present_perfect.sentencePattern.test(userAns)
+    !matchesGrammarSkill('present_perfect', userAns)
   ) {
     hits.push({ skillId: 'present_perfect', bonus: 24 });
   }
@@ -275,18 +282,73 @@ function pushEvidence(
   }
 }
 
-function matchGrammarSkillsForEnglish(en: string): WeakSkillId[] {
-  const matched: WeakSkillId[] = [];
-  for (const skillId of REMEDIAL_SKILL_ORDER) {
-    if (skillId === 'trouble_vocab' || skillId === 'word_order_syntax' || skillId === 'listening_gap') {
-      continue;
-    }
-    const spec = REMEDIAL_SKILL_CATALOG[skillId];
-    if (spec.sentencePattern.test(en)) {
-      matched.push(skillId);
+export function matchGrammarSkillsForEnglish(en: string): WeakSkillId[] {
+  return analyzeEnglishGrammarSkills(en);
+}
+
+const GENERIC_FALLBACK_HELP_SKILLS = new Set<VoiceCoachRuleId>([
+  'word_order_syntax',
+  'trouble_vocab',
+  'listening_gap',
+]);
+
+/**
+ * Returns true when a prompt/card contains 2+ substantive grammar/usage voice guides
+ * (excluding generic fallbacks like word order, vocab, or listening), so "Bana Öğret"
+ * only glows on grammar-rich sentences rather than on every routine prompt.
+ */
+export function hasRichTeachMeSkills(detectedSkills: readonly VoiceCoachRuleId[]): boolean {
+  let substantiveCount = 0;
+  for (const sid of detectedSkills) {
+    if (!GENERIC_FALLBACK_HELP_SKILLS.has(sid)) {
+      substantiveCount += 1;
     }
   }
-  return matched;
+  return substantiveCount >= 2;
+}
+
+/**
+ * Detect relevant grammar & coaching rules (across all 35 voice-coach guides) inside a prompt/card
+ * for on-demand "Teach Me" (`🎧 Bana Öğret`) audio & written help.
+ */
+export function detectHelpSkillsForQuestion(params: {
+  englishText: string;
+  cardType?: 'word' | 'sentence';
+  exerciseKind?: string;
+  primarySkillId?: VoiceCoachRuleId;
+}): VoiceCoachRuleId[] {
+  const detected = new Set<VoiceCoachRuleId>();
+  if (params.primarySkillId && isValidVoiceCoachRuleId(params.primarySkillId)) {
+    detected.add(params.primarySkillId);
+  }
+
+  const en = (params.englishText || '').trim();
+  const wordCount = en ? en.split(/\s+/).filter(Boolean).length : 0;
+
+  if (en && (params.cardType !== 'word' || wordCount >= 3)) {
+    for (const rid of analyzeVoiceCoachRules(en)) {
+      detected.add(rid);
+    }
+  }
+
+  if (params.exerciseKind === 'audio_dictation') {
+    detected.add('listening_gap');
+  }
+
+  const hasWordOrderCue = en ? matchesGrammarSkill('word_order_syntax', en) : false;
+  if (
+    params.exerciseKind === 'word_bank' ||
+    hasWordOrderCue ||
+    (detected.size === 0 && ((params.cardType === 'sentence' && wordCount >= 4) || wordCount >= 5))
+  ) {
+    detected.add('word_order_syntax');
+  }
+
+  if ((params.cardType === 'word' && wordCount < 3) || detected.size === 0) {
+    detected.add('trouble_vocab');
+  }
+
+  return Array.from(detected).slice(0, 3);
 }
 
 function matchSkillsForConcept(
@@ -408,7 +470,7 @@ function collectSkillAccumulators(input: DiagnoseWeaknessesInput): Map<WeakSkill
           isEnglishAttempt &&
           m.lastUserAnswer &&
           m.lastUserAnswer !== '(skipped)' &&
-          spec.sentencePattern.test(m.lastUserAnswer)
+          matchesGrammarSkill(sid, m.lastUserAnswer)
         ) {
           // User reproduced this exact grammar structure cleanly; the mistake was elsewhere in the sentence.
           continue;
@@ -752,6 +814,7 @@ function pickSkillSentenceCards(
       c.type === 'sentence' &&
       c.id.startsWith('m_') &&
       !seen.has(c.id) &&
+      matchesGrammarSkill(skillId, c.en) &&
       spec.sentencePattern.test(c.en) &&
       tokenizeSentenceForBank(c.en).length >= 4 &&
       tokenizeSentenceForBank(c.en).length <= 10
@@ -767,6 +830,7 @@ function pickSkillSentenceCards(
       (c) =>
         c.type === 'sentence' &&
         !seen.has(c.id) &&
+        matchesGrammarSkill(skillId, c.en) &&
         spec.sentencePattern.test(c.en) &&
         tokenizeSentenceForBank(c.en).length >= 4 &&
         tokenizeSentenceForBank(c.en).length <= 10

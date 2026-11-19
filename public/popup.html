@@ -75,6 +75,16 @@
               />
             </svg>
           </a>
+          <button
+            id="topbar-guide-btn"
+            class="icon-btn el-help-trigger is-dot"
+            type="button"
+            data-guide-id="tour_topbar_controls"
+            aria-pressed="false"
+            title="Üst kontroller ne işe yarar? (Sesli anlatım · Durdurmak için tekrar tıkla)"
+          >
+            ?
+          </button>
           <label class="switch" title="Otomatik kartları aç/kapat">
             <input type="checkbox" id="enabled-toggle" />
             <span class="slider"></span>
@@ -112,7 +122,7 @@
           </div>
         </div>
 
-        <div id="no-api-popup-banner" class="banner-card backup-nudge" hidden>
+        <div id="no-api-popup-banner" class="banner-card no-api-nudge" hidden>
           <div class="banner-body">
             <span class="banner-icon" aria-hidden="true">🔑</span>
             <div class="banner-copy">
@@ -131,22 +141,55 @@
 
       <!-- Row 3: Single Clean Bottom Action Strip -->
       <footer class="action-bar">
-        <button id="trigger-now-btn" class="act-btn act-primary" type="button">
-          <svg class="ico" viewBox="0 0 16 16" fill="none">
-            <path d="M9.2 1.5L3.5 9h4.1l-.8 5.5L12.5 7H8.4l.8-5.5z" fill="currentColor" />
-          </svg>
-          <span id="trigger-now-label">Şimdi Soru Sor</span>
-        </button>
+        <div class="act-slot">
+          <button id="trigger-now-btn" class="act-btn act-primary" type="button">
+            <svg class="ico" viewBox="0 0 16 16" fill="none">
+              <path d="M9.2 1.5L3.5 9h4.1l-.8 5.5L12.5 7H8.4l.8-5.5z" fill="currentColor" />
+            </svg>
+            <span id="trigger-now-label">Şimdi Soru Sor</span>
+          </button>
+          <button
+            type="button"
+            class="el-help-trigger is-dot act-help-btn is-on-primary"
+            data-guide-id="tour_ask_now"
+            aria-pressed="false"
+            title="Şimdi Soru Sor ne işe yarar? (Sesli anlatım)"
+          >
+            ?
+          </button>
+        </div>
 
-        <button id="page-quiz-btn" class="act-btn" type="button">
-          <span class="dot amber"></span>
-          <span id="page-quiz-label">Challenge</span>
-        </button>
+        <div class="act-slot">
+          <button id="page-quiz-btn" class="act-btn" type="button">
+            <span class="dot amber"></span>
+            <span id="page-quiz-label">Challenge</span>
+          </button>
+          <button
+            type="button"
+            class="el-help-trigger is-dot act-help-btn"
+            data-guide-id="tour_challenge"
+            aria-pressed="false"
+            title="Challenge modu ne işe yarar? (Sesli anlatım)"
+          >
+            ?
+          </button>
+        </div>
 
-        <button id="listening-quiz-btn" class="act-btn" type="button">
-          <span class="dot emerald"></span>
-          <span id="listening-quiz-label">Dinle &amp; Yaz</span>
-        </button>
+        <div class="act-slot">
+          <button id="listening-quiz-btn" class="act-btn" type="button">
+            <span class="dot emerald"></span>
+            <span id="listening-quiz-label">Dinle &amp; Yaz</span>
+          </button>
+          <button
+            type="button"
+            class="el-help-trigger is-dot act-help-btn"
+            data-guide-id="tour_listen_write"
+            aria-pressed="false"
+            title="Dinle &amp; Yaz ne işe yarar? (Sesli anlatım)"
+          >
+            ?
+          </button>
+        </div>
       </footer>
 
       <div id="popup-onboarding" class="onboarding-overlay" hidden>
@@ -154,6 +197,16 @@
           <div class="ob-brand">
             <span class="ob-logo">⚡</span>
             <span class="ob-title-brand">EasyLang</span>
+            <button
+              id="ob-guide-replay-btn"
+              class="el-help-trigger is-pill ob-guide-btn"
+              type="button"
+              aria-pressed="false"
+              title="Sesli anlatımı tekrar dinle veya durdur"
+            >
+              <span class="el-help-q">?</span>
+              <span id="ob-guide-replay-label">Sesli Anlatım</span>
+            </button>
           </div>
 
           <section id="ob-step-choice" class="ob-step">

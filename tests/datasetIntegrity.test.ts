@@ -6,7 +6,23 @@ import {
   CURRICULUM_UNITS,
   buildUnitLessonExercises,
 } from '../src/shared/curriculum.ts';
-import { REMEDIAL_SKILL_CATALOG, REMEDIAL_SKILL_ORDER } from '../src/shared/remedialCatalog.ts';
+import {
+  ASSISTANT_GUIDE_LABELS,
+  ASSISTANT_GUIDE_ORDER,
+  getGuideAudioRelativePath,
+} from '../src/shared/guideAssistant.ts';
+import {
+  REMEDIAL_AUDIO_WORD_TIMINGS,
+  findActiveWordIndex,
+} from '../src/shared/remedialAudioTimings.ts';
+import {
+  REMEDIAL_SKILL_CATALOG,
+  REMEDIAL_SKILL_ORDER,
+} from '../src/shared/remedialCatalog.ts';
+import {
+  VOICE_COACH_RULE_ORDER,
+  getVoiceCoachRuleSpec,
+} from '../src/shared/voiceCoachCatalog.ts';
 import type { Card, UserCardProgress } from '../src/shared/types.ts';
 import { buildRemedialLessonPlan } from '../src/shared/weaknessDetector.ts';
 
@@ -231,5 +247,88 @@ test('all 18 Remedial workshops generate clean non-ambiguous cloze_blank and tro
         assert.equal(new Set(folded).size, folded.length, `Duplicate choice in remedial ${skillId}`);
       }
     }
+  }
+});
+
+test('all 35 bundled ElevenLabs voiceover MP3 files, transcripts, and word timings exist and align 1-to-1', () => {
+  const audioDir = path.resolve(process.cwd(), 'public', 'audio', 'remedial');
+  assert.equal(VOICE_COACH_RULE_ORDER.length, 35, 'Expected 35 voice-coach rules');
+
+  for (const ruleId of VOICE_COACH_RULE_ORDER) {
+    const filePath = path.join(audioDir, `${ruleId}.mp3`);
+    assert.ok(fs.existsSync(filePath), `Missing bundled MP3 for ${ruleId}: ${filePath}`);
+    const stat = fs.statSync(filePath);
+    assert.ok(stat.size > 50_000, `MP3 too small / corrupt for ${ruleId}: ${stat.size} bytes`);
+
+    const spec = getVoiceCoachRuleSpec(ruleId);
+    const transcript = spec.transcriptTr;
+    assert.ok(transcript && transcript.length >= 120, `Missing transcript for ${ruleId}`);
+    assert.ok(!transcript.includes('/') && !transcript.includes('→'), `Transcript for ${ruleId} has TTS symbols`);
+
+    const words = transcript.trim().split(/\s+/).filter(Boolean);
+    const timings = REMEDIAL_AUDIO_WORD_TIMINGS[ruleId];
+    assert.ok(timings && timings.length > 0, `Missing word timings for ${ruleId}`);
+    assert.equal(
+      timings.length,
+      words.length,
+      `Timing count mismatch for ${ruleId}: ${timings.length} vs ${words.length}`
+    );
+
+    let prevStart = -1;
+    for (let i = 0; i < timings.length; i += 1) {
+      const [startMs, endMs] = timings[i]!;
+      assert.ok(
+        Number.isFinite(startMs) && Number.isFinite(endMs) && startMs >= 0 && endMs > startMs,
+        `Invalid timing interval for ${ruleId}[${i}]: [${startMs}, ${endMs}]`
+      );
+      assert.ok(
+        startMs >= prevStart,
+        `Non-monotonic timing start for ${ruleId}[${i}]: ${startMs} < ${prevStart}`
+      );
+      prevStart = startMs;
+    }
+
+    // Verify binary-search lookup hits first word and clears during leading silence/idle
+    assert.equal(findActiveWordIndex(timings, -1, 0), -1);
+    assert.equal(findActiveWordIndex(timings, timings[0]![0] + 10, 0), 0);
+    assert.equal(
+      findActiveWordIndex(timings, timings[timings.length - 1]![0] + 10, 0),
+      timings.length - 1
+    );
+  }
+});
+
+test('Voice Guide Assistant metadata, manifest exposure, and bundled MP3 assets are valid', () => {
+  assert.equal(ASSISTANT_GUIDE_ORDER.length, 16, 'Expected 16 guide assistant slots');
+  assert.equal(new Set(ASSISTANT_GUIDE_ORDER).size, 16, 'Duplicate guide assistant IDs');
+
+  const manifestPath = path.resolve(process.cwd(), 'public', 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+    web_accessible_resources?: Array<{ resources?: string[] }>;
+  };
+  const allExposed = (manifest.web_accessible_resources ?? []).flatMap((r) => r.resources ?? []);
+  assert.ok(
+    allExposed.includes('audio/assistant/*.mp3'),
+    'manifest.json must expose audio/assistant/*.mp3 in web_accessible_resources'
+  );
+
+  // onboarding_restore.mp3 is pending user download (A3); verify all 15 bundled MP3s strictly
+  const pendingGuides = new Set(['onboarding_restore']);
+  for (const guideId of ASSISTANT_GUIDE_ORDER) {
+    const labels = ASSISTANT_GUIDE_LABELS[guideId];
+    assert.ok(labels && labels.tr.length > 4 && labels.en.length > 4, `Missing labels for ${guideId}`);
+    assert.ok(
+      !/duolingo|chatgpt/i.test(`${labels.tr} ${labels.en}`),
+      `Trademark term found in guide label for ${guideId}`
+    );
+
+    const relPath = getGuideAudioRelativePath(guideId);
+    const absPath = path.resolve(process.cwd(), 'public', relPath);
+    if (pendingGuides.has(guideId) && !fs.existsSync(absPath)) {
+      continue;
+    }
+    assert.ok(fs.existsSync(absPath), `Missing assistant MP3: ${absPath}`);
+    const stat = fs.statSync(absPath);
+    assert.ok(stat.size > 50_000, `Assistant MP3 too small / corrupt for ${guideId}: ${stat.size} bytes`);
   }
 });

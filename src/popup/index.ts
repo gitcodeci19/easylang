@@ -1,4 +1,12 @@
 import { ratingToCefrProgress } from '../shared/analytics';
+import {
+  ASSISTANT_GUIDE_LABELS,
+  type AssistantGuideId,
+  playGuideAssistant,
+  playGuideOnce,
+  stopGuideAssistant,
+  toggleGuideAssistant,
+} from '../shared/guideAssistant';
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
 import { RoadmapController } from '../shared/roadmapView';
 import { isUrlBlocked } from '../shared/siteFilter';
@@ -154,7 +162,35 @@ function renderStatus(status: StatusSnapshot): void {
 
   openOptionsBtn.title = ui.settingsAiBtn;
   updateCurrentTabBlockButton(status, isTr);
+  syncStaticGuideTooltips(isTr);
 }
+
+function syncStaticGuideTooltips(isTr: boolean): void {
+  document.querySelectorAll<HTMLButtonElement>('.el-help-trigger[data-guide-id]').forEach((btn) => {
+    const gid = btn.dataset.guideId as AssistantGuideId | undefined;
+    if (!gid || !(gid in ASSISTANT_GUIDE_LABELS)) return;
+    const meta = ASSISTANT_GUIDE_LABELS[gid];
+    btn.title = isTr
+      ? `${meta.tr} (Sesli anlatım · Durdurmak için tekrar tıkla)`
+      : `${meta.en} (Voice guide · Click again to stop)`;
+  });
+}
+
+document.querySelectorAll<HTMLButtonElement>('.el-help-trigger[data-guide-id]').forEach((btn) => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const gid = btn.dataset.guideId as AssistantGuideId | undefined;
+    if (!gid || !(gid in ASSISTANT_GUIDE_LABELS)) return;
+    toggleGuideAssistant(gid, {
+      isTr: isTurkishUi(currentStatus),
+      triggerEl: btn,
+    });
+  });
+});
+
+window.addEventListener('pagehide', () => stopGuideAssistant());
+window.addEventListener('beforeunload', () => stopGuideAssistant());
 
 async function fetchStatus(): Promise<void> {
   const [tabs, res, settings, ai] = await Promise.all([
@@ -591,12 +627,12 @@ function applyPopupOnboardingCopy(
   }
 }
 
-async function ensurePopupOnboarding(): Promise<void> {
+async function ensurePopupOnboarding(): Promise<boolean> {
   const onboarding = await getOnboardingState();
-  if (onboarding.completed) return;
+  if (onboarding.completed) return false;
 
   const overlay = document.getElementById('popup-onboarding');
-  if (!overlay) return;
+  if (!overlay) return false;
 
   const stepChoice = document.getElementById('ob-step-choice');
   const stepNew = document.getElementById('ob-step-new');
@@ -614,11 +650,32 @@ async function ensurePopupOnboarding(): Promise<void> {
   const restoreErrorEl = document.getElementById('ob-restore-error');
   const restoreBtn = document.getElementById('ob-restore-btn') as HTMLButtonElement | null;
   const skipRestoreBtn = document.getElementById('ob-skip-restore-btn') as HTMLButtonElement | null;
+  const obGuideReplayBtn = document.getElementById('ob-guide-replay-btn') as HTMLButtonElement | null;
+  const obGuideReplayLabel = document.getElementById('ob-guide-replay-label');
 
   let selectedLang: ObFeedbackLang = obResolveSupportedLang('auto');
   let selectedCurrent: ObCefrLevel = 'A1';
   let selectedTarget: ObCefrLevel = 'B1';
   let activeCopy = getOnboardingCopy('auto');
+  let activeStep: 'choice' | 'new' | 'returning' = 'choice';
+
+  const stepGuideMap: Record<'choice' | 'new' | 'returning', AssistantGuideId> = {
+    choice: 'welcome_onboarding',
+    new: 'onboarding_profile',
+    returning: 'onboarding_restore',
+  };
+
+  const syncObGuideLabel = (): void => {
+    const isTrOb = obResolveSupportedLang(selectedLang) === 'tr';
+    if (obGuideReplayLabel) {
+      obGuideReplayLabel.textContent = isTrOb ? 'Sesli Anlatım' : 'Voice Guide';
+    }
+    if (obGuideReplayBtn) {
+      obGuideReplayBtn.title = isTrOb
+        ? 'Bu adımın sesli anlatımını dinle veya durdur'
+        : 'Play or stop voice guide for this step';
+    }
+  };
 
   if (nativeLangSelect && nativeLangSelect.options.length === 0) {
     for (const opt of OB_LANG_CHOICES) {
@@ -638,19 +695,42 @@ async function ensurePopupOnboarding(): Promise<void> {
       btn.classList.toggle('is-active', btn.dataset.level === selectedTarget);
     });
     applyPopupOnboardingCopy(activeCopy, selectedCurrent, selectedTarget);
+    syncObGuideLabel();
   };
 
   const showStep = (step: 'choice' | 'new' | 'returning'): void => {
+    activeStep = step;
     if (stepChoice) stepChoice.hidden = step !== 'choice';
     if (stepNew) stepNew.hidden = step !== 'new';
     if (stepReturning) stepReturning.hidden = step !== 'returning';
+    void playGuideAssistant(stepGuideMap[step], {
+      isTr: obResolveSupportedLang(selectedLang) === 'tr',
+      triggerEl: obGuideReplayBtn,
+      isAutoPlay: true,
+    });
   };
 
   syncLevelPills();
-  showStep('choice');
+  document.body.classList.add('is-onboarding-open');
   overlay.hidden = false;
+  showStep('choice');
 
   await new Promise<void>((resolve) => {
+    const finishOnboarding = (): void => {
+      stopGuideAssistant();
+      document.body.classList.remove('is-onboarding-open');
+      overlay.hidden = true;
+      resolve();
+    };
+
+    obGuideReplayBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleGuideAssistant(stepGuideMap[activeStep], {
+        isTr: obResolveSupportedLang(selectedLang) === 'tr',
+        triggerEl: obGuideReplayBtn,
+      });
+    });
+
     chooseNewBtn?.addEventListener('click', () => showStep('new'));
     chooseReturningBtn?.addEventListener('click', () => showStep('returning'));
     backFromNewBtn?.addEventListener('click', () => showStep('choice'));
@@ -660,6 +740,7 @@ async function ensurePopupOnboarding(): Promise<void> {
       selectedLang = nativeLangSelect.value as ObFeedbackLang;
       activeCopy = getOnboardingCopy(selectedLang);
       applyPopupOnboardingCopy(activeCopy, selectedCurrent, selectedTarget);
+      syncObGuideLabel();
     });
 
     curLevelsWrap?.addEventListener('click', (event) => {
@@ -717,8 +798,7 @@ async function ensurePopupOnboarding(): Promise<void> {
         await chrome.runtime.sendMessage({
           type: 'SETTINGS_UPDATED',
         } satisfies ObExtensionMessage);
-        overlay.hidden = true;
-        resolve();
+        finishOnboarding();
       })();
     });
 
@@ -737,23 +817,23 @@ async function ensurePopupOnboarding(): Promise<void> {
         await chrome.runtime.sendMessage({
           type: 'SETTINGS_UPDATED',
         } satisfies ObExtensionMessage);
-        overlay.hidden = true;
-        resolve();
+        finishOnboarding();
       })();
     });
 
     skipRestoreBtn?.addEventListener('click', () => {
       void (async () => {
         await saveOnboardingState({ completed: true, b1GateAccepted: true });
-        overlay.hidden = true;
-        resolve();
+        finishOnboarding();
       })();
     });
   });
+
+  return true;
 }
 
 async function initPopup(): Promise<void> {
-  await ensurePopupOnboarding();
+  const justCompletedOnboarding = await ensurePopupOnboarding();
   const [settings, ai] = await Promise.all([getSettings(), getAiConfig()]);
   const initialLang =
     settings.uiLanguage && settings.uiLanguage !== 'auto'
@@ -765,6 +845,11 @@ async function initPopup(): Promise<void> {
     fetchStatus(),
     roadmapController.setLanguage(initialLang),
   ]);
+  if (justCompletedOnboarding) {
+    void playGuideOnce('tour_home_roadmap', {
+      isTr: resolveSupportedLanguage(initialLang) === 'tr',
+    });
+  }
 }
 
 void initPopup();

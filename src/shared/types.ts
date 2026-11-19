@@ -356,6 +356,27 @@ export type WeakSkillId =
   | 'negation_questions'
   | 'trouble_vocab';
 
+export type ExtraGrammarRuleId =
+  | 'simple_present'
+  | 'articles_a_an_the'
+  | 'simple_past'
+  | 'can_could_able'
+  | 'quantifiers_count'
+  | 'present_continuous'
+  | 'wh_questions'
+  | 'imperatives_lets'
+  | 'comparatives_superlatives'
+  | 'relative_clauses'
+  | 'reflexives_reciprocals'
+  | 'there_is_it_is'
+  | 'reported_speech'
+  | 'be_get_used_to'
+  | 'cause_effect_linkers'
+  | 'past_perfect'
+  | 'time_place_prepositions_extra';
+
+export type VoiceCoachRuleId = WeakSkillId | ExtraGrammarRuleId;
+
 export interface RemedialBriefingExample {
   en: string;
   tr: string;
