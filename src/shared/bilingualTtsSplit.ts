@@ -1,7 +1,7 @@
 export interface BilingualTtsSegment {
   lang: 'tr' | 'en';
   text: string;
-  /** Range `[startWordIdx, endWordIdx)` of whitespace tokens in the original display text covered by this segment. */
+  /** Range `[startWordIdx, endWordIdx)` of whitespace tokens in the displayed text covered by this segment. */
   startWordIdx: number;
   endWordIdx: number;
 }
@@ -13,7 +13,29 @@ const COMMON_TURKISH_ASCII_WORDS = new Set([
   'cumle', 'kelime', 'fiil', 'ozne', 'gecmis', 'simdi', 'gelecek', 'tekil', 'cogul', 'olumsuz',
   'soru', 'ornek', 'mesela', 'yani', 'kural', 'anlam', 'hayir', 'evet', 'tamam', 'yerine',
   'gidelim', 'yapalim', 'edelim', 'olur', 'oldu', 'isim', 'sifat', 'zarf', 'hal', 'hali',
+  'fincan', 'kahve', 'bardak', 'cay', 'yemek', 'ev', 'okul', 'masa', 'kitap', 'kalem', 'gun',
 ]);
+
+function normalizeMarkupQuotes(input: string): string {
+  return input
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    // Normalize accidental `"[[word]]"` or `'[[word]]'` into clean `[[word]]`
+    .replace(/["'`]\s*\[\[([^\[\]\n]{1,140})\]\]\s*["'`]/g, '[[$1]]')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Convert hidden AI language markers (`[[a cup of]]`) into clean quoted display text (`"a cup of"`)
+ * so learners never see raw technical tags while preserving exact whitespace token alignment.
+ */
+export function stripCoachMarkupForDisplay(input: string): string {
+  return normalizeMarkupQuotes(input)
+    .replace(/\[\[([^\[\]\n]{1,140})\]\]/g, (_, inner: string) => `"${inner.trim()}"`)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 function looksEnglishQuotedSegment(raw: string): boolean {
   const cleaned = raw.trim();
@@ -31,24 +53,25 @@ function looksEnglishQuotedSegment(raw: string): boolean {
 }
 
 /**
- * Split a Turkish AI coaching paragraph containing quoted English words/phrases
- * (`"was"`, `"Let's go"`, `'instead of'`, `` `should` ``) into alternating
- * Turkish (`tr` -> EMA Lightning) and English (`en` -> HFC Female) segments,
- * tracking exact whitespace word index ranges for millisecond karaoke sync.
+ * Split an AI coaching explanation into alternating Turkish (`tr` -> EMA Lightning 48 kHz)
+ * and English (`en` -> HFC Female) segments with exact whitespace word index ranges
+ * aligned to `stripCoachMarkupForDisplay(input)`.
+ *
+ * When hidden `[[...]]` markers are present (preferred AI output), ONLY `[[...]]` spans
+ * route to the English voice — quoted Turkish words like `"bir fincan kahve"` stay 100% Turkish!
  */
 export function splitBilingualCoachSegments(input: string): BilingualTtsSegment[] {
-  const normalized = input
-    .replace(/[“”]/g, '"')
-    .replace(/[‘’]/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!normalized) return [];
+  const raw = normalizeMarkupQuotes(input);
+  if (!raw) return [];
 
-  // Pre-compute character offsets of each whitespace token in `normalized`
+  const hasExplicitTags = /\[\[[^\[\]\n]{1,140}\]\]/.test(raw);
+  const display = stripCoachMarkupForDisplay(raw);
+
+  // Build token offsets in `display` for karaoke sync
   const tokenOffsets: Array<{ start: number; end: number }> = [];
   const tokRe = /\S+/g;
   let tm: RegExpExecArray | null;
-  while ((tm = tokRe.exec(normalized)) !== null) {
+  while ((tm = tokRe.exec(display)) !== null) {
     tokenOffsets.push({ start: tm.index, end: tm.index + tm[0].length });
   }
 
@@ -66,13 +89,13 @@ export function splitBilingualCoachSegments(input: string): BilingualTtsSegment[
   };
 
   const segments: BilingualTtsSegment[] = [];
-  const pushSegment = (lang: 'tr' | 'en', rawText: string, charStart: number, charEnd: number): void => {
+  const pushSegment = (lang: 'tr' | 'en', rawText: string, displayStart: number, displayEnd: number): void => {
     const cleaned = rawText
       .replace(/^[\s"'`.,;:!?]+|[\s"'`]+$/g, '')
       .replace(/\s+/g, ' ')
       .trim();
     if (!cleaned || !/[A-Za-z0-9ğüşöçıİĞÜŞÖÇ]/.test(cleaned)) return;
-    const [wStart, wEnd] = charRangeToWords(charStart, charEnd);
+    const [wStart, wEnd] = charRangeToWords(displayStart, displayEnd);
     const prev = segments[segments.length - 1];
     if (prev && prev.lang === lang) {
       prev.text = `${prev.text} ${cleaned}`;
@@ -82,15 +105,47 @@ export function splitBilingualCoachSegments(input: string): BilingualTtsSegment[
     }
   };
 
-  // Match "...", `...`, or single-quoted English spans bounded by whitespace/punctuation (allows inner contractions like 'Let's go')
+  if (hasExplicitTags) {
+    // 100% deterministic mode: ONLY `[[...]]` spans route to English TTS; all Turkish quotes stay on EMA!
+    const tagRe = /\[\[([^\[\]\n]{1,140})\]\]/g;
+    let lastRawIdx = 0;
+    let displayCursor = 0;
+    let m: RegExpExecArray | null;
+
+    while ((m = tagRe.exec(raw)) !== null) {
+      if (m.index > lastRawIdx) {
+        const trSlice = raw.slice(lastRawIdx, m.index);
+        const dispEnd = displayCursor + trSlice.length;
+        pushSegment('tr', trSlice, displayCursor, dispEnd);
+        displayCursor = dispEnd;
+      }
+      const enInner = m[1]!.trim();
+      const dispQuotedLen = enInner.length + 2; // `"..."` in display text
+      const dispEnd = displayCursor + dispQuotedLen;
+      if (enInner) {
+        // Safety guard: even inside `[[...]]`, if it has Turkish-only letters, keep on EMA
+        const targetLang = TURKISH_ONLY_CHARS_RE.test(enInner) ? 'tr' : 'en';
+        pushSegment(targetLang, enInner, displayCursor, dispEnd);
+      }
+      displayCursor = dispEnd;
+      lastRawIdx = m.index + m[0].length;
+    }
+
+    if (lastRawIdx < raw.length) {
+      const tail = raw.slice(lastRawIdx);
+      pushSegment('tr', tail, displayCursor, displayCursor + tail.length);
+    }
+    return segments;
+  }
+
+  // Legacy fallback (when no `[[...]]` tags are present)
   const quoteRe =
     /"([^"\n]{1,140})"|`([^`\n]{1,140})`|(?<=^|[\s(,;:])'([A-Za-z][A-Za-z0-9\s\-']{0,80}[A-Za-z0-9])'(?=$|[\s.,;:!?)])/g;
-
   let lastIdx = 0;
   let m: RegExpExecArray | null;
-  while ((m = quoteRe.exec(normalized)) !== null) {
+  while ((m = quoteRe.exec(display)) !== null) {
     if (m.index > lastIdx) {
-      pushSegment('tr', normalized.slice(lastIdx, m.index), lastIdx, m.index);
+      pushSegment('tr', display.slice(lastIdx, m.index), lastIdx, m.index);
     }
     const quoted = (m[1] ?? m[2] ?? m[3] ?? '').trim();
     const matchEnd = m.index + m[0].length;
@@ -100,8 +155,8 @@ export function splitBilingualCoachSegments(input: string): BilingualTtsSegment[
     lastIdx = matchEnd;
   }
 
-  if (lastIdx < normalized.length) {
-    pushSegment('tr', normalized.slice(lastIdx), lastIdx, normalized.length);
+  if (lastIdx < display.length) {
+    pushSegment('tr', display.slice(lastIdx), lastIdx, display.length);
   }
 
   return segments;

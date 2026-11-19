@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { splitBilingualCoachSegments } from '../src/shared/bilingualTtsSplit.ts';
+import { splitBilingualCoachSegments, stripCoachMarkupForDisplay } from '../src/shared/bilingualTtsSplit.ts';
 import {
   buildEmaPieceInputs,
   buildEmaTimeline,
@@ -322,6 +322,39 @@ test('findRuleHighlightSpans pinpoints exact tokens across all 35 voice-coach ru
 });
 
 test('splitBilingualCoachSegments routes Turkish prose to EMA and quoted English phrases (single or double quotes) to EN voice with word indices', () => {
+  // Explicit hidden `[[...]]` markers: Turkish quoted words without diacritics ("bir fincan kahve", "fincan") MUST stay Turkish!
+  const rawTagged =
+    'İngilizcede [[a cup of]] yapısı kullanılır. Türkçede "bir fincan kahve" derken "fincan" kelimesi miktarı ifade eder. İngilizcede ise [[cup]] ile [[coffee]] arasına [[of]] konur.';
+  const display = stripCoachMarkupForDisplay(rawTagged);
+  assert.equal(display.includes('[['), false);
+  assert.equal(display.includes(']]'), false);
+  assert.ok(display.includes('"a cup of"'));
+  assert.ok(display.includes('"bir fincan kahve"'));
+
+  const taggedSegs = splitBilingualCoachSegments(rawTagged);
+  assert.deepEqual(
+    taggedSegs.map(({ lang, text }) => ({ lang, text })),
+    [
+      { lang: 'tr', text: 'İngilizcede' },
+      { lang: 'en', text: 'a cup of' },
+      {
+        lang: 'tr',
+        text: 'yapısı kullanılır. Türkçede "bir fincan kahve" derken "fincan" kelimesi miktarı ifade eder. İngilizcede ise',
+      },
+      { lang: 'en', text: 'cup' },
+      { lang: 'tr', text: 'ile' },
+      { lang: 'en', text: 'coffee' },
+      { lang: 'tr', text: 'arasına' },
+      { lang: 'en', text: 'of' },
+      { lang: 'tr', text: 'konur.' },
+    ]
+  );
+
+  // Verify exact token alignment with display text for karaoke sync
+  const displayWords = display.split(/\s+/);
+  assert.equal(displayWords.slice(taggedSegs[1]!.startWordIdx, taggedSegs[1]!.endWordIdx).join(' '), '"a cup of"');
+
+  // Legacy fallback (without `[[...]]` tags)
   const segs = splitBilingualCoachSegments(
     'Bu cümlede "was" kelimesi tekil geçmiş zamanı anlatır; örneğin \'Let\'s go\' gibi. "hayır" veya "örnek" ise Türkçe kalır.'
   );

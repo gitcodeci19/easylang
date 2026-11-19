@@ -1472,17 +1472,20 @@ export async function generateAiGrammarCoach(
     throw new Error('Açıklanacak İngilizce cümle bulunamadı.');
   }
 
-  const ruleHints = (params.detectedRules ?? []).filter(Boolean).slice(0, 5);
   const systemPrompt = [
-    'You are a sharp, calm Turkish English teacher creating independent mini voice-lessons for the EXACT grammar structures inside one English sentence.',
-    'Identify 1 to 3 DISTINCT, genuinely important grammar points present in this exact sentence (never invent structures that are not in the sentence).',
-    'Each item is selected and listened to SEPARATELY by the learner, so each item must stand completely on its own without referring to other items and without greetings like "Merhaba!".',
+    'You are a master Turkish English teacher creating independent mini voice-lessons for the MOST VALUABLE learning points inside one English sentence.',
+    'Analyze the sentence independently — DO NOT just pick surface-level textbook tags. Think like a sharp Turkish learner reading this exact sentence for the first time and ask: "What is the REAL trap, hidden meaning, idiom, preposition nuance, or structural trick here?"',
+    'STRICT PEDAGOGICAL PRIORITY (order items from #1 most insightful to #3):',
+    '1. FIRST PRIORITY — Non-literal meanings, idiomatic prepositions, phrasal verbs, collocations, and false traps that surprise Turkish learners (e.g., in "We talked over a cup of coffee.", #1 MUST be "over" / "talked over" because learners know "over" as "bitmek/üzerinde", whereas "over coffee/dinner" means "eşliğinde / içerken"; in "run out of milk", explain "run out of" = tükenmek vs literal "run"; in "instead of lunch", explain "instead of" = yerine).',
+    '2. SECOND PRIORITY — Meaningful grammar & phrase structures (tenses with nuance, modals, passive, conditionals, gerund/infinitive, relative/time clauses, measure phrases like "a cup of", contrast/cause linkers).',
+    '3. LOWEST PRIORITY — Basic A1 mechanics like plain "a/an/the" or simple regular "-ed" past tense. SKIP trivial "a/an" or plain "-ed" whenever the sentence already has richer idiomatic, prepositional, or structural teaching points!',
+    'Return 1 to 3 DISTINCT, high-value items (never invent structures absent from the sentence). Each item is listened to SEPARATELY, so each must stand completely on its own without referring to other items and without greetings like "Merhaba!".',
     'For EACH item return:',
-    '- "ruleTitle": ultra-short 2-3 word Turkish tab title (e.g. "Let\'s + V1 Öneri", "instead of Yapısı", "was / Tekil Geçmiş").',
-    '- "focusPhrase": exact verbatim substring from the English sentence that this rule applies to so the UI highlights it (e.g. "Let\'s go", "instead of lunch", "was").',
-    '- "headlineTr": 1 punchy golden takeaway sentence (max 85 chars, e.g. "Let\'s + yalın fiil ile birlikte yapalım önerisi kur!").',
-    '- "explanationTr": 2-3 clear, natural, calm Turkish sentences that will BOTH be displayed on screen AND read aloud verbatim by our TTS voice. Write ONLY prose (NO bullet marks, NO markdown asterisks, NO emojis, NO parenthetical grammar codes like (V1)). CRITICAL: wrap EVERY English word or phrase inside straight double quotes "..." (e.g. "Let\'s go", "instead of") — NEVER single quotes — and DO NOT put Turkish words inside double quotes, so our bilingual TTS speaks English parts in English and Turkish parts in Turkish!',
-    '- "examples": 2 short, modern everyday examples fitting THIS specific rule: [{"en": "...", "tr": "..."}].',
+    '- "ruleTitle": ultra-short 2-3 word Turkish tab title (e.g. "over: Eşliğinde", "a cup of Kalıbı", "Let\'s + Fiil Öneri").',
+    '- "focusPhrase": exact verbatim substring from the English sentence so the UI highlights it (e.g. "over", "over a cup of coffee", "instead of lunch").',
+    '- "headlineTr": 1 punchy golden takeaway sentence in natural Turkish (max 85 chars; use normal quotes for English words here, NO [[...]] brackets).',
+    '- "explanationTr": 2-3 clear, calm, natural Turkish sentences (NO anglicisms like "spesifikleştirmek" or "artikl"; NO bullet marks, NO markdown asterisks, NO emojis, NO codes like (V1)). This text is BOTH displayed AND read aloud verbatim. HIDDEN VOICE TAG RULE: wrap ONLY English words/phrases inside [[...]] (e.g. [[over]], [[a cup of]], [[cup]], [[a glass of water]]) — NEVER put quotes around [[...]]. For Turkish quoted words/meanings use normal double quotes "..." (e.g. "bir fincan kahve", "fincan", "eşliğinde"). The UI automatically hides [[...]] as clean quotes while our bilingual engine sends ONLY [[...]] to the English voice and EVERYTHING ELSE to the Turkish voice!',
+    '- "examples": 2 short, modern everyday examples fitting THIS exact usage: [{"en": "...", "tr": "..."}].',
     'Respond ONLY with valid JSON:',
     '{"items":[{"ruleTitle":"...","focusPhrase":"...","headlineTr":"...","explanationTr":"...","examples":[{"en":"...","tr":"..."}]}]}',
   ].join('\n');
@@ -1490,7 +1493,6 @@ export async function generateAiGrammarCoach(
   const userPrompt = [
     `English sentence: "${sentenceEn}"`,
     params.meaningTr ? `Turkish meaning: "${params.meaningTr}"` : '',
-    ruleHints.length > 0 ? `Detected grammar cues in this sentence: ${ruleHints.join(', ')}` : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -1512,11 +1514,18 @@ export async function generateAiGrammarCoach(
   for (const raw of parsed.items.slice(0, 3)) {
     if (!raw || typeof raw !== 'object') continue;
     const obj = raw as Record<string, unknown>;
-    const ruleTitle = typeof obj.ruleTitle === 'string' ? obj.ruleTitle.trim().slice(0, 48) : '';
-    const focusPhrase = typeof obj.focusPhrase === 'string' ? obj.focusPhrase.trim().slice(0, 64) : '';
+    const stripBrackets = (s: string): string => s.replace(/\[\[([^\[\]\n]+)\]\]/g, '"$1"').trim();
+    const ruleTitle =
+      typeof obj.ruleTitle === 'string'
+        ? obj.ruleTitle.replace(/\[\[|\]\]/g, '').trim().slice(0, 48)
+        : '';
+    const focusPhrase =
+      typeof obj.focusPhrase === 'string'
+        ? obj.focusPhrase.replace(/\[\[|\]\]/g, '').trim().slice(0, 64)
+        : '';
     const headlineTr =
       typeof obj.headlineTr === 'string' && obj.headlineTr.trim()
-        ? obj.headlineTr.trim().slice(0, 110)
+        ? stripBrackets(obj.headlineTr).slice(0, 110)
         : ruleTitle;
     const explanationTr =
       typeof obj.explanationTr === 'string'

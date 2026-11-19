@@ -1,3 +1,4 @@
+import { stripCoachMarkupForDisplay } from './bilingualTtsSplit';
 import { stopGuideAssistant } from './guideAssistant';
 import { findActiveWordIndex } from './remedialAudioTimings';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
@@ -458,7 +459,8 @@ export function createAiGrammarCoachView(
 
       const expEl = document.createElement('p');
       expEl.className = 'ai-coach-item-exp';
-      const words = item.explanationTr.replace(/\s+/g, ' ').trim().split(/\s+/).filter(Boolean);
+      const displayExplanation = stripCoachMarkupForDisplay(item.explanationTr);
+      const words = displayExplanation.split(/\s+/).filter(Boolean);
       words.forEach((word, wIdx) => {
         if (wIdx > 0) expEl.appendChild(document.createTextNode(' '));
         const sp = document.createElement('span');

@@ -1,6 +1,6 @@
 import * as ort from 'onnxruntime-web/wasm';
 import { createPiperPhonemize } from 'piper-phonemize';
-import { splitBilingualCoachSegments } from '../shared/bilingualTtsSplit.ts';
+import { splitBilingualCoachSegments, stripCoachMarkupForDisplay } from '../shared/bilingualTtsSplit.ts';
 import {
   buildEmaPieceInputs,
   buildEmaTimeline,
@@ -843,7 +843,7 @@ async function handleSpeakTurkishCoach(
     const pauseSamples = Math.round(targetSampleRate * 0.11);
     const silenceGap = new Float32Array(pauseSamples);
     const chunks: Float32Array[] = [];
-    const tokens = cleaned.split(/\s+/).filter(Boolean);
+    const tokens = stripCoachMarkupForDisplay(cleaned).split(/\s+/).filter(Boolean);
     const wordTimings: Array<[number, number]> = tokens.map(() => [0, 0]);
 
     let sampleCursor = 0;
