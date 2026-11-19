@@ -164,9 +164,9 @@ export const REMEDIAL_SKILL_CATALOG: Record<WeakSkillId, RemedialSkillSpec> = {
     scenarios: [
       {
         scenarioTr:
-          'Arkadaşına dün gece konserin nasıl geçtiğini ve sahnedeki grup üyelerinin enerjik olup olmadığını soracaksın:',
+          'Arkadaşına dün geceki konserin harika geçtiğini ve grup üyelerinin çok enerjik olduğunu anlatacaksın:',
         scenarioEn:
-          'Ask your friend how the concert went and whether the band members had good energy:',
+          'Tell your friend that last night’s concert was awesome and the band members were super energetic:',
         choices: [
           'The concert was awesome, and the band members were super energetic!',
           'The concert were awesome, and the band members was super energetic!',

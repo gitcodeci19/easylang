@@ -6,7 +6,7 @@ import {
   CURRICULUM_UNITS,
   buildUnitLessonExercises,
 } from '../src/shared/curriculum.ts';
-import { REMEDIAL_SKILL_ORDER } from '../src/shared/remedialCatalog.ts';
+import { REMEDIAL_SKILL_CATALOG, REMEDIAL_SKILL_ORDER } from '../src/shared/remedialCatalog.ts';
 import type { Card, UserCardProgress } from '../src/shared/types.ts';
 import { buildRemedialLessonPlan } from '../src/shared/weaknessDetector.ts';
 
@@ -195,6 +195,19 @@ test('all 18 Remedial workshops generate clean non-ambiguous cloze_blank and tro
   };
 
   for (const skillId of REMEDIAL_SKILL_ORDER) {
+    const spec = REMEDIAL_SKILL_CATALOG[skillId];
+    for (const sc of spec.scenarios) {
+      const asksQuestion =
+        /\bsoracaksın\b|\bsor\s*:?\s*$/i.test(sc.scenarioTr) ||
+        /^ask\b/i.test(sc.scenarioEn.trim());
+      if (asksQuestion) {
+        assert.ok(
+          sc.correctChoice.trim().endsWith('?'),
+          `Scenario in ${skillId} instructs learner to ask a question, but correctChoice is not a question: "${sc.correctChoice}"`
+        );
+      }
+    }
+
     const plan = buildRemedialLessonPlan(skillId, null, ALL_CARDS, sampleProgress, 987654);
     for (const ex of plan.exercises) {
       if (ex.kind === 'cloze_blank') {

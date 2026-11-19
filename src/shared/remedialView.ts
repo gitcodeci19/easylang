@@ -773,10 +773,10 @@ function getExerciseBadgeInfo(
       };
     case 'spot_fix':
       return {
-        badge: isTr ? '🕵️ HATA DEDEKTİFİ' : '🕵️ BUG DETECTIVE',
+        badge: isTr ? '✎ CÜMLE DÜZELTME' : '✎ PROOFREAD & FIX',
         instruction: isTr
-          ? '1) Cümledeki HATALI kelimeye tıkla  2) Doğrusuyla değiştir!'
-          : '1) Tap the BUGGY word in the sentence  2) Pick its fix!',
+          ? 'Cümledeki hatalı kelimeyi bul ve doğrusuyla değiştir.'
+          : 'Find the incorrect word in the sentence and replace it.',
       };
     case 'scenario_pick':
       return {
@@ -1154,26 +1154,66 @@ export function startRemedialLessonSession(
       };
       document.addEventListener('keydown', activeKeyHandler);
     } else if (ex.kind === 'spot_fix' && ex.buggyTokens && typeof ex.buggyTokenIndex === 'number') {
-      const hintLine = document.createElement('div');
-      hintLine.className = 'rem-spot-hint';
-      hintLine.textContent = isTr
-        ? `Anlamı: "${ex.promptSubtext}" — Hangi kelimede hata var?`
-        : `Meaning: "${ex.promptSubtext}" — Tap the buggy word!`;
-      stage.appendChild(hintLine);
+      const buggyTok = ex.buggyTokens[ex.buggyTokenIndex] ?? '';
+
+      // Editorial proofreader card (visually distinct from Word Bank tiles)
+      const proofCard = document.createElement('div');
+      proofCard.className = 'rem-proofread-card';
+
+      const stepper = document.createElement('div');
+      stepper.className = 'rem-spot-stepper';
+
+      const step1Pill = document.createElement('span');
+      step1Pill.className = 'rem-spot-step';
+      const stepArrow = document.createElement('span');
+      stepArrow.className = 'rem-spot-step-sep';
+      stepArrow.textContent = '›';
+      const step2Pill = document.createElement('span');
+      step2Pill.className = 'rem-spot-step';
+      stepper.append(step1Pill, stepArrow, step2Pill);
+
+      const syncStepper = (): void => {
+        if (!spotBugFound) {
+          step1Pill.className = 'rem-spot-step is-active';
+          step1Pill.textContent = isTr ? '1. Hatalı kelimeyi işaretle' : '1. Mark wrong word';
+          step2Pill.className = 'rem-spot-step';
+          step2Pill.textContent = isTr ? '2. Doğrusunu seç' : '2. Choose fix';
+        } else if (!spotSelectedFix) {
+          step1Pill.className = 'rem-spot-step is-done';
+          step1Pill.textContent = `✓ "${buggyTok}"`;
+          step2Pill.className = 'rem-spot-step is-active';
+          step2Pill.textContent = isTr ? '2. Doğrusunu seç' : '2. Choose fix';
+        } else {
+          step1Pill.className = 'rem-spot-step is-done';
+          step1Pill.textContent = `✓ "${buggyTok}"`;
+          step2Pill.className = 'rem-spot-step is-done';
+          step2Pill.textContent = `✓ "${spotSelectedFix}"`;
+        }
+      };
 
       const sentenceBox = document.createElement('div');
-      sentenceBox.className = 'rem-bug-sentence';
+      sentenceBox.className = `rem-bug-sentence ${spotBugFound ? 'is-resolved-step1' : ''}`;
+
+      const meaningRow = document.createElement('div');
+      meaningRow.className = 'rem-proofread-meaning';
+      if (ex.promptSubtext) {
+        const langPill = document.createElement('span');
+        langPill.className = 'rem-proofread-lang';
+        langPill.textContent = 'TR';
+        const meaningText = document.createElement('span');
+        meaningText.className = 'rem-proofread-meaning-text';
+        meaningText.textContent = ex.promptSubtext;
+        meaningRow.append(langPill, meaningText);
+      }
+
+      proofCard.append(stepper, sentenceBox);
+      if (ex.promptSubtext) {
+        proofCard.appendChild(meaningRow);
+      }
 
       const feedbackMini = document.createElement('div');
-      feedbackMini.className = spotBugFound ? 'rem-spot-status is-found' : 'rem-spot-status';
-      const buggyTok = ex.buggyTokens[ex.buggyTokenIndex] ?? '';
-      feedbackMini.textContent = spotBugFound
-        ? isTr
-          ? `✓ Süper! "${buggyTok}" hatalı — aşağıdan doğrusunu seç:`
-          : `✓ Spot on! "${buggyTok}" is the bug — choose its fix below:`
-        : isTr
-          ? '👆 Hatalı gördüğün kelimeye tıkla'
-          : '👆 Click the word that contains the mistake';
+      feedbackMini.className = 'rem-spot-status';
+      feedbackMini.hidden = true;
 
       const fixWrap = document.createElement('div');
       fixWrap.className = 'rem-fix-wrap';
@@ -1181,13 +1221,35 @@ export function startRemedialLessonSession(
 
       const fixLabel = document.createElement('div');
       fixLabel.className = 'rem-fix-label';
-      fixLabel.textContent = isTr
-        ? '🎯 Buldun! Şimdi doğrusuyla değiştir:'
-        : '🎯 Found it! Now pick the correct fix:';
+      const errChip = document.createElement('span');
+      errChip.className = 'rem-fix-err-chip';
+      errChip.textContent = buggyTok;
+      if (isTr) {
+        fixLabel.append(errChip, document.createTextNode(' yerine hangisi gelmeli?'));
+      } else {
+        fixLabel.append(document.createTextNode('Replace '), errChip, document.createTextNode(' with:'));
+      }
 
       const fixRow = document.createElement('div');
       fixRow.className = 'rem-fix-row';
       fixWrap.append(fixLabel, fixRow);
+
+      const renderTokenDiff = (btn: HTMLButtonElement, original: string, replacement: string | null): void => {
+        btn.replaceChildren();
+        if (replacement) {
+          const oldSpan = document.createElement('span');
+          oldSpan.className = 'rem-bug-old';
+          oldSpan.textContent = original;
+          const newSpan = document.createElement('span');
+          newSpan.className = 'rem-bug-new';
+          newSpan.textContent = replacement;
+          btn.append(oldSpan, newSpan);
+          btn.classList.add('is-patched');
+        } else {
+          btn.textContent = original;
+          btn.classList.remove('is-patched');
+        }
+      };
 
       const tokenBtns: HTMLButtonElement[] = [];
       for (let i = 0; i < ex.buggyTokens.length; i += 1) {
@@ -1203,8 +1265,7 @@ export function startRemedialLessonSession(
           if (spotBugFound) {
             tBtn.classList.add('is-bug-found');
             if (spotSelectedFix) {
-              tBtn.textContent = spotSelectedFix;
-              tBtn.classList.add('is-patched');
+              renderTokenDiff(tBtn, tok, spotSelectedFix);
             }
           } else if (spotWrongTaps >= 2) {
             tBtn.classList.add('is-nudge-hint');
@@ -1215,12 +1276,12 @@ export function startRemedialLessonSession(
           if (i === ex.buggyTokenIndex) {
             spotBugFound = true;
             currentDraft.spotBugFound = true;
+            tBtn.classList.remove('is-nudge-hint');
             tBtn.classList.add('is-bug-found');
-            feedbackMini.className = 'rem-spot-status is-found';
-            feedbackMini.textContent = isTr
-              ? `✓ Süper! "${tok}" hatalı — aşağıdan doğrusunu seç:`
-              : `✓ Spot on! "${tok}" is the bug — choose its fix below:`;
+            sentenceBox.classList.add('is-resolved-step1');
+            feedbackMini.hidden = true;
             fixWrap.hidden = false;
+            syncStepper();
             updateCheckEnabled();
             persistLesson(false);
           } else {
@@ -1229,10 +1290,11 @@ export function startRemedialLessonSession(
             currentDraft.spotWrongTaps = spotWrongTaps;
             currentDraft.spotSafeIndices = [...spotSafeSet];
             tBtn.classList.add('is-safe-word');
+            feedbackMini.hidden = false;
             feedbackMini.className = 'rem-spot-status is-miss';
             feedbackMini.textContent = isTr
-              ? `"${tok}" doğru görünüyor — başka bir kelimeye bak!`
-              : `"${tok}" looks fine — inspect another word!`;
+              ? `"${tok}" doğru kullanılmış — başka bir kelimeyi incele.`
+              : `"${tok}" is correct here — check another word.`;
             if (spotWrongTaps >= 2) {
               tokenBtns[ex.buggyTokenIndex!]?.classList.add('is-nudge-hint');
             }
@@ -1244,11 +1306,19 @@ export function startRemedialLessonSession(
       }
 
       const fixBtns: HTMLButtonElement[] = [];
-      for (const fChoice of ex.fixChoices ?? []) {
+      const fixChoices = ex.fixChoices ?? [];
+      for (let idx = 0; idx < fixChoices.length; idx += 1) {
+        const fChoice = fixChoices[idx]!;
         const fBtn = document.createElement('button');
         fBtn.type = 'button';
         fBtn.className = `duo-choice-card rem-fix-btn ${spotSelectedFix === fChoice ? 'selected' : ''}`;
-        fBtn.textContent = fChoice;
+        const keyBadge = document.createElement('span');
+        keyBadge.className = 'duo-choice-key';
+        keyBadge.textContent = String(idx + 1);
+        const valSpan = document.createElement('span');
+        valSpan.className = 'rem-fix-val';
+        valSpan.textContent = fChoice;
+        fBtn.append(keyBadge, valSpan);
         fBtn.addEventListener('click', () => {
           if (locked) return;
           spotSelectedFix = fChoice;
@@ -1256,9 +1326,9 @@ export function startRemedialLessonSession(
           fixBtns.forEach((b) => b.classList.toggle('selected', b === fBtn));
           const targetTokBtn = tokenBtns[ex.buggyTokenIndex!];
           if (targetTokBtn) {
-            targetTokBtn.textContent = fChoice;
-            targetTokBtn.classList.add('is-patched');
+            renderTokenDiff(targetTokBtn, buggyTok, fChoice);
           }
+          syncStepper();
           updateCheckEnabled();
           persistLesson(false);
         });
@@ -1266,7 +1336,8 @@ export function startRemedialLessonSession(
         fixRow.appendChild(fBtn);
       }
 
-      stage.append(sentenceBox, feedbackMini, fixWrap);
+      syncStepper();
+      stage.append(proofCard, feedbackMini, fixWrap);
 
       activeKeyHandler = (e: KeyboardEvent) => {
         if (!sessionEl.isConnected) {
