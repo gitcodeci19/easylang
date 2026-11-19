@@ -128,6 +128,7 @@ export function createAiGrammarCoachView(
 
   // Player DOM refs (recreated per active rule)
   let playBtnRef: HTMLButtonElement | null = null;
+  let restartBtnRef: HTMLButtonElement | null = null;
   let rangeRef: HTMLInputElement | null = null;
   let timeRef: HTMLElement | null = null;
   let statusBadgeRef: HTMLElement | null = null;
@@ -150,20 +151,22 @@ export function createAiGrammarCoachView(
 
   const syncPlayerUi = (): void => {
     if (playBtnRef) {
-      playBtnRef.textContent = isSynthesizing ? '…' : isPlaying ? '⏸' : '▶';
+      playBtnRef.textContent = isSynthesizing ? '✦' : isPlaying ? '⏸' : '▶';
       playBtnRef.disabled = isSynthesizing;
+    }
+    if (restartBtnRef) {
+      restartBtnRef.disabled = isSynthesizing;
     }
     if (playerBarRef) {
       playerBarRef.classList.toggle('is-playing', isPlaying);
+      playerBarRef.classList.toggle('is-synthesizing', isSynthesizing);
     }
     if (rangeRef && durationSec > 0) {
       rangeRef.max = String(durationSec);
       rangeRef.value = String(Math.min(durationSec, currentSec));
     }
     if (timeRef) {
-      if (isSynthesizing) {
-        timeRef.textContent = 'Hazırlanıyor…';
-      } else if (durationSec > 0) {
+      if (durationSec > 0) {
         timeRef.textContent = `${formatSec(currentSec)} / ${formatSec(durationSec)}`;
       } else {
         timeRef.textContent = '0:00';
@@ -220,9 +223,7 @@ export function createAiGrammarCoachView(
     activeWordTimings = [];
     updateKaraokeWord(-1, false);
     if (statusBadgeRef) {
-      statusBadgeRef.textContent = isLikelyCached
-        ? '⚡ EMA Lightning · 48 kHz'
-        : '⚡ EMA Lightning hazırlıyor…';
+      statusBadgeRef.textContent = '⚡ EMA Lightning · 48 kHz';
     }
     syncPlayerUi();
 
@@ -356,6 +357,30 @@ export function createAiGrammarCoachView(
       restartBtn.className = 'tm-audio-mini-btn';
       restartBtn.textContent = '↺';
       restartBtn.title = 'Baştan oynat';
+      restartBtnRef = restartBtn;
+
+      const synthWaveEl = document.createElement('div');
+      synthWaveEl.className = 'ai-coach-synth-wave';
+      synthWaveEl.setAttribute('role', 'status');
+      synthWaveEl.setAttribute('aria-live', 'polite');
+
+      const buildWaveGroup = (side: 'left' | 'right', count: number): HTMLElement => {
+        const group = document.createElement('span');
+        group.className = `ai-coach-wave-group is-${side}`;
+        group.setAttribute('aria-hidden', 'true');
+        for (let i = 0; i < count; i += 1) {
+          const barEl = document.createElement('i');
+          barEl.className = 'ai-coach-wave-bar';
+          group.appendChild(barEl);
+        }
+        return group;
+      };
+
+      const synthLabelEl = document.createElement('span');
+      synthLabelEl.className = 'ai-coach-synth-label';
+      synthLabelEl.textContent = 'Hazırlanıyor…';
+
+      synthWaveEl.append(buildWaveGroup('left', 7), synthLabelEl, buildWaveGroup('right', 7));
 
       const rangeEl = document.createElement('input');
       rangeEl.type = 'range';
@@ -404,6 +429,7 @@ export function createAiGrammarCoachView(
       });
 
       restartBtn.addEventListener('click', () => {
+        if (isSynthesizing) return;
         void startEmaNarration(item.explanationTr);
       });
 
@@ -432,7 +458,7 @@ export function createAiGrammarCoachView(
         } satisfies ExtensionMessage);
       });
 
-      bar.append(playBtn, restartBtn, rangeEl, timeEl, speedBtn);
+      bar.append(playBtn, restartBtn, synthWaveEl, rangeEl, timeEl, speedBtn);
       audioWrap.append(audioTop, bar);
 
       // 2. Verbatim Displayed & Spoken Transcript + Tailored Examples for THIS rule only
