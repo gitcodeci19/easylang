@@ -576,98 +576,6 @@ export function renderRecallWidget(
       renderConceptBanner(targetConcept, outcome.conceptProgressNote, !isCorrect);
     }
 
-    const flagPanel = createEl('div', 'etr-flag-panel');
-    flagPanel.hidden = true;
-
-    const flagPromptLabel = createEl(
-      'span',
-      'etr-label',
-      isTr
-        ? 'Kelime seçin veya sorunuzu yazın:'
-        : 'Pick a word or type a question:'
-    );
-    flagPromptLabel.style.marginBottom = '6px';
-
-    const tokens = Array.from(
-      new Set(
-        card.en
-          .split(/\s+/)
-          .map((t) => t.replace(/^[^a-zA-Z']+|[^a-zA-Z']+$/g, ''))
-          .filter(Boolean)
-      )
-    );
-
-    const chipsWrap = createEl('div', 'etr-token-chips');
-    const flagInput = createEl('input', 'etr-input-sm');
-    flagInput.type = 'text';
-    flagInput.placeholder = isTr
-      ? 'örn. cut short veya neden get kullanıldı?'
-      : 'e.g. cut short or why used to?';
-    isolateKeyboardEvents(flagInput);
-
-    const flagSubmitBtn = createEl(
-      'button',
-      'etr-btn etr-btn-flag-solid',
-      isTr ? 'Kaydet' : 'Save'
-    );
-    flagSubmitBtn.type = 'button';
-
-    const submitConceptFlag = async (token: string, question?: string): Promise<void> => {
-      const cleaned = token.trim();
-      if (!cleaned) {
-        flagInput.focus();
-        return;
-      }
-      flagSubmitBtn.disabled = true;
-      flagSubmitBtn.textContent = '...';
-      const res = await sendBgMessage<{ ok: boolean; concept?: ConceptNote; error?: string }>({
-        type: 'FLAG_CONCEPT_GAP',
-        cardId: card.id,
-        focusToken: cleaned,
-        userQuestion: question,
-        card,
-      });
-      flagSubmitBtn.disabled = false;
-      flagSubmitBtn.textContent = isTr ? 'Kaydet' : 'Save';
-
-      if (res?.ok && res.concept) {
-        flagPanel.hidden = true;
-        renderConceptBanner(
-          res.concept,
-          isTr
-            ? `"${res.concept.label}" odak listesine eklendi`
-            : `"${res.concept.label}" added to Focus`
-        );
-      }
-    };
-
-    for (const tok of tokens) {
-      const chip = createEl('button', 'etr-token-chip', tok);
-      chip.type = 'button';
-      chip.addEventListener('click', () => {
-        flagInput.value = tok;
-        void submitConceptFlag(tok);
-      });
-      chipsWrap.appendChild(chip);
-    }
-
-    flagSubmitBtn.addEventListener('click', () => {
-      const raw = flagInput.value.trim();
-      const firstMatch = tokens.find((t) => raw.toLowerCase().includes(t.toLowerCase()));
-      void submitConceptFlag(firstMatch ?? raw, raw);
-    });
-
-    flagInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        flagSubmitBtn.click();
-      }
-    });
-
-    const flagRow = createEl('div', 'etr-flag-row');
-    flagRow.append(flagInput, flagSubmitBtn);
-    flagPanel.append(flagPromptLabel, chipsWrap, flagRow);
-
     // Instant AI Tutor Q&A panel on Recall card
     const askAiPanel = createEl('div', 'etr-flag-panel etr-ask-panel');
     askAiPanel.hidden = true;
@@ -763,7 +671,7 @@ export function renderRecallWidget(
     outcomeTeachHost.hidden = true;
     let outcomeTeachCtrl: ReturnType<typeof buildInlineTeachMePanel> | null = null;
 
-    lowerDetails.append(repeatNote, conceptSlot, flagPanel, askAiPanel);
+    lowerDetails.append(repeatNote, conceptSlot, askAiPanel);
 
     const lowerStage = createEl('div', 'etr-lower-stage');
     lowerStage.append(lowerDetails, outcomeTeachHost);
@@ -796,7 +704,6 @@ export function renderRecallWidget(
       lowerDetails.hidden = open;
       teachOutcomeBtn.classList.toggle('is-open', open);
       if (open) {
-        flagPanel.hidden = true;
         askAiPanel.hidden = true;
         if (!outcomeTeachCtrl) {
           const useAi = await isAiApiConfigured();
@@ -841,8 +748,7 @@ export function renderRecallWidget(
       ? 'Bu cümle hakkında yapay zekâya soru sor'
       : 'Ask the AI tutor about this card';
     askAiToggleBtn.addEventListener('click', () => {
-      setOutcomeTeachOpen(false);
-      flagPanel.hidden = true;
+      void setOutcomeTeachOpen(false);
       askAiPanel.hidden = !askAiPanel.hidden;
       if (!askAiPanel.hidden) {
         askAiPanel.scrollIntoView({ block: 'nearest' });
@@ -850,26 +756,7 @@ export function renderRecallWidget(
       }
     });
 
-    const flagToggleBtn = createEl(
-      'button',
-      'etr-btn etr-btn-flag',
-      isTr ? 'Takıldım' : 'Flag'
-    );
-    flagToggleBtn.type = 'button';
-    flagToggleBtn.title = isTr
-      ? 'Kelime veya gramer kuralını odak listesine ekle'
-      : 'Pin word or grammar rule for review';
-    flagToggleBtn.addEventListener('click', () => {
-      setOutcomeTeachOpen(false);
-      askAiPanel.hidden = true;
-      flagPanel.hidden = !flagPanel.hidden;
-      if (!flagPanel.hidden) {
-        flagPanel.scrollIntoView({ block: 'nearest' });
-        flagInput.focus();
-      }
-    });
-
-    secondaryRow.append(teachOutcomeBtn, askAiToggleBtn, flagToggleBtn);
+    secondaryRow.append(teachOutcomeBtn, askAiToggleBtn);
     footer.append(secondaryRow, nextBtn);
     cardEl.appendChild(footer);
   };
