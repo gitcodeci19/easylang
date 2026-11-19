@@ -4956,3 +4956,29 @@ body.remedial-crimson-active {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* ==================== NEURAL TTS STATUS BAR ==================== */
+.neural-tts-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+}
+
+.neural-tts-status {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.btn-xs {
+  padding: 4px 9px;
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}

@@ -17,5 +17,9 @@
     "@types/node": "^26.6.6",
     "esbuild": "^0.25.2",
     "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "@mintplex-labs/piper-tts-web": "^1.0.5",
+    "onnxruntime-web": "^1.18.0"
   }
 }

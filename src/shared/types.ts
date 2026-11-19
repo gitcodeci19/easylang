@@ -41,7 +41,16 @@ export interface UserCardProgress {
 }
 
 export type ContentMode = 'mixed' | 'word' | 'sentence';
-export type TtsVoiceMode = 'hybrid' | 'natural' | 'local';
+export type TtsVoiceMode = 'hybrid' | 'neural' | 'natural' | 'local';
+
+export interface NeuralTtsStatus {
+  voiceId: string;
+  cached: boolean;
+  ready: boolean;
+  downloading: boolean;
+  progressPercent: number;
+  error?: string;
+}
 
 export interface ExtensionSettings {
   enabled: boolean;
@@ -685,7 +694,11 @@ export type ExtensionMessage =
   | { type: 'RECORD_PAGE_QUIZ_RESULT'; isCorrect: boolean }
   | { type: 'RUN_STORAGE_HYGIENE' }
   | { type: 'GET_STATUS' }
-  | { type: 'SETTINGS_UPDATED' };
+  | { type: 'SETTINGS_UPDATED' }
+  | { type: 'SPEAK_NEURAL_TTS'; text: string; rate?: number; reqId?: number }
+  | { type: 'CANCEL_NEURAL_TTS' }
+  | { type: 'PREPARE_NEURAL_TTS' }
+  | { type: 'GET_NEURAL_TTS_STATUS' };
 
 export interface AiTutorChatTurn {
   role: 'user' | 'assistant';

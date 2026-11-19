@@ -436,7 +436,77 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 });
 
-chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
+const TTS_OFFSCREEN_PATH = 'tts-offscreen.html';
+let offscreenCreatePromise: Promise<void> | null = null;
+
+async function hasTtsOffscreenDocument(): Promise<boolean> {
+  const offscreenUrl = chrome.runtime.getURL(TTS_OFFSCREEN_PATH);
+  const runtimeAny = chrome.runtime as unknown as {
+    getContexts?: (filter: { contextTypes?: string[]; documentUrls?: string[] }) => Promise<unknown[]>;
+  };
+  if (typeof runtimeAny.getContexts === 'function') {
+    const contexts = await runtimeAny.getContexts({
+      contextTypes: ['OFFSCREEN_DOCUMENT'],
+      documentUrls: [offscreenUrl],
+    });
+    return contexts.length > 0;
+  }
+  const offscreenAny = chrome.offscreen as unknown as {
+    hasDocument?: () => Promise<boolean>;
+  };
+  if (typeof offscreenAny?.hasDocument === 'function') {
+    return offscreenAny.hasDocument();
+  }
+  return false;
+}
+
+async function ensureTtsOffscreenDocument(): Promise<void> {
+  if (await hasTtsOffscreenDocument()) return;
+  if (offscreenCreatePromise) {
+    await offscreenCreatePromise;
+    return;
+  }
+  offscreenCreatePromise = (async () => {
+    try {
+      await chrome.offscreen.createDocument({
+        url: TTS_OFFSCREEN_PATH,
+        reasons: [chrome.offscreen.Reason.AUDIO_PLAYBACK],
+        justification: 'Run local Piper neural TTS model and play natural English speech audio',
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.toLowerCase().includes('single offscreen document')) {
+        throw err;
+      }
+    } finally {
+      offscreenCreatePromise = null;
+    }
+  })();
+  await offscreenCreatePromise;
+}
+
+async function sendToTtsOffscreen(payload: {
+  action: 'SPEAK' | 'CANCEL' | 'PREPARE' | 'STATUS';
+  text?: string;
+  rate?: number;
+}): Promise<Record<string, unknown>> {
+  if (payload.action === 'CANCEL') {
+    if (!(await hasTtsOffscreenDocument())) {
+      return { ok: true };
+    }
+  } else {
+    await ensureTtsOffscreenDocument();
+  }
+  return chrome.runtime.sendMessage({
+    target: 'tts-offscreen',
+    ...payload,
+  });
+}
+
+chrome.runtime.onMessage.addListener((message: ExtensionMessage & { target?: string }, sender, sendResponse) => {
+  if (message?.target === 'tts-offscreen' || (message as { type?: string })?.type === 'NEURAL_TTS_PROGRESS') {
+    return false;
+  }
   (async () => {
     switch (message.type) {
       case 'USER_ACTIVITY': {
@@ -804,6 +874,30 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         await syncActionBadge();
         const status = await getStatusSnapshot();
         sendResponse({ ok: true, status });
+        break;
+      }
+      case 'SPEAK_NEURAL_TTS': {
+        const res = await sendToTtsOffscreen({
+          action: 'SPEAK',
+          text: message.text,
+          rate: message.rate,
+        });
+        sendResponse(res ?? { ok: false, error: 'No response from TTS offscreen' });
+        break;
+      }
+      case 'CANCEL_NEURAL_TTS': {
+        const res = await sendToTtsOffscreen({ action: 'CANCEL' });
+        sendResponse(res ?? { ok: true });
+        break;
+      }
+      case 'PREPARE_NEURAL_TTS': {
+        const res = await sendToTtsOffscreen({ action: 'PREPARE' });
+        sendResponse(res ?? { ok: false, error: 'No response from TTS offscreen' });
+        break;
+      }
+      case 'GET_NEURAL_TTS_STATUS': {
+        const res = await sendToTtsOffscreen({ action: 'STATUS' });
+        sendResponse(res ?? { ok: false });
         break;
       }
       default:

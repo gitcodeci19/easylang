@@ -12,6 +12,14 @@ const isWatch = process.argv.includes('--watch');
 async function copyStaticAssets() {
   await mkdir(distDir, { recursive: true });
   await cp(publicDir, distDir, { recursive: true, force: true });
+
+  // Copy ONNX Runtime Web single-threaded WASM binaries locally for MV3 CSP compliance
+  const ortDistDir = path.join(rootDir, 'node_modules/onnxruntime-web/dist');
+  const ttsDistDir = path.join(distDir, 'tts');
+  await mkdir(ttsDistDir, { recursive: true });
+  for (const wasmFile of ['ort-wasm-simd.wasm', 'ort-wasm.wasm']) {
+    await cp(path.join(ortDistDir, wasmFile), path.join(ttsDistDir, wasmFile), { force: true });
+  }
 }
 
 async function runBuild() {
@@ -50,6 +58,28 @@ async function runBuild() {
       entryPoints: [path.join(rootDir, 'src/options/index.ts')],
       outfile: path.join(distDir, 'options.js'),
       format: 'esm',
+    },
+    {
+      ...sharedOptions,
+      entryPoints: [path.join(rootDir, 'src/offscreen/ttsOffscreen.ts')],
+      outfile: path.join(distDir, 'tts-offscreen.js'),
+      format: 'esm',
+      plugins: [
+        {
+          name: 'emscripten-node-stub',
+          setup(build) {
+            // Emscripten's piper_phonemize wrapper contains Node-only guarded branches for fs/path
+            build.onResolve({ filter: /^(fs|path|crypto)$/ }, (args) => ({
+              path: args.path,
+              namespace: 'node-stub',
+            }));
+            build.onLoad({ filter: /.*/, namespace: 'node-stub' }, () => ({
+              contents: 'export default {};',
+              loader: 'js',
+            }));
+          },
+        },
+      ],
     },
   ];
 

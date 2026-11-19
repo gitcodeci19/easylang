@@ -18,7 +18,9 @@ import {
 } from '../src/shared/roadmapCoach.ts';
 import {
   formatTextForEnglishTts,
+  hasBrowserNaturalEnglishVoice,
   pickBestEnglishVoice,
+  shouldUseNeuralTts,
 } from '../src/shared/speech.ts';
 import {
   ACTIVE_ROADMAP_SESSION_VERSION,
@@ -490,6 +492,34 @@ test('formatTextForEnglishTts expands awkward contractions like "we\'ve" and pic
     { lang: 'tr-TR', name: 'Microsoft Tolga - Turkish', localService: true },
   ] as unknown as SpeechSynthesisVoice[];
   assert.equal(pickBestEnglishVoice(trOnly), null);
+
+  const braveOfflineVoices = [
+    { lang: 'tr-TR', name: 'Microsoft Tolga - Turkish', localService: true },
+    { lang: 'en-US', name: 'Microsoft David - English (United States)', localService: true },
+    { lang: 'en-US', name: 'Microsoft Zira - English (United States)', localService: true },
+  ] as unknown as SpeechSynthesisVoice[];
+
+  const edgeNaturalVoices = [
+    { lang: 'en-US', name: 'Microsoft Aria Online (Natural) - English (United States)', localService: false },
+  ] as unknown as SpeechSynthesisVoice[];
+
+  assert.equal(hasBrowserNaturalEnglishVoice(mixedLocalAndCloud), true);
+  assert.equal(hasBrowserNaturalEnglishVoice(edgeNaturalVoices), true);
+  assert.equal(hasBrowserNaturalEnglishVoice(braveOfflineVoices), false);
+  assert.equal(hasBrowserNaturalEnglishVoice(trOnly), false);
+
+  // Hybrid: Brave/offline auto-upgrades sentences to Piper neural, Chrome/Edge stay native
+  assert.equal(shouldUseNeuralTts('hybrid', braveOfflineVoices, false), true);
+  assert.equal(shouldUseNeuralTts('hybrid', braveOfflineVoices, true), false);
+  assert.equal(shouldUseNeuralTts('hybrid', mixedLocalAndCloud, false), false);
+  assert.equal(shouldUseNeuralTts('hybrid', edgeNaturalVoices, false), false);
+
+  // Neural mode forces Piper on every browser including Chrome
+  assert.equal(shouldUseNeuralTts('neural', mixedLocalAndCloud, false), true);
+  assert.equal(shouldUseNeuralTts('neural', mixedLocalAndCloud, true), true);
+
+  // Local mode never invokes Piper
+  assert.equal(shouldUseNeuralTts('local', braveOfflineVoices, false), false);
 });
 
 test('multiple-choice answer positions are well-distributed for large Date.now()-style seeds', () => {
