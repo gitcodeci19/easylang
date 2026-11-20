@@ -8,6 +8,10 @@ import {
   REMEDIAL_SKILL_ORDER,
   type RemedialSkillSpec,
 } from './remedialCatalog.ts';
+import {
+  getRemedialQuestionAudioId,
+  REMEDIAL_QUESTION_SCRIPTS,
+} from './remedialQuestionScripts.ts';
 import { isValidVoiceCoachRuleId } from './voiceCoachCatalog.ts';
 import type {
   Card,
@@ -1021,17 +1025,16 @@ export function buildRemedialLessonPlan(
     };
   }
 
-  const exercises: RemedialExercise[] = [];
-
-  // 1. Contrast Duels (up to 2)
-  const duels = shuffleWithSeed(spec.duels, seed + 11).slice(0, 2);
-  for (let i = 0; i < duels.length; i += 1) {
-    const d = duels[i]!;
+  // 1. Pre-authored ElevenLabs-voiced Contrast Duels (up to 2, preserving stable template index)
+  const indexedDuels = spec.duels.map((template, origIdx) => ({ template, origIdx }));
+  const selectedDuels = shuffleWithSeed(indexedDuels, seed + 11).slice(0, 2);
+  const duelExercises: RemedialExercise[] = selectedDuels.map(({ template: d, origIdx }, i) => {
+    const audioId = getRemedialQuestionAudioId(skillId, 'duel', origIdx + 1);
     const shuffledChoices = shuffleWithSeed(d.choices, seed + 100 + i);
-    exercises.push({
-      id: `rem_duel_${skillId}_${i}`,
+    return {
+      id: `rem_duel_${audioId}`,
       kind: 'contrast_duel',
-      card: makeSyntheticCard(`rem_c_duel_${skillId}_${i}`, d.fullSentence, d.meaningTr),
+      card: makeSyntheticCard(`rem_c_duel_${audioId}`, d.fullSentence, d.meaningTr),
       promptText: d.promptSentence,
       promptSubtext: d.promptSubtextTr,
       postAnswerSubtext: d.meaningTr,
@@ -1042,18 +1045,21 @@ export function buildRemedialLessonPlan(
       correctChoice: d.correctChoice,
       expectedAnswers: [d.correctChoice],
       direction: 'en-to-tr',
-    });
-  }
+      questionAudioId: audioId,
+      questionVoiceScriptTr: REMEDIAL_QUESTION_SCRIPTS[audioId],
+    };
+  });
 
-  // 2. Spot-the-Bug Detective (up to 2)
-  const spots = shuffleWithSeed(spec.spotFixes, seed + 23).slice(0, 2);
-  for (let i = 0; i < spots.length; i += 1) {
-    const sf = spots[i]!;
+  // 2. Pre-authored ElevenLabs-voiced Spot-the-Bug Detective (up to 2, preserving stable template index)
+  const indexedSpots = spec.spotFixes.map((template, origIdx) => ({ template, origIdx }));
+  const selectedSpots = shuffleWithSeed(indexedSpots, seed + 23).slice(0, 2);
+  const spotExercises: RemedialExercise[] = selectedSpots.map(({ template: sf, origIdx }, i) => {
+    const audioId = getRemedialQuestionAudioId(skillId, 'spot', origIdx + 1);
     const shuffledFixChoices = shuffleWithSeed(sf.fixChoices, seed + 200 + i);
-    exercises.push({
-      id: `rem_spot_${skillId}_${i}`,
+    return {
+      id: `rem_spot_${audioId}`,
       kind: 'spot_fix',
-      card: makeSyntheticCard(`rem_c_spot_${skillId}_${i}`, sf.correctedSentence, sf.meaningTr),
+      card: makeSyntheticCard(`rem_c_spot_${audioId}`, sf.correctedSentence, sf.meaningTr),
       promptText: sf.buggyTokens.join(' '),
       promptSubtext: sf.meaningTr,
       postAnswerSubtext: sf.meaningTr,
@@ -1067,16 +1073,20 @@ export function buildRemedialLessonPlan(
       correctedSentence: sf.correctedSentence,
       expectedAnswers: [sf.correctedSentence],
       direction: 'en-to-tr',
-    });
-  }
+      questionAudioId: audioId,
+      questionVoiceScriptTr: REMEDIAL_QUESTION_SCRIPTS[audioId],
+    };
+  });
 
-  // 3. Real-Life Scenario Pick (1)
+  // 3. Pre-authored ElevenLabs-voiced Real-Life Scenario Pick (1)
   const scenario = spec.scenarios[0];
+  let scenExercise: RemedialExercise | null = null;
   if (scenario) {
-    exercises.push({
-      id: `rem_scen_${skillId}_0`,
+    const audioId = getRemedialQuestionAudioId(skillId, 'scen', 1);
+    scenExercise = {
+      id: `rem_scen_${audioId}`,
       kind: 'scenario_pick',
-      card: makeSyntheticCard(`rem_c_scen_${skillId}_0`, scenario.correctChoice, scenario.meaningTr),
+      card: makeSyntheticCard(`rem_c_scen_${audioId}`, scenario.correctChoice, scenario.meaningTr),
       promptText: scenario.scenarioTr,
       promptSubtext: scenario.scenarioEn,
       postAnswerSubtext: scenario.meaningTr,
@@ -1087,10 +1097,16 @@ export function buildRemedialLessonPlan(
       correctChoice: scenario.correctChoice,
       expectedAnswers: [scenario.correctChoice],
       direction: 'tr-to-en',
-    });
+      questionAudioId: audioId,
+      questionVoiceScriptTr: REMEDIAL_QUESTION_SCRIPTS[audioId],
+    };
   }
 
   // 4. Dynamic personalized drills from user's real missed / modern cards
+  const vocabExercises: RemedialExercise[] = [];
+  let clozeEx: RemedialExercise | null = null;
+  let wbEx: RemedialExercise | null = null;
+
   if (skillId === 'trouble_vocab' && matchedCards.length > 0) {
     // Build personal vocab_recall drills with level+POS-matched, zero-synonym-collision distractors
     const allWordPool = allCards.filter((c) => c.type === 'word' && c.acceptedTr.length > 0);
@@ -1124,7 +1140,7 @@ export function buildRemedialLessonPlan(
       if (pickedDistractors.length >= 2) {
         const primaryMeaning = targetWord.acceptedTr[0]!;
         const meaningPreview = targetWord.acceptedTr.slice(0, 3).join(', ');
-        exercises.push({
+        vocabExercises.push({
           id: `rem_tv_mc_${targetWord.id}`,
           kind: 'vocab_recall',
           card: targetWord,
@@ -1144,18 +1160,16 @@ export function buildRemedialLessonPlan(
       }
     }
   } else {
-    // Dynamic Cloze from matched sentence
+    // Dynamic Cloze from matched sentence (prioritizing user's real missed card)
     const clozeCard = matchedCards[0];
     if (clozeCard) {
-      const clozeEx = buildDynamicClozeExercise(skillId, clozeCard, allCards, seed);
-      if (clozeEx) exercises.push(clozeEx);
+      clozeEx = buildDynamicClozeExercise(skillId, clozeCard, allCards, seed);
     }
 
     // Dynamic Word Bank from matched sentence
     const wbCard = matchedCards[1] ?? matchedCards[0];
     if (wbCard) {
-      const wbEx = buildDynamicWordBankExercise(skillId, wbCard, allCards, seed);
-      if (wbEx) exercises.push(wbEx);
+      wbEx = buildDynamicWordBankExercise(skillId, wbCard, allCards, seed);
     }
   }
 
@@ -1174,19 +1188,49 @@ export function buildRemedialLessonPlan(
       ? bossCard.exampleTr
       : bossCard.acceptedTr[0] ?? bossEn;
 
-  exercises.push({
+  const bossEx: RemedialExercise = {
     id: `rem_boss_${skillId}_${bossCard.id}`,
     kind: 'free_translation',
     card: bossCard,
     promptText: bossTr,
-    promptSubtext: `${spec.titleTr} · Final Meydan Okuma (İngilizceye çevir)`,
+    promptSubtext: spec.titleTr,
     postAnswerSubtext: bossTr,
     explanationTr: `Örnek doğru cevap: "${bossEn}"`,
     explanationEn: `Reference answer: "${bossEn}"`,
     audioText: bossEn,
     expectedAnswers: [bossEn],
     direction: 'tr-to-en',
-  });
+  };
+
+  // 6. Balanced Interleaving:
+  // Start with a user-personalized mistake drill, then alternate smoothly with
+  // pre-authored ElevenLabs-narrated drills, finishing with the personalized Boss Challenge.
+  const orderedSlots: Array<RemedialExercise | null | undefined> =
+    skillId === 'trouble_vocab'
+      ? [
+          vocabExercises[0],
+          duelExercises[0],
+          vocabExercises[1],
+          spotExercises[0],
+          vocabExercises[2],
+          duelExercises[1],
+          scenExercise,
+          bossEx,
+        ]
+      : [
+          clozeEx,
+          duelExercises[0],
+          spotExercises[0],
+          wbEx,
+          duelExercises[1],
+          scenExercise,
+          spotExercises[1],
+          bossEx,
+        ];
+
+  const exercises: RemedialExercise[] = orderedSlots.filter(
+    (item): item is RemedialExercise => Boolean(item)
+  );
 
   return {
     skillId,
@@ -1196,4 +1240,80 @@ export function buildRemedialLessonPlan(
     exercises: exercises.slice(0, 8),
     relatedConceptIds: weakness?.relatedConceptIds ?? [],
   };
+}
+
+export interface MatchedRemedialQuestionAudio {
+  skillId: WeakSkillId;
+  questionAudioId: string;
+  questionVoiceScriptTr: string;
+}
+
+let cachedSentenceToQuestionAudio: Map<string, MatchedRemedialQuestionAudio> | null = null;
+
+function normalizeSentenceForAudioLookup(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[’‘`]/g, "'")
+    .replace(/[^a-z0-9'\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Look up whether an English sentence (e.g. inside a Roadmap exercise) exactly matches
+ * one of the 92 pre-authored remedial questions that have a bundled ElevenLabs explanation MP3.
+ */
+export function findRemedialQuestionAudioForSentence(
+  englishText: string
+): MatchedRemedialQuestionAudio | null {
+  const key = normalizeSentenceForAudioLookup(englishText);
+  if (!key || key.split(' ').length < 3) return null;
+
+  if (!cachedSentenceToQuestionAudio) {
+    cachedSentenceToQuestionAudio = new Map<string, MatchedRemedialQuestionAudio>();
+    for (const skillId of REMEDIAL_SKILL_ORDER) {
+      const spec = REMEDIAL_SKILL_CATALOG[skillId];
+      spec.duels.forEach((d, idx) => {
+        const audioId = getRemedialQuestionAudioId(skillId, 'duel', idx + 1);
+        const scriptTr = REMEDIAL_QUESTION_SCRIPTS[audioId];
+        if (!scriptTr) return;
+        const norm = normalizeSentenceForAudioLookup(d.fullSentence);
+        if (norm && !cachedSentenceToQuestionAudio!.has(norm)) {
+          cachedSentenceToQuestionAudio!.set(norm, {
+            skillId,
+            questionAudioId: audioId,
+            questionVoiceScriptTr: scriptTr,
+          });
+        }
+      });
+      spec.spotFixes.forEach((sf, idx) => {
+        const audioId = getRemedialQuestionAudioId(skillId, 'spot', idx + 1);
+        const scriptTr = REMEDIAL_QUESTION_SCRIPTS[audioId];
+        if (!scriptTr) return;
+        const norm = normalizeSentenceForAudioLookup(sf.correctedSentence);
+        if (norm && !cachedSentenceToQuestionAudio!.has(norm)) {
+          cachedSentenceToQuestionAudio!.set(norm, {
+            skillId,
+            questionAudioId: audioId,
+            questionVoiceScriptTr: scriptTr,
+          });
+        }
+      });
+      spec.scenarios.forEach((sc, idx) => {
+        const audioId = getRemedialQuestionAudioId(skillId, 'scen', idx + 1);
+        const scriptTr = REMEDIAL_QUESTION_SCRIPTS[audioId];
+        if (!scriptTr) return;
+        const norm = normalizeSentenceForAudioLookup(sc.correctChoice);
+        if (norm && !cachedSentenceToQuestionAudio!.has(norm)) {
+          cachedSentenceToQuestionAudio!.set(norm, {
+            skillId,
+            questionAudioId: audioId,
+            questionVoiceScriptTr: scriptTr,
+          });
+        }
+      });
+    }
+  }
+
+  return cachedSentenceToQuestionAudio.get(key) ?? null;
 }

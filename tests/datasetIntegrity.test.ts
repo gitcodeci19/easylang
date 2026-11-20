@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   CURRICULUM_UNITS,
+  STEPS_PER_NODE,
   buildUnitLessonExercises,
 } from '../src/shared/curriculum.ts';
 import {
@@ -19,6 +20,11 @@ import {
   REMEDIAL_SKILL_CATALOG,
   REMEDIAL_SKILL_ORDER,
 } from '../src/shared/remedialCatalog.ts';
+import {
+  REMEDIAL_QUESTION_AUDIO_DIR,
+  REMEDIAL_QUESTION_SCRIPTS,
+} from '../src/shared/remedialQuestionScripts.ts';
+import { REMEDIAL_QUESTION_AUDIO_WORD_TIMINGS } from '../src/shared/remedialQuestionAudioTimings.ts';
 import {
   VOICE_COACH_RULE_ORDER,
   getVoiceCoachRuleSpec,
@@ -114,15 +120,54 @@ test('polysemous and compound word cards have 100% sense-aligned examples matchi
   }
 });
 
-test('all 300 Roadmap lessons (2,400 exercises) have zero duplicate choices, zero synonym collisions, and Turkish cues on cloze', () => {
+test('all 500 Roadmap lessons (4,000 exercises) have zero duplicate choices, zero synonym collisions, Turkish cues on cloze, and rich diversity', () => {
+  assert.equal(STEPS_PER_NODE, 5, 'Expected 5 steps per node (0/5 -> 5/5)');
   const wordByEn = new Map<string, Card>();
   for (const c of ALL_CARDS) {
     if (c.type === 'word') wordByEn.set(c.en.trim().toLowerCase(), c);
   }
 
+  // Spot check localized everyday meanings and pop-culture sentences
+  const localizedChecks: Array<[string, string]> = [
+    ['daughter', 'kız çocuğu'],
+    ['trailer', 'fragman'],
+    ['hardware', 'donanım'],
+    ['mall', 'alışveriş merkezi'],
+    ['shock', 'şok'],
+    ['cop', 'polis'],
+    ['flu', 'grip'],
+    ['hobby', 'hobi'],
+    ['fantastic', 'harika'],
+    ['mum', 'anne'],
+    ['staff', 'personel'],
+    ['shelf', 'raf'],
+    ['poem', 'şiir'],
+    ['lip', 'dudak'],
+    ['level', 'seviye'],
+    ['ingredient', 'malzeme'],
+    ['written', 'yazılı'],
+    ['ban', 'yasaklamak'],
+    ['accommodation', 'konaklama'],
+    ['retire', 'emekli olmak'],
+    ['recover', 'iyileşmek'],
+  ];
+  for (const [en, expectedPrimaryTr] of localizedChecks) {
+    const card = wordByEn.get(en);
+    assert.ok(card, `Missing word card "${en}"`);
+    assert.equal(card.acceptedTr[0], expectedPrimaryTr, `Expected "${en}" primary meaning "${expectedPrimaryTr}", got "${card.acceptedTr[0]}"`);
+  }
+
+  const mjCard = ALL_CARDS.find((c) => c.en === 'Michael Jackson died in 2009.');
+  assert.ok(mjCard && mjCard.acceptedTr.length >= 4, 'Expected Michael Jackson pop-culture sentence with rich TR alternatives');
+  const spotifyCard = ALL_CARDS.find((c) => c.en === 'I forgot the password to my Spotify account.');
+  assert.ok(spotifyCard && spotifyCard.acceptedTr.length >= 4, 'Expected Spotify pop-culture sentence with rich TR alternatives');
+
   for (const unit of CURRICULUM_UNITS) {
+    const unitWordCounts = new Map<string, number>();
+    const unitSentCounts = new Map<string, number>();
+
     for (let nodeIdx = 0; nodeIdx < 5; nodeIdx += 1) {
-      for (let step = 0; step < 3; step += 1) {
+      for (let step = 0; step < STEPS_PER_NODE; step += 1) {
         const exercises = buildUnitLessonExercises(
           unit.id,
           nodeIdx,
@@ -131,7 +176,11 @@ test('all 300 Roadmap lessons (2,400 exercises) have zero duplicate choices, zer
           1700000000000 + nodeIdx * 100 + step,
           step
         );
+        assert.equal(exercises.length, 8);
         for (const ex of exercises) {
+          const map = ex.card.type === 'word' ? unitWordCounts : unitSentCounts;
+          map.set(ex.card.id, (map.get(ex.card.id) ?? 0) + 1);
+
           if (ex.choices && ex.choices.length > 0) {
             const folded = ex.choices.map(foldTr);
             assert.equal(
@@ -181,6 +230,13 @@ test('all 300 Roadmap lessons (2,400 exercises) have zero duplicate choices, zer
         }
       }
     }
+
+    assert.ok(unitWordCounts.size >= 80, `${unit.id} expected >= 80 unique words across 25 steps, got ${unitWordCounts.size}`);
+    assert.ok(unitSentCounts.size >= 75, `${unit.id} expected >= 75 unique sentences across 25 steps, got ${unitSentCounts.size}`);
+    const maxWordRep = Math.max(...unitWordCounts.values());
+    const maxSentRep = Math.max(...unitSentCounts.values());
+    assert.ok(maxWordRep <= 3, `${unit.id} word repeated too often across 25 steps: maxRep=${maxWordRep}`);
+    assert.equal(maxSentRep, 1, `${unit.id} sentence repeated across 25 steps: maxRep=${maxSentRep}`);
   }
 });
 
@@ -330,5 +386,74 @@ test('Voice Guide Assistant metadata, manifest exposure, and bundled MP3 assets 
     assert.ok(fs.existsSync(absPath), `Missing assistant MP3: ${absPath}`);
     const stat = fs.statSync(absPath);
     assert.ok(stat.size > 50_000, `Assistant MP3 too small / corrupt for ${guideId}: ${stat.size} bytes`);
+  }
+});
+
+test('all 92 per-question Remedial ElevenLabs MP3 files exist, have valid headers, zero orphans, and are exposed in manifest', () => {
+  const questionAudioDir = path.resolve(process.cwd(), 'public', ...REMEDIAL_QUESTION_AUDIO_DIR.split('/'));
+  const expectedIds = Object.keys(REMEDIAL_QUESTION_SCRIPTS);
+  assert.equal(expectedIds.length, 92, 'Expected 92 per-question scripts');
+
+  const manifestPath = path.resolve(process.cwd(), 'public', 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+    web_accessible_resources?: Array<{ resources?: string[] }>;
+  };
+  const allExposed = (manifest.web_accessible_resources ?? []).flatMap((r) => r.resources ?? []);
+  assert.ok(
+    allExposed.includes(`${REMEDIAL_QUESTION_AUDIO_DIR}/*.mp3`),
+    `manifest.json must expose ${REMEDIAL_QUESTION_AUDIO_DIR}/*.mp3 in web_accessible_resources`
+  );
+
+  const actualFiles = fs
+    .readdirSync(questionAudioDir)
+    .filter((f) => f.toLowerCase().endsWith('.mp3'))
+    .sort();
+  assert.equal(actualFiles.length, 92, `Expected 92 MP3 files in ${questionAudioDir}, got ${actualFiles.length}`);
+
+  const expectedFileSet = new Set(expectedIds.map((id) => `${id}.mp3`));
+  for (const actual of actualFiles) {
+    assert.ok(expectedFileSet.has(actual), `Unexpected orphan MP3 in remedial_questions: ${actual}`);
+  }
+
+  for (const audioId of expectedIds) {
+    const filePath = path.join(questionAudioDir, `${audioId}.mp3`);
+    assert.ok(fs.existsSync(filePath), `Missing question MP3: ${filePath}`);
+    const buf = fs.readFileSync(filePath);
+    assert.ok(buf.length > 50_000, `Question MP3 too small / corrupt for ${audioId}: ${buf.length} bytes`);
+    const validHeader =
+      (buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) ||
+      (buf[0] === 0xff && (buf[1]! & 0xe0) === 0xe0);
+    assert.ok(validHeader, `Invalid MP3 header for ${audioId}`);
+
+    // Verify 1-to-1 acoustic word timings for karaoke highlighting
+    const script = REMEDIAL_QUESTION_SCRIPTS[audioId]!;
+    const words = script.trim().split(/\s+/).filter(Boolean);
+    const timings = REMEDIAL_QUESTION_AUDIO_WORD_TIMINGS[audioId];
+    assert.ok(timings && timings.length > 0, `Missing question word timings for ${audioId}`);
+    assert.equal(
+      timings.length,
+      words.length,
+      `Question word timing mismatch for ${audioId}: ${timings.length} vs ${words.length}`
+    );
+    let prevStart = -1;
+    for (let i = 0; i < timings.length; i += 1) {
+      const pair = timings[i]!;
+      const startMs: number = pair[0];
+      const endMs: number = pair[1];
+      assert.ok(
+        Number.isFinite(startMs) && Number.isFinite(endMs) && startMs >= 0 && endMs > startMs,
+        `Invalid question timing interval for ${audioId}[${i}]: [${startMs}, ${endMs}]`
+      );
+      assert.ok(
+        startMs >= prevStart,
+        `Non-monotonic question timing for ${audioId}[${i}]: ${startMs} < ${prevStart}`
+      );
+      prevStart = startMs;
+    }
+    assert.equal(findActiveWordIndex(timings, timings[0]![0] + 10, 0), 0);
+    assert.equal(
+      findActiveWordIndex(timings, timings[timings.length - 1]![0] + 10, 0),
+      timings.length - 1
+    );
   }
 });

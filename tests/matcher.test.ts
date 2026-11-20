@@ -57,3 +57,36 @@ test('evaluateTurkishAnswer accepts multi-synonym comma input and evaluateEnglis
   assert.equal(evaluateEnglishAnswer('spcae', ['space'], 'word').isCorrect, true);
   assert.equal(evaluateEnglishAnswer('hello', ['goodbye'], 'word').isCorrect, false);
 });
+
+test('offline evaluator accepts rich Turkish and English paraphrases, synonyms, and register variants without AI', () => {
+  // 1. "Michael Jackson died in 2009." -> öldü / ölmüştür / hayatını kaybetti / vefat etti / 2009 yılında
+  const mjTarget = ["Michael Jackson 2009'da öldü."];
+  assert.equal(evaluateTurkishAnswer("Michael Jackson 2009'da ölmüştür", mjTarget, 'sentence').isCorrect, true);
+  assert.equal(evaluateTurkishAnswer('Michael Jackson 2009 yılında öldü', mjTarget, 'sentence').isCorrect, true);
+  assert.equal(evaluateTurkishAnswer('Michael Jackson 2009 yılında hayatını kaybetti.', mjTarget, 'sentence').isCorrect, true);
+  assert.equal(evaluateTurkishAnswer("Michael Jackson 2009'da vefat etti", mjTarget, 'sentence').isCorrect, true);
+
+  // 2. "I forgot the password to my Spotify account." -> şifre / parola / hesap / üyelik / explicit pronoun
+  const spotifyTrTarget = ['Spotify hesabımın şifresini unuttum.'];
+  assert.equal(evaluateTurkishAnswer('Spotify hesabımın parolasını unuttum', spotifyTrTarget, 'sentence').isCorrect, true);
+  assert.equal(evaluateTurkishAnswer('Ben Spotify hesabımın şifresini unuttum', spotifyTrTarget, 'sentence').isCorrect, true);
+  assert.equal(evaluateTurkishAnswer('Benim Spotify üyeliğimin parolasını unuttum', spotifyTrTarget, 'sentence').isCorrect, true);
+
+  // 3. English paraphrases in TR->EN mode
+  const spotifyEnTarget = ['I forgot the password to my Spotify account.'];
+  assert.equal(evaluateEnglishAnswer('I forgot my Spotify account password', spotifyEnTarget, 'sentence').isCorrect, true);
+  assert.equal(evaluateEnglishAnswer('I forgot the password of my Spotify account', spotifyEnTarget, 'sentence').isCorrect, true);
+  assert.equal(evaluateEnglishAnswer('I forgot the passcode for my Spotify account', spotifyEnTarget, 'sentence').isCorrect, true);
+
+  const mjEnTarget = ['Michael Jackson died in 2009.'];
+  assert.equal(evaluateEnglishAnswer('Michael Jackson passed away in 2009.', mjEnTarget, 'sentence').isCorrect, true);
+
+  // 4. Localized word synonyms (kız çocuğu / kız evlat, şifre / parola)
+  assert.equal(evaluateTurkishAnswer('kız evlat', ['kız çocuğu'], 'word').isCorrect, true);
+  assert.equal(evaluateTurkishAnswer('parola', ['şifre'], 'word').isCorrect, true);
+  assert.equal(evaluateTurkishAnswer('alışveriş merkezi', ['AVM'], 'word').isCorrect, true);
+
+  // 5. Negation polarity protection: affirmative must not match explicit negative
+  assert.equal(evaluateTurkishAnswer('Ben yorgunum', ['Ben yorgun değilim.'], 'sentence').isCorrect, false);
+  assert.equal(evaluateEnglishAnswer('I am ready', ['I am not ready.'], 'sentence').isCorrect, false);
+});

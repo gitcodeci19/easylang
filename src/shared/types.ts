@@ -486,6 +486,10 @@ export interface RemedialExercise {
   expectedAnswers: string[];
   direction: 'en-to-tr' | 'tr-to-en' | 'en-audio';
   isRetryRequeue?: boolean;
+  /** Deterministic audio ID (e.g. `was_vs_were__duel_1`) for bundled per-question ElevenLabs narration. */
+  questionAudioId?: string;
+  /** Verbatim Turkish voiceover script matching `audio/remedial_questions/<questionAudioId>.mp3`. */
+  questionVoiceScriptTr?: string;
 }
 
 export interface RemedialLessonPlan {

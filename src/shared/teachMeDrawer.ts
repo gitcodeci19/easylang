@@ -12,6 +12,8 @@ import {
 } from './guideAssistant';
 import { resolveSupportedLanguage } from './i18n';
 import { findActiveWordIndex, REMEDIAL_AUDIO_WORD_TIMINGS } from './remedialAudioTimings';
+import { REMEDIAL_QUESTION_AUDIO_WORD_TIMINGS } from './remedialQuestionAudioTimings';
+import { getRemedialQuestionAudioRelativePath } from './remedialQuestionScripts';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
 import type { FeedbackLanguageMode, VoiceCoachRuleId } from './types';
 import { getVoiceCoachRuleSpec, VOICE_COACH_RULE_ORDER } from './voiceCoachCatalog';
@@ -72,12 +74,15 @@ export function getRemedialAudioRelativePath(skillId: VoiceCoachRuleId): string 
   return `audio/remedial/${skillId}.mp3`;
 }
 
-function resolveExtensionAudioUrl(skillId: VoiceCoachRuleId): string {
-  const rel = getRemedialAudioRelativePath(skillId);
+function resolveExtensionRelativeUrl(rel: string): string {
   if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
     return chrome.runtime.getURL(rel);
   }
   return rel;
+}
+
+function resolveExtensionAudioUrl(skillId: VoiceCoachRuleId): string {
+  return resolveExtensionRelativeUrl(getRemedialAudioRelativePath(skillId));
 }
 
 function formatAudioSeconds(sec: number): string {
@@ -95,6 +100,12 @@ export interface CreateRuleAudioPlayerOptions {
   compact?: boolean;
   autoPlay?: boolean;
   onTimeMs?: (currentMs: number, isPlaying: boolean) => void;
+  /** Optional relative audio path (e.g. `audio/remedial_questions/was_vs_were__duel_1.mp3`) overriding the skill rule track. */
+  customAudioRelativePath?: string;
+  /** Optional custom play button tooltip when overriding the audio track. */
+  customPlayTitle?: string;
+  /** Optional callback fired if the bundled MP3 track cannot be loaded (e.g. not yet generated). */
+  onAudioUnavailable?: () => void;
 }
 
 export interface RuleAudioPlayerController {
@@ -105,21 +116,18 @@ export interface RuleAudioPlayerController {
 }
 
 /**
- * Mount clickable, word-by-word synchronized transcript spans inside `container`.
- * When `skillId` has acoustic timestamps matching `text`'s whitespace tokens, each word
- * illuminates in lockstep with audio playback and supports click-to-seek.
+ * Shared word-by-word karaoke highlighter + click-to-seek renderer for any
+ * transcript with 1-to-1 acoustic [startMs, endMs] timestamps.
  */
-export function mountSyncedTranscript(
+function mountSyncedWordSpans(
   container: HTMLElement,
-  skillId: VoiceCoachRuleId,
+  timings: ReadonlyArray<readonly [number, number]> | undefined,
   text: string,
-  isTr: boolean,
   onSeekMs?: (startMs: number) => void
 ): { update: (currentMs: number, isPlaying: boolean) => void } {
-  const timings = REMEDIAL_AUDIO_WORD_TIMINGS[skillId];
   const tokens = text.trim().split(/\s+/).filter(Boolean);
 
-  if (!isTr || !timings || timings.length !== tokens.length) {
+  if (!timings || timings.length !== tokens.length) {
     container.textContent = text;
     return { update: () => {} };
   }
@@ -166,6 +174,25 @@ export function mountSyncedTranscript(
 }
 
 /**
+ * Mount clickable, word-by-word synchronized transcript spans inside `container`.
+ * When `skillId` has acoustic timestamps matching `text`'s whitespace tokens, each word
+ * illuminates in lockstep with audio playback and supports click-to-seek.
+ */
+export function mountSyncedTranscript(
+  container: HTMLElement,
+  skillId: VoiceCoachRuleId,
+  text: string,
+  isTr: boolean,
+  onSeekMs?: (startMs: number) => void
+): { update: (currentMs: number, isPlaying: boolean) => void } {
+  if (!isTr) {
+    container.textContent = text;
+    return { update: () => {} };
+  }
+  return mountSyncedWordSpans(container, REMEDIAL_AUDIO_WORD_TIMINGS[skillId], text, onSeekMs);
+}
+
+/**
  * Build a compact studio voiceover audio player bar backed by bundled ElevenLabs MP3 files.
  * Includes Play/Pause, Restart, 60fps seekable timeline + word sync clock, mm:ss clock, and speed control.
  */
@@ -174,6 +201,9 @@ export function createRuleAudioPlayer(
 ): RuleAudioPlayerController {
   const { skillId, isTr } = options;
   const spec = getVoiceCoachRuleSpec(skillId);
+  const resolvedTrackUrl = options.customAudioRelativePath
+    ? resolveExtensionRelativeUrl(options.customAudioRelativePath)
+    : resolveExtensionAudioUrl(skillId);
 
   const bar = document.createElement('div');
   bar.className = `tm-audio-bar ${options.crimson ? 'is-crimson' : ''} ${
@@ -184,9 +214,11 @@ export function createRuleAudioPlayer(
   playBtn.type = 'button';
   playBtn.className = 'tm-audio-play-btn';
   playBtn.textContent = '▶';
-  playBtn.title = isTr
-    ? `Sesli Anlatımı Dinle / Duraklat (${spec.titleTr.split('(')[0]!.trim()})`
-    : `Play / Pause Voiceover (${spec.titleEn.split('(')[0]!.trim()})`;
+  playBtn.title =
+    options.customPlayTitle ??
+    (isTr
+      ? `Sesli Anlatımı Dinle / Duraklat (${spec.titleTr.split('(')[0]!.trim()})`
+      : `Play / Pause Voiceover (${spec.titleEn.split('(')[0]!.trim()})`);
 
   const restartBtn = document.createElement('button');
   restartBtn.type = 'button';
@@ -308,8 +340,7 @@ export function createRuleAudioPlayer(
       const ctx = new AudioContext();
       activeWebAudioCtx = ctx;
       if (!decoded) {
-        const url = resolveExtensionAudioUrl(skillId);
-        const resp = await fetch(url);
+        const resp = await fetch(resolvedTrackUrl);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const buf = await resp.arrayBuffer();
         if (disposed) return;
@@ -345,17 +376,20 @@ export function createRuleAudioPlayer(
       };
       src.start(0, clampedStart);
     } catch {
-      timeSpan.textContent = isTr ? 'Ses yüklenemedi' : 'Audio unavailable';
+      timeSpan.textContent = isTr ? 'Ses eklenmedi' : 'Audio missing';
       syncPlayUi(false);
       emitTime(-1, false);
+      options.onAudioUnavailable?.();
     }
   };
 
   const ensureAudio = (): HTMLAudioElement => {
     if (audio) return audio;
-    const el = new Audio(resolveExtensionAudioUrl(skillId));
+    const el = new Audio(resolvedTrackUrl);
     el.preload = 'metadata';
-    el.playbackRate = speeds[speedIdx] ?? 1.0;
+    const initialRate = speeds[speedIdx] ?? 1.0;
+    el.defaultPlaybackRate = initialRate;
+    el.playbackRate = initialRate;
     el.addEventListener('loadedmetadata', () => {
       if (Number.isFinite(el.duration) && el.duration > 0) {
         rangeEl.max = String(el.duration);
@@ -475,7 +509,10 @@ export function createRuleAudioPlayer(
     const rate = speeds[speedIdx] ?? 1.0;
     webAudioRate = rate;
     speedBtn.textContent = `${rate.toFixed(rate === 1 ? 1 : 2).replace(/\.00$/, '.0')}x`;
-    if (audio) audio.playbackRate = rate;
+    if (audio) {
+      audio.defaultPlaybackRate = rate;
+      audio.playbackRate = rate;
+    }
     if (activeWebAudioSource) activeWebAudioSource.playbackRate.value = rate;
   });
 
@@ -500,6 +537,561 @@ export function createRuleAudioPlayer(
       disposed = true;
       stopSyncLoop();
       timeListener = null;
+      if (audio && activeRuleAudio === audio) {
+        stopActiveRuleAudio();
+      } else if (audio) {
+        try {
+          audio.pause();
+          audio.removeAttribute('src');
+        } catch {
+          // Ignore
+        }
+      }
+      audio = null;
+    },
+  };
+}
+
+/**
+ * Build a compact inline audio player bound to a specific pre-authored remedial question's
+ * ElevenLabs voiceover MP3 (`audio/remedial_questions/<questionAudioId>.mp3`).
+ */
+export function createQuestionAudioPlayer(options: {
+  skillId: VoiceCoachRuleId;
+  questionAudioId: string;
+  isTr: boolean;
+  crimson?: boolean;
+  compact?: boolean;
+  onAudioUnavailable?: () => void;
+}): RuleAudioPlayerController {
+  return createRuleAudioPlayer({
+    skillId: options.skillId,
+    isTr: options.isTr,
+    crimson: options.crimson ?? true,
+    compact: options.compact ?? true,
+    customAudioRelativePath: getRemedialQuestionAudioRelativePath(options.questionAudioId),
+    customPlayTitle: options.isTr
+      ? 'Bu soruya özel sesli anlatımı oynat / duraklat'
+      : 'Play / pause voice explanation for this question',
+    onAudioUnavailable: options.onAudioUnavailable,
+  });
+}
+
+export interface QuestionVoiceCardController {
+  element: HTMLElement;
+  /** Automatically activate and start narration (used when user answers wrong without listening first). */
+  playAutoOnWrong: () => void;
+  /** Returns true if the learner manually clicked to play narration on this question. */
+  wasPlayedManually: () => boolean;
+  /** Cleanly stops playback and releases listeners/RAF handles. */
+  dispose: () => void;
+}
+
+/**
+ * Render an aesthetic AI-aurora animated soundwave card for a per-question ElevenLabs narration.
+ * Idle state shows a sleek iridescent banner with gently breathing soundwave bars ("Bu Soruya Özel Sesli Anlatım").
+ * Clicking (or calling `playAutoOnWrong`) expands subtle scrub/speed/transcript controls and animates the live waveform.
+ */
+export function createQuestionVoiceCard(options: {
+  questionAudioId: string;
+  scriptTr: string;
+  isTr: boolean;
+}): QuestionVoiceCardController {
+  const { questionAudioId, scriptTr, isTr } = options;
+  const resolvedTrackUrl = resolveExtensionRelativeUrl(
+    getRemedialQuestionAudioRelativePath(questionAudioId)
+  );
+
+  const card = document.createElement('div');
+  card.className = 'ai-voice-card';
+
+  const inner = document.createElement('div');
+  inner.className = 'ai-voice-inner';
+
+  const triggerBtn = document.createElement('button');
+  triggerBtn.type = 'button';
+  triggerBtn.className = 'ai-voice-trigger';
+  triggerBtn.setAttribute(
+    'aria-label',
+    isTr ? 'Bu soruya özel sesli anlatımı dinle' : 'Listen to voice explanation for this question'
+  );
+
+  // Left: Iridescent 5-bar animated soundwave orb
+  const waveOrb = document.createElement('span');
+  waveOrb.className = 'ai-voice-wave-orb';
+  waveOrb.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 5; i += 1) {
+    const barEl = document.createElement('span');
+    barEl.className = `ai-voice-bar b${i + 1}`;
+    waveOrb.appendChild(barEl);
+  }
+
+  // Center: Title + dynamic subtitle
+  const copyWrap = document.createElement('span');
+  copyWrap.className = 'ai-voice-copy';
+
+  const titleEl = document.createElement('span');
+  titleEl.className = 'ai-voice-title';
+  titleEl.textContent = isTr
+    ? 'Bu Soruya Özel Sesli Anlatım'
+    : 'Voice Explanation for This Question';
+
+  const subEl = document.createElement('span');
+  subEl.className = 'ai-voice-sub';
+  subEl.textContent = isTr ? 'Dinlemek için tıkla' : 'Tap to listen';
+
+  copyWrap.append(titleEl, subEl);
+
+  // Right: Action pill chip
+  const chipEl = document.createElement('span');
+  chipEl.className = 'ai-voice-chip';
+  chipEl.textContent = isTr ? '✦ Dinle' : '✦ Listen';
+
+  triggerBtn.append(waveOrb, copyWrap, chipEl);
+
+  // Expandable slim control strip (revealed on click or auto-play)
+  const controlsWrap = document.createElement('div');
+  controlsWrap.className = 'ai-voice-controls';
+  controlsWrap.hidden = true;
+
+  const rangeEl = document.createElement('input');
+  rangeEl.type = 'range';
+  rangeEl.className = 'ai-voice-range';
+  rangeEl.min = '0';
+  rangeEl.max = '100';
+  rangeEl.step = '0.02';
+  rangeEl.value = '0';
+  rangeEl.style.setProperty('--ai-progress', '0%');
+  rangeEl.setAttribute('aria-label', isTr ? 'Sesli anlatım ilerlemesi' : 'Voiceover progress');
+
+  const controlsMeta = document.createElement('div');
+  controlsMeta.className = 'ai-voice-controls-meta';
+
+  const timeSpan = document.createElement('span');
+  timeSpan.className = 'ai-voice-time';
+  timeSpan.textContent = '0:00';
+
+  const miniActions = document.createElement('div');
+  miniActions.className = 'ai-voice-mini-actions';
+
+  const restartBtn = document.createElement('button');
+  restartBtn.type = 'button';
+  restartBtn.className = 'ai-voice-ghost-btn';
+  restartBtn.textContent = '↺';
+  restartBtn.title = isTr ? 'Baştan oynat' : 'Restart';
+
+  const speeds = [0.85, 1.0, 1.15];
+  let speedIdx = 1;
+  const speedBtn = document.createElement('button');
+  speedBtn.type = 'button';
+  speedBtn.className = 'ai-voice-ghost-btn';
+  speedBtn.textContent = '1.0x';
+  speedBtn.title = isTr ? 'Oynatma hızı' : 'Playback speed';
+
+  const scriptToggleBtn = document.createElement('button');
+  scriptToggleBtn.type = 'button';
+  scriptToggleBtn.className = 'ai-voice-ghost-btn is-script-btn';
+  scriptToggleBtn.textContent = isTr ? 'Metni Gör ▾' : 'Script ▾';
+
+  miniActions.append(restartBtn, speedBtn, scriptToggleBtn);
+  controlsMeta.append(timeSpan, miniActions);
+  controlsWrap.append(rangeEl, controlsMeta);
+
+  // Collapsible verbatim script panel
+  const scriptBox = document.createElement('div');
+  scriptBox.className = 'ai-voice-script';
+  scriptBox.hidden = true;
+
+  const scriptStatus = document.createElement('div');
+  scriptStatus.className = 'ai-voice-script-status';
+  scriptStatus.hidden = true;
+
+  const scriptBody = document.createElement('p');
+  scriptBody.className = 'ai-voice-script-body';
+
+  scriptBox.append(scriptStatus, scriptBody);
+  inner.append(triggerBtn, controlsWrap, scriptBox);
+  card.appendChild(inner);
+
+  let audio: HTMLAudioElement | null = null;
+  let disposed = false;
+  let isPlayingWebAudio = false;
+  let webAudioDecoded: AudioBuffer | null = null;
+  let webAudioStartCtxTime = 0;
+  let webAudioOffsetSec = 0;
+  let webAudioRate = speeds[speedIdx] ?? 1.0;
+  let syncRafId: number | null = null;
+  let knownDurationSec = 0;
+  let playedManually = false;
+  let isAutoTriggered = false;
+  let hasStartedOnce = false;
+  let userCollapsedScript = false;
+
+  const stopSyncLoop = (): void => {
+    if (syncRafId !== null) {
+      cancelAnimationFrame(syncRafId);
+      syncRafId = null;
+    }
+  };
+
+  const setScriptOpen = (open: boolean): void => {
+    scriptBox.hidden = !open;
+    scriptToggleBtn.classList.toggle('is-open', open);
+    scriptToggleBtn.textContent = open
+      ? isTr
+        ? 'Metni Gizle ▴'
+        : 'Hide ▴'
+      : isTr
+        ? 'Metni Gör ▾'
+        : 'Script ▾';
+  };
+
+  const updateProgressDisplay = (sec: number, dur: number): void => {
+    const safeDur = Number.isFinite(dur) && dur > 0 ? dur : knownDurationSec;
+    if (safeDur > 0) {
+      knownDurationSec = safeDur;
+      const clampedSec = Math.max(0, Math.min(safeDur, sec));
+      const pct = Math.min(100, Math.max(0, (clampedSec / safeDur) * 100));
+      rangeEl.max = String(safeDur);
+      rangeEl.value = String(clampedSec);
+      rangeEl.style.setProperty('--ai-progress', `${pct.toFixed(2)}%`);
+      timeSpan.textContent = `${formatAudioSeconds(clampedSec)} / ${formatAudioSeconds(safeDur)}`;
+    } else {
+      timeSpan.textContent = formatAudioSeconds(sec);
+    }
+  };
+
+  const refreshCopy = (playing: boolean, ended = false): void => {
+    if (playing) {
+      subEl.textContent = isAutoTriggered
+        ? isTr
+          ? 'Yanlış cevap · asistan otomatik anlatıyor'
+          : 'Wrong answer · explaining automatically'
+        : isTr
+          ? 'Asistan anlatıyor · duraklatmak için tıkla'
+          : 'Assistant speaking · tap to pause';
+      chipEl.textContent = isTr ? '⏸ Duraklat' : '⏸ Pause';
+      return;
+    }
+
+    const durSuffix = knownDurationSec > 0 ? ` · ${formatAudioSeconds(knownDurationSec)}` : '';
+    if (!hasStartedOnce || ended) {
+      subEl.textContent = isTr
+        ? `Dinlemek için tıkla${durSuffix}`
+        : `Tap to listen${durSuffix}`;
+      chipEl.textContent = ended ? (isTr ? '↺ Tekrar' : '↺ Replay') : isTr ? '✦ Dinle' : '✦ Listen';
+    } else {
+      subEl.textContent = isTr ? 'Duraklatıldı · devam etmek için tıkla' : 'Paused · tap to resume';
+      chipEl.textContent = isTr ? '▶ Devam' : '▶ Resume';
+    }
+  };
+
+  const revealControls = (): void => {
+    card.classList.add('is-activated');
+    controlsWrap.hidden = false;
+    if (!userCollapsedScript) {
+      setScriptOpen(true);
+    }
+  };
+
+  const getWebAudioCurrentSec = (): number => {
+    if (!isPlayingWebAudio || !activeWebAudioCtx || !webAudioDecoded) return 0;
+    const elapsed = (activeWebAudioCtx.currentTime - webAudioStartCtxTime) * webAudioRate;
+    return Math.max(0, Math.min(webAudioDecoded.duration, webAudioOffsetSec + elapsed));
+  };
+
+  let seekToMsImpl: (ms: number, autoPlay?: boolean) => void = () => {};
+  const syncedScript = mountSyncedWordSpans(
+    scriptBody,
+    REMEDIAL_QUESTION_AUDIO_WORD_TIMINGS[questionAudioId],
+    scriptTr,
+    (startMs) => seekToMsImpl(startMs, true)
+  );
+
+  const tickSync = (): void => {
+    syncRafId = null;
+    if (disposed) return;
+
+    if (isPlayingWebAudio && activeWebAudioCtx && webAudioDecoded) {
+      const sec = getWebAudioCurrentSec();
+      updateProgressDisplay(sec, webAudioDecoded.duration);
+      syncedScript.update(sec * 1000, true);
+      syncRafId = requestAnimationFrame(tickSync);
+      return;
+    }
+
+    if (audio && !audio.paused && !audio.ended) {
+      const sec = audio.currentTime;
+      updateProgressDisplay(sec, audio.duration);
+      syncedScript.update(sec * 1000, true);
+      syncRafId = requestAnimationFrame(tickSync);
+    }
+  };
+
+  const syncPlayUi = (playing: boolean, ended = false): void => {
+    card.classList.toggle('is-playing', playing);
+    if (playing) {
+      hasStartedOnce = true;
+      revealControls();
+      stopSyncLoop();
+      if (!disposed) syncRafId = requestAnimationFrame(tickSync);
+    } else {
+      stopSyncLoop();
+      if (ended) {
+        syncedScript.update(-1, false);
+      }
+    }
+    refreshCopy(playing, ended);
+  };
+
+  const resetUi = (): void => {
+    isPlayingWebAudio = false;
+    syncedScript.update(-1, false);
+    syncPlayUi(false);
+  };
+
+  const handleUnavailable = (): void => {
+    revealControls();
+    scriptStatus.hidden = false;
+    scriptStatus.textContent = isTr
+      ? 'Ses dosyası yüklenemedi — yazılı anlatım aşağıda:'
+      : 'Audio unavailable — read the explanation below:';
+    setScriptOpen(true);
+    syncPlayUi(false);
+  };
+
+  const playViaWebAudioFallback = async (startOffsetSec = 0): Promise<void> => {
+    stopGuideAssistant();
+    stopActiveRuleAudio();
+    cancelEnglishSpeech();
+    try {
+      let decoded = webAudioDecoded;
+      const ctx = new AudioContext();
+      activeWebAudioCtx = ctx;
+      if (!decoded) {
+        const resp = await fetch(resolvedTrackUrl);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const buf = await resp.arrayBuffer();
+        if (disposed) return;
+        decoded = await ctx.decodeAudioData(buf);
+        if (disposed) return;
+        webAudioDecoded = decoded;
+      }
+      const clampedStart = Math.max(0, Math.min(decoded.duration - 0.05, startOffsetSec));
+      const src = ctx.createBufferSource();
+      src.buffer = decoded;
+      webAudioRate = speeds[speedIdx] ?? 1.0;
+      src.playbackRate.value = webAudioRate;
+      src.connect(ctx.destination);
+      activeWebAudioSource = src;
+      activeRuleStopCallback = resetUi;
+      webAudioOffsetSec = clampedStart;
+      webAudioStartCtxTime = ctx.currentTime;
+      isPlayingWebAudio = true;
+      updateProgressDisplay(clampedStart, decoded.duration);
+      syncPlayUi(true);
+      src.onended = () => {
+        if (activeWebAudioSource === src) {
+          isPlayingWebAudio = false;
+          if (!disposed) {
+            isAutoTriggered = false;
+            card.classList.remove('is-auto-triggered');
+            updateProgressDisplay(0, decoded.duration);
+            syncPlayUi(false, true);
+          }
+        }
+      };
+      src.start(0, clampedStart);
+    } catch {
+      handleUnavailable();
+    }
+  };
+
+  const ensureAudio = (): HTMLAudioElement => {
+    if (audio) return audio;
+    const el = new Audio(resolvedTrackUrl);
+    el.preload = 'metadata';
+    const initialRate = speeds[speedIdx] ?? 1.0;
+    el.defaultPlaybackRate = initialRate;
+    el.playbackRate = initialRate;
+    el.addEventListener('loadedmetadata', () => {
+      if (Number.isFinite(el.duration) && el.duration > 0) {
+        knownDurationSec = el.duration;
+        updateProgressDisplay(el.currentTime, el.duration);
+        if (el.paused) refreshCopy(false);
+      }
+    });
+    el.addEventListener('timeupdate', () => {
+      updateProgressDisplay(el.currentTime, el.duration);
+      syncedScript.update(el.currentTime * 1000, !el.paused && !el.ended);
+    });
+    el.addEventListener('ended', () => {
+      isAutoTriggered = false;
+      card.classList.remove('is-auto-triggered');
+      updateProgressDisplay(0, el.duration);
+      syncedScript.update(-1, false);
+      syncPlayUi(false, true);
+    });
+    el.addEventListener('pause', () => {
+      if (!el.ended) {
+        syncedScript.update(el.currentTime * 1000, false);
+        syncPlayUi(false);
+      }
+    });
+    el.addEventListener('play', () => {
+      syncedScript.update(el.currentTime * 1000, true);
+      syncPlayUi(true);
+    });
+    audio = el;
+    return el;
+  };
+
+  const startPlayback = async (fromStart = false): Promise<void> => {
+    if (disposed) return;
+    const el = ensureAudio();
+    if (fromStart) {
+      try {
+        el.currentTime = 0;
+      } catch {
+        // Seek will apply after metadata loads
+      }
+    }
+    stopGuideAssistant();
+    cancelEnglishSpeech();
+    if (activeRuleAudio && activeRuleAudio !== el) {
+      stopActiveRuleAudio();
+    } else if (activeWebAudioSource) {
+      stopActiveRuleAudio();
+    }
+    activeRuleAudio = el;
+    activeRuleStopCallback = resetUi;
+    const rate = speeds[speedIdx] ?? 1.0;
+    el.defaultPlaybackRate = rate;
+    el.playbackRate = rate;
+    try {
+      await el.play();
+    } catch {
+      await playViaWebAudioFallback(fromStart ? 0 : el.currentTime || 0);
+    }
+  };
+
+  seekToMsImpl = (ms: number, autoPlay = true): void => {
+    playedManually = true;
+    isAutoTriggered = false;
+    card.classList.remove('is-auto-triggered');
+    const targetSec = Math.max(0, ms / 1000);
+    updateProgressDisplay(targetSec, knownDurationSec);
+    syncedScript.update(targetSec * 1000, autoPlay);
+    if (isPlayingWebAudio) {
+      void playViaWebAudioFallback(targetSec);
+      return;
+    }
+    const el = ensureAudio();
+    const applySeek = (): void => {
+      const dur = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : targetSec + 1;
+      el.currentTime = Math.min(dur, targetSec);
+      updateProgressDisplay(el.currentTime, dur);
+      syncedScript.update(el.currentTime * 1000, !el.paused || autoPlay);
+    };
+    if (el.readyState >= 1) {
+      applySeek();
+    } else {
+      el.addEventListener('loadedmetadata', applySeek, { once: true });
+    }
+    if (autoPlay) {
+      void startPlayback(false);
+    }
+  };
+
+  const togglePlay = async (): Promise<void> => {
+    playedManually = true;
+    isAutoTriggered = false;
+    card.classList.remove('is-auto-triggered');
+    if (isPlayingWebAudio) {
+      stopActiveRuleAudio();
+      return;
+    }
+    const el = ensureAudio();
+    if (!el.paused) {
+      el.pause();
+      return;
+    }
+    await startPlayback(false);
+  };
+
+  triggerBtn.addEventListener('click', () => {
+    void togglePlay();
+  });
+
+  restartBtn.addEventListener('click', () => {
+    playedManually = true;
+    isAutoTriggered = false;
+    card.classList.remove('is-auto-triggered');
+    if (isPlayingWebAudio) {
+      void playViaWebAudioFallback(0);
+      return;
+    }
+    void startPlayback(true);
+  });
+
+  rangeEl.addEventListener('input', () => {
+    const target = Number(rangeEl.value);
+    if (!Number.isFinite(target)) return;
+    updateProgressDisplay(target, knownDurationSec);
+    if (isPlayingWebAudio) {
+      syncedScript.update(target * 1000, true);
+      void playViaWebAudioFallback(target);
+      return;
+    }
+    const el = ensureAudio();
+    el.currentTime = target;
+    syncedScript.update(target * 1000, !el.paused);
+  });
+
+  speedBtn.addEventListener('click', () => {
+    if (isPlayingWebAudio && activeWebAudioCtx) {
+      webAudioOffsetSec = getWebAudioCurrentSec();
+      webAudioStartCtxTime = activeWebAudioCtx.currentTime;
+    }
+    speedIdx = (speedIdx + 1) % speeds.length;
+    const rate = speeds[speedIdx] ?? 1.0;
+    webAudioRate = rate;
+    speedBtn.textContent = `${rate.toFixed(rate === 1 ? 1 : 2).replace(/\.00$/, '.0')}x`;
+    if (audio) {
+      audio.defaultPlaybackRate = rate;
+      audio.playbackRate = rate;
+    }
+    if (activeWebAudioSource) activeWebAudioSource.playbackRate.value = rate;
+  });
+
+  scriptToggleBtn.addEventListener('click', () => {
+    const nextOpen = scriptBox.hidden;
+    userCollapsedScript = !nextOpen;
+    setScriptOpen(nextOpen);
+  });
+
+  // Preload metadata quietly so duration badge appears immediately
+  try {
+    ensureAudio();
+  } catch {
+    // Ignore preload failure
+  }
+
+  return {
+    element: card,
+    playAutoOnWrong: () => {
+      if (disposed || playedManually || isPlayingWebAudio || (audio && !audio.paused)) {
+        return;
+      }
+      isAutoTriggered = true;
+      card.classList.add('is-auto-triggered');
+      revealControls();
+      void startPlayback(true);
+    },
+    wasPlayedManually: () => playedManually,
+    dispose: () => {
+      disposed = true;
+      stopSyncLoop();
       if (audio && activeRuleAudio === audio) {
         stopActiveRuleAudio();
       } else if (audio) {

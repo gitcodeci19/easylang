@@ -25,9 +25,11 @@ import {
   saveRoadmapUiMode,
 } from './storage';
 import {
+  createQuestionVoiceCard,
   createRuleAudioPlayer,
   mountSyncedTranscript,
   openTeachMeDrawer,
+  type QuestionVoiceCardController,
   stopActiveRuleAudio,
 } from './teachMeDrawer';
 import {
@@ -872,8 +874,8 @@ function getExerciseBadgeInfo(
       return {
         badge: isTr ? '🎭 GERÇEK HAYAT SENARYOSU' : '🎭 REAL-LIFE SCENARIO',
         instruction: isTr
-          ? 'Bu durumda en doğal İngilizce cümle hangisi?'
-          : 'Which English reply fits this real-life situation?',
+          ? 'En doğal İngilizce karşılığı seç:'
+          : 'Choose the most natural English reply:',
       };
     case 'vocab_recall':
       return {
@@ -932,6 +934,14 @@ export function startRemedialLessonSession(
   let maxCombo = resumedSession ? resumedSession.maxCombo : 0;
   let cheatSheetOpen = Boolean(resumedSession?.cheatSheetOpen);
   let activeKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+  let activeQuestionPlayer: QuestionVoiceCardController | null = null;
+
+  const disposeQuestionPlayer = (): void => {
+    if (activeQuestionPlayer) {
+      activeQuestionPlayer.dispose();
+      activeQuestionPlayer = null;
+    }
+  };
 
   let currentDraft: ExerciseDraftState = {};
   let currentCheckedState: CheckedFeedbackSnapshot | undefined;
@@ -983,6 +993,7 @@ export function startRemedialLessonSession(
     tutorDraft?: string;
   }): void => {
     detachKeys();
+    disposeQuestionPlayer();
     cancelEnglishSpeech();
 
     if (currentIdx >= queue.length) {
@@ -1001,6 +1012,7 @@ export function startRemedialLessonSession(
     persistLesson(false);
 
     const ex = queue[currentIdx]!;
+    const hasQuestionVoiceover = Boolean(ex.questionAudioId && ex.questionVoiceScriptTr);
     const { badge, instruction } = getExerciseBadgeInfo(ex.kind, isTr);
     sessionEl.replaceChildren();
 
@@ -1015,6 +1027,7 @@ export function startRemedialLessonSession(
     exitBtn.title = isTr ? 'Atölyeye Dön' : 'Back to Studio';
     exitBtn.addEventListener('click', () => {
       detachKeys();
+      disposeQuestionPlayer();
       cancelEnglishSpeech();
       stopActiveRuleAudio();
       void clearActiveRemedialSession().finally(() => {
@@ -1123,7 +1136,11 @@ export function startRemedialLessonSession(
         ? `${combo}x 🔥`
         : `${Math.min(currentIdx + 1, queue.length)}/${queue.length}`;
 
-    topBar.append(exitBtn, progTrack, teachRemBtn, rulePeekBtn, askRemTopBtn, comboEl);
+    if (hasQuestionVoiceover) {
+      topBar.append(exitBtn, progTrack, rulePeekBtn, askRemTopBtn, comboEl);
+    } else {
+      topBar.append(exitBtn, progTrack, teachRemBtn, rulePeekBtn, askRemTopBtn, comboEl);
+    }
     sessionEl.appendChild(topBar);
 
     // Inline toggleable cheat-sheet drawer
@@ -1150,10 +1167,13 @@ export function startRemedialLessonSession(
       : badge;
     stage.appendChild(badgeEl);
 
-    const instrEl = document.createElement('div');
-    instrEl.className = 'duo-ex-instruction';
-    instrEl.textContent = instruction;
-    stage.appendChild(instrEl);
+    // spot_fix already displays its interactive 2-step guide inside the proofreader card
+    if (ex.kind !== 'spot_fix') {
+      const instrEl = document.createElement('div');
+      instrEl.className = 'duo-ex-instruction';
+      instrEl.textContent = instruction;
+      stage.appendChild(instrEl);
+    }
 
     // Interaction state (hydrated from persisted draft if resuming)
     let selectedChoice: string | null = currentDraft.selectedChoice ?? null;
@@ -1246,6 +1266,7 @@ export function startRemedialLessonSession(
         const ch = ex.choices![i]!;
         const btn = document.createElement('button');
         btn.type = 'button';
+        btn.dataset.choiceVal = ch;
         btn.className = `duo-choice-card rem-duel-btn ${selectedChoice === ch ? 'selected' : ''}`;
         btn.innerHTML = `<span class="duo-choice-key">${i + 1}</span><span class="rem-duel-val"></span>`;
         btn.querySelector('.rem-duel-val')!.textContent = ch;
@@ -1439,6 +1460,7 @@ export function startRemedialLessonSession(
         const fChoice = fixChoices[idx]!;
         const fBtn = document.createElement('button');
         fBtn.type = 'button';
+        fBtn.dataset.choiceVal = fChoice;
         fBtn.className = `duo-choice-card rem-fix-btn ${spotSelectedFix === fChoice ? 'selected' : ''}`;
         const keyBadge = document.createElement('span');
         keyBadge.className = 'duo-choice-key';
@@ -1487,10 +1509,13 @@ export function startRemedialLessonSession(
     } else if (ex.kind === 'scenario_pick') {
       const scenBox = document.createElement('div');
       scenBox.className = 'rem-scenario-box';
+      const scenEyebrow = document.createElement('div');
+      scenEyebrow.className = 'rem-scenario-eyebrow';
+      scenEyebrow.textContent = isTr ? '💬 DURUM' : '💬 SITUATION';
       const scenText = document.createElement('div');
       scenText.className = 'rem-scenario-text';
       scenText.textContent = isTr ? ex.promptText : ex.promptSubtext || ex.promptText;
-      scenBox.appendChild(scenText);
+      scenBox.append(scenEyebrow, scenText);
       stage.appendChild(scenBox);
 
       const list = document.createElement('div');
@@ -1501,6 +1526,7 @@ export function startRemedialLessonSession(
         const ch = ex.choices![i]!;
         const btn = document.createElement('button');
         btn.type = 'button';
+        btn.dataset.choiceVal = ch;
         btn.className = `duo-choice-card rem-scenario-btn ${selectedChoice === ch ? 'selected' : ''}`;
         btn.innerHTML = `<span class="duo-choice-key">${i + 1}</span><span class="rem-scen-val"></span>`;
         btn.querySelector('.rem-scen-val')!.textContent = ch;
@@ -1568,6 +1594,7 @@ export function startRemedialLessonSession(
         const ch = ex.choices![i]!;
         const btn = document.createElement('button');
         btn.type = 'button';
+        btn.dataset.choiceVal = ch;
         btn.className = `duo-choice-card ${selectedChoice === ch ? 'selected' : ''}`;
         btn.innerHTML = `<span class="duo-choice-key">${i + 1}</span><span class="duo-choice-val"></span>`;
         btn.querySelector('.duo-choice-val')!.textContent = ch;
@@ -1614,6 +1641,9 @@ export function startRemedialLessonSession(
 
       const answerTray = document.createElement('div');
       answerTray.className = 'duo-wb-answer-tray';
+      answerTray.dataset.placeholder = isTr
+        ? 'Kelimeleri seçerek veya sürükleyerek cümleyi buraya kur…'
+        : 'Click or drag words here to build the sentence…';
       const bankTray = document.createElement('div');
       bankTray.className = 'duo-wb-bank-tray';
 
@@ -1750,6 +1780,16 @@ export function startRemedialLessonSession(
       }
     }
 
+    // Inline iridescent AI soundwave voice explanation directly below the question
+    if (hasQuestionVoiceover && ex.questionAudioId && ex.questionVoiceScriptTr) {
+      activeQuestionPlayer = createQuestionVoiceCard({
+        questionAudioId: ex.questionAudioId,
+        scriptTr: ex.questionVoiceScriptTr,
+        isTr,
+      });
+      stage.appendChild(activeQuestionPlayer.element);
+    }
+
     sessionEl.appendChild(stage);
     updateCheckEnabled();
 
@@ -1762,6 +1802,23 @@ export function startRemedialLessonSession(
       if (freeInputEl) freeInputEl.disabled = true;
 
       const effectiveCorrect = snap.isCorrect || Boolean(snap.overridden);
+      const expectedChoiceNorm = (
+        ex.kind === 'spot_fix' ? ex.correctFixToken ?? '' : ex.correctChoice ?? ''
+      )
+        .trim()
+        .toLowerCase();
+      const chosenNorm = (snap.userAnswer ?? '').trim().toLowerCase();
+      for (const btn of stage.querySelectorAll<HTMLButtonElement>('.duo-choice-card')) {
+        btn.classList.remove('is-result-correct', 'is-result-wrong');
+        const valNorm = (btn.dataset.choiceVal ?? '').trim().toLowerCase();
+        if (!valNorm) continue;
+        if (expectedChoiceNorm && valNorm === expectedChoiceNorm) {
+          btn.classList.add('is-result-correct');
+        } else if (!effectiveCorrect && chosenNorm && valNorm === chosenNorm) {
+          btn.classList.add('is-result-wrong');
+        }
+      }
+
       footerBar.className = `duo-lesson-footer ${effectiveCorrect ? 'is-correct' : 'is-wrong'}`;
       footerBar.replaceChildren();
 
@@ -1826,13 +1883,15 @@ export function startRemedialLessonSession(
         actionsWrap.appendChild(spk);
       }
 
-      const teachRemFbBtn = document.createElement('button');
-      teachRemFbBtn.type = 'button';
-      teachRemFbBtn.className = `duo-teach-mini-btn is-crimson${shouldGlowRemTeach ? ' is-glow' : ''}`;
-      teachRemFbBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Rule';
-      teachRemFbBtn.title = isTr ? 'Sesli ve yazılı kural anlatımını aç' : 'Open voice rule coach';
-      teachRemFbBtn.addEventListener('click', () => void openRemTeachMe());
-      actionsWrap.appendChild(teachRemFbBtn);
+      if (!hasQuestionVoiceover) {
+        const teachRemFbBtn = document.createElement('button');
+        teachRemFbBtn.type = 'button';
+        teachRemFbBtn.className = `duo-teach-mini-btn is-crimson${shouldGlowRemTeach ? ' is-glow' : ''}`;
+        teachRemFbBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Rule';
+        teachRemFbBtn.title = isTr ? 'Sesli ve yazılı kural anlatımını aç' : 'Open voice rule coach';
+        teachRemFbBtn.addEventListener('click', () => void openRemTeachMe());
+        actionsWrap.appendChild(teachRemFbBtn);
+      }
 
       const askRemFbBtn = document.createElement('button');
       askRemFbBtn.type = 'button';
@@ -1969,6 +2028,12 @@ export function startRemedialLessonSession(
       currentCheckedState = snap;
       persistLesson(false);
       renderCheckedFooter(snap);
+
+      // In Remedial Studio, if the learner chose a wrong answer without listening first,
+      // automatically play the dedicated voice explanation so the rule sinks in right away.
+      if (!skipped && !isCorrect && activeQuestionPlayer && !activeQuestionPlayer.wasPlayedManually()) {
+        activeQuestionPlayer.playAutoOnWrong();
+      }
     };
 
     skipBtn.addEventListener('click', () => void evaluateCurrent(true));
@@ -1986,6 +2051,7 @@ export function startRemedialLessonSession(
 
   const finishRemedialSession = async (): Promise<void> => {
     detachKeys();
+    disposeQuestionPlayer();
     cancelEnglishSpeech();
     await clearActiveRemedialSession();
 

@@ -657,11 +657,12 @@ export async function handleEvaluateRoadmapExercise(
   ]);
 
   const { card, direction, kind, promptText, expectedAnswers, userAnswer, localCorrect, localScore } = payload;
+  const evalCardType = kind === 'word_bank' ? 'sentence' : card.type;
   let evaluation: AnswerEvaluation;
 
   if (direction === 'en-to-tr') {
     const trCandidates = Array.from(new Set([...expectedAnswers, ...card.acceptedTr].filter(Boolean)));
-    const localEval = evaluateTurkishAnswer(userAnswer, trCandidates, card.type);
+    const localEval = evaluateTurkishAnswer(userAnswer, trCandidates, evalCardType);
     const isStrongLocal =
       localCorrect ||
       localEval.matchKind === 'exact' ||
@@ -702,7 +703,7 @@ export async function handleEvaluateRoadmapExercise(
     const enCandidates = Array.from(
       new Set([...expectedAnswers, card.en, ...(card.exampleEn ? [card.exampleEn] : [])].filter(Boolean))
     );
-    const localEn = evaluateEnglishAnswer(userAnswer, enCandidates, card.type);
+    const localEn = evaluateEnglishAnswer(userAnswer, enCandidates, evalCardType);
     const isStrongLocal =
       localCorrect ||
       localEn.matchKind === 'exact' ||

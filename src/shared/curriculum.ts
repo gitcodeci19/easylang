@@ -65,7 +65,7 @@ export interface RoadmapState {
   focusUnitOnly: boolean;
   /** Completed node keys formatted as `${unitId}:${nodeIndex}` */
   completedNodeIds: string[];
-  /** Per-node step progress (0..2 before completion; 3 = node completed) */
+  /** Per-node step progress (0..4 before completion; 5 = node completed) */
   nodeStepProgress: Record<string, number>;
   /** Unit IDs whose mid-unit chest reward (+25 XP) has been claimed */
   claimedChestUnitIds: string[];
@@ -867,7 +867,7 @@ export function getLocalDateKey(now: number = Date.now()): string {
   return `${year}-${month}-${day}`;
 }
 
-export const STEPS_PER_NODE = 3;
+export const STEPS_PER_NODE = 5;
 
 export function createInitialRoadmapState(now: number = Date.now()): RoadmapState {
   return {
@@ -1078,24 +1078,24 @@ export function getCardsForUnit(unitId: string, allCards: Card[]): Card[] {
 
   const levelBuckets = getLevelsByDistance(unit.level);
   for (let dist = 0; dist < levelBuckets.length; dist += 1) {
-    const wantMoreWords = dist <= 1 || wordCount < 32;
+    const wantMoreWords = (dist <= 1 && wordCount < 110) || wordCount < 90;
     const wantMoreSentences =
-      dist === 0 || (dist === 1 && sentenceCount < 85) || (dist > 1 && sentenceCount < 45) || result.length < 65;
+      dist === 0 || (dist === 1 && sentenceCount < 110) || (dist > 1 && sentenceCount < 85) || result.length < 180;
 
     if (!wantMoreWords && !wantMoreSentences) continue;
 
     for (const lvl of levelBuckets[dist]!) {
       for (const c of index.byLevel.get(lvl) ?? []) {
-        // Cards with an explicit unitId stay exclusively in their designated unit (zero cross-unit modern sentence duplication)
+        // Cards with an explicit unitId stay exclusively in their designated unit (zero cross-unit duplication)
         if (c.unitId && c.unitId !== unit.id) continue;
         if (!matchesUnitTopic(unit, c)) continue;
         if (c.type === 'word') {
-          if (dist <= 1 || wordCount < 32) pushUnique(c);
+          if ((dist <= 1 && wordCount < 110) || wordCount < 90) pushUnique(c);
         } else if (
           dist === 0 ||
-          (dist === 1 && result.length < 150) ||
-          sentenceCount < 45 ||
-          result.length < 65
+          (dist === 1 && sentenceCount < 110) ||
+          sentenceCount < 85 ||
+          result.length < 180
         ) {
           pushUnique(c);
         }
@@ -1103,14 +1103,23 @@ export function getCardsForUnit(unitId: string, allCards: Card[]): Card[] {
     }
   }
 
-  if (wordCount < 16 || sentenceCount < 15) {
-    for (const c of index.byLevel.get(unit.level) ?? []) {
-      if (c.type === 'word' && wordCount < 16) {
-        pushUnique(c);
-      } else if (c.type === 'sentence' && sentenceCount < 15) {
-        pushUnique(c);
+  if (wordCount < 90 || sentenceCount < 80) {
+    for (const lvlGroup of levelBuckets) {
+      for (const lvl of lvlGroup) {
+        for (const c of index.byLevel.get(lvl) ?? []) {
+          if (c.unitId && c.unitId !== unit.id) continue;
+          const exclusion = UNIT_TOPIC_EXCLUSIONS[unit.id];
+          if (exclusion && exclusion.test(c.en)) continue;
+          if (c.type === 'word' && wordCount < 90) {
+            pushUnique(c);
+          } else if (c.type === 'sentence' && sentenceCount < 80) {
+            pushUnique(c);
+          }
+          if (wordCount >= 90 && sentenceCount >= 80) break;
+        }
+        if (wordCount >= 90 && sentenceCount >= 80) break;
       }
-      if (wordCount >= 16 && sentenceCount >= 15) break;
+      if (wordCount >= 90 && sentenceCount >= 80) break;
     }
   }
 
@@ -1318,8 +1327,8 @@ export function completeRoadmapNode(
 }
 
 /**
- * Advance a single step (`1/3 -> 2/3 -> 3/3`) within a roadmap node.
- * On the 3rd step (`3/3`), the node itself is marked completed and the next node unlocks.
+ * Advance a single step (`1/5 -> 2/5 -> 3/5 -> 4/5 -> 5/5`) within a roadmap node.
+ * On the 5th step (`5/5`), the node itself is marked completed and the next node unlocks.
  */
 export function completeRoadmapNodeStep(
   state: RoadmapState,
@@ -1455,10 +1464,10 @@ function cleanToken(w: string): string {
 }
 
 /**
- * Build a scaffolded lesson for a given Unit, Node (`0..4`), and Step (`0..2`)!
- * Uses disjoint cohort slicing across the 15 steps of a unit (`slot = nodeIndex * 3 + stepIndex`)
+ * Build a scaffolded lesson for a given Unit, Node (`0..4`), and Step (`0..4`)!
+ * Uses disjoint cohort slicing across the 25 steps of a unit (`slot = nodeIndex * 5 + stepIndex`)
  * so every step introduces fresh vocabulary/sentences while weaving in 1-2 spiral reviews from
- * earlier steps in a different exercise format.
+ * earlier steps in a different exercise format without over-repeating the same words.
  */
 export function buildUnitLessonExercises(
   unitId: string,
@@ -1511,7 +1520,10 @@ export function buildUnitLessonExercises(
     if (i < extraSents.length) interleavedPureSents.push(extraSents[i]!);
   }
   const shiftedExampleWords = deterministicShuffle(wordsWithExamples, unitSeed + 404);
-  const orderedSentences: Card[] = [...interleavedPureSents, ...shiftedExampleWords];
+  const orderedSentences: Card[] =
+    interleavedPureSents.length >= 75
+      ? interleavedPureSents
+      : [...interleavedPureSents, ...shiftedExampleWords];
 
   const distractorPoolTrWords = (rawWords.length >= 4 ? rawWords : allCards.filter((c) => c.type === 'word'))
     .map((c) => c.acceptedTr[0] ?? '')
@@ -1915,7 +1927,10 @@ export function buildUnitLessonExercises(
         audioText: sentenceEn,
         wordBankTiles,
         targetTokens: trTokens,
-        expectedAnswers: [trTokens.join(' '), sentenceTr],
+        expectedAnswers:
+          card.type === 'sentence'
+            ? [trTokens.join(' '), ...card.acceptedTr]
+            : [trTokens.join(' '), sentenceTr],
         direction: 'en-to-tr',
       };
     }
@@ -2027,11 +2042,12 @@ export function buildUnitLessonExercises(
     };
   };
 
-  // Compute unique lesson slot (0..14 across 5 nodes x 3 steps) with node-accurate cumulative strides
+  // Compute unique lesson slot (0..24 across 5 nodes x 5 steps) with node-accurate cumulative strides
   // so consecutive steps (including Node 2's 4-sentence dictation) never collide on sentence boundaries.
   const numericNode = typeof nodeIndex === 'number' ? nodeIndex : 4;
-  const safeStep = Math.max(0, Math.min(2, stepIndex));
-  const lessonSlot = nodeIndex === 'jump_test' ? 14 : numericNode * STEPS_PER_NODE + safeStep;
+  const safeStep = Math.max(0, Math.min(STEPS_PER_NODE - 1, stepIndex));
+  const lessonSlot =
+    nodeIndex === 'jump_test' ? 5 * STEPS_PER_NODE - 1 : numericNode * STEPS_PER_NODE + safeStep;
 
   const WORDS_PER_STEP_BY_NODE = [4, 4, 3, 3, 3] as const;
   const SENT_PER_STEP_BY_NODE = [2, 3, 4, 3, 3] as const;
@@ -2082,7 +2098,16 @@ export function buildUnitLessonExercises(
     return p.streak < 2 || (p.totalWrong >= 2 && p.streak < 3 && p.totalWrong > p.totalCorrect);
   };
 
-  // Pick a Spiral Review card from genuinely weak unit cards (rotating across steps) or earlier cohorts
+  // Sequential ordinal for spiral reviews across slots 1..24 so each earlier word is revisited at most once
+  const computeSpiralOrdinal = (slot: number, reviewOffset: number): number => {
+    let totalBefore = 0;
+    for (let s = 1; s < slot; s += 1) {
+      totalBefore += s >= 3 * STEPS_PER_NODE ? 2 : 1;
+    }
+    return totalBefore + reviewOffset;
+  };
+
+  // Pick a Spiral Review card from genuinely weak unit cards (rotating across steps) or distinct earlier cohorts
   const pickSpiralReviewWord = (reviewOffset: number): Card => {
     const weakCards = unitCards
       .filter((c) => isActivelyWeakCard(progressMap[c.id]) && !usedIdsInStep.has(c.id))
@@ -2100,11 +2125,23 @@ export function buildUnitLessonExercises(
       return chosen;
     }
     if (lessonSlot > 0 && orderedWords.length > 0) {
-      const lookbackSteps = Math.min(lessonSlot, 4);
-      for (let back = 1; back <= lookbackSteps; back += 1) {
-        const prevSlot = lessonSlot - back;
-        const prevIdx = (prevSlot * 3 + ((reviewOffset + back) % 3)) % orderedWords.length;
-        const candidate = orderedWords[prevIdx]!;
+      const introducedCount = Math.min(wordBaseOffset, orderedWords.length);
+      if (introducedCount > 0) {
+        const ordinal = computeSpiralOrdinal(lessonSlot, reviewOffset);
+        const startIdx = (ordinal * 2) % introducedCount;
+        for (let probe = 0; probe < introducedCount; probe += 1) {
+          const candidate = orderedWords[(startIdx + probe) % introducedCount]!;
+          if (!usedIdsInStep.has(candidate.id)) {
+            usedIdsInStep.add(candidate.id);
+            return candidate;
+          }
+        }
+      }
+    }
+    // For slot 0 (no prior cohort), pull from the tail of the unit's word pool so we never steal slot 1's opening words
+    if (orderedWords.length > 4) {
+      for (let tail = orderedWords.length - 1; tail >= 4; tail -= 1) {
+        const candidate = orderedWords[tail]!;
         if (!usedIdsInStep.has(candidate.id)) {
           usedIdsInStep.add(candidate.id);
           return candidate;
@@ -2120,7 +2157,7 @@ export function buildUnitLessonExercises(
   const ns0 = pickFreshSentence(0);
   const ns1 = pickFreshSentence(1);
   const ns2 = pickFreshSentence(2);
-  const rev0 = lessonSlot > 0 ? pickSpiralReviewWord(0) : pickFreshWord(4);
+  const rev0 = pickSpiralReviewWord(0);
 
   if (nodeIndex === 0) {
     // Node 0: Word Discovery (1 intentional scaffold revisit nw0->cloze; distinct card for free_translation)

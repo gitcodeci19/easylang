@@ -43,7 +43,11 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["audio/remedial/*.mp3", "audio/assistant/*.mp3"],
+      "resources": [
+        "audio/remedial/*.mp3",
+        "audio/remedial_questions/*.mp3",
+        "audio/assistant/*.mp3"
+      ],
       "matches": ["<all_urls>"]
     }
   ],

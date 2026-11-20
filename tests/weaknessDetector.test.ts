@@ -4,6 +4,10 @@ import {
   REMEDIAL_SKILL_CATALOG,
   REMEDIAL_SKILL_ORDER,
 } from '../src/shared/remedialCatalog.ts';
+import {
+  getRemedialQuestionAudioId,
+  REMEDIAL_QUESTION_SCRIPTS,
+} from '../src/shared/remedialQuestionScripts.ts';
 import type {
   Card,
   ConceptTrackerState,
@@ -16,6 +20,7 @@ import {
   buildRemedialLessonPlan,
   detectAnswerConfusionSkills,
   diagnoseUserWeaknesses,
+  findRemedialQuestionAudioForSentence,
   getResolvedRemedialSkillIds,
 } from '../src/shared/weaknessDetector.ts';
 
@@ -592,4 +597,122 @@ test('all 18 remedial workshops have 100% valid briefings, duels, spot_fix token
       `${skillId} plan missing free_translation`
     );
   }
+});
+
+test('all 92 pre-authored remedial questions have exact 1-to-1 ElevenLabs scripts and balanced interleaving', () => {
+  const expectedIds = new Set<string>();
+  for (const skillId of REMEDIAL_SKILL_ORDER) {
+    const spec = REMEDIAL_SKILL_CATALOG[skillId];
+    spec.duels.forEach((_, idx) => {
+      expectedIds.add(getRemedialQuestionAudioId(skillId, 'duel', idx + 1));
+    });
+    spec.spotFixes.forEach((_, idx) => {
+      expectedIds.add(getRemedialQuestionAudioId(skillId, 'spot', idx + 1));
+    });
+    spec.scenarios.forEach((_, idx) => {
+      expectedIds.add(getRemedialQuestionAudioId(skillId, 'scen', idx + 1));
+    });
+  }
+
+  assert.equal(expectedIds.size, 92, 'Expected exactly 92 pre-authored remedial questions');
+  assert.equal(
+    Object.keys(REMEDIAL_QUESTION_SCRIPTS).length,
+    92,
+    'REMEDIAL_QUESTION_SCRIPTS must contain exactly 92 entries'
+  );
+
+  for (const audioId of expectedIds) {
+    const script = REMEDIAL_QUESTION_SCRIPTS[audioId];
+    assert.ok(script && script.trim().length >= 120, `Missing or too-short script for ${audioId}`);
+    assert.ok(!/\bV[123]\b|\bSVO\b|[→/]/.test(script), `Script ${audioId} has TTS-unfriendly symbol/abbrev: ${script}`);
+  }
+
+  // Verify interleaving & stable template-to-audioId mapping across seeds
+  const richDeck: Card[] = [
+    makeSentence('s_w1', 'My friends were waiting for the train at dusk.', 'Arkadaşlarım alacakaranlıkta treni bekliyordu.'),
+    makeSentence('s_w2', 'She was happy about her exam score yesterday.', 'Dün sınav puanı konusunda mutluydu.'),
+    makeSentence('s_w3', 'The concerts were louder than we expected.', 'Konserler beklediğimizden daha gürültülüydü.'),
+    makeWord('w_1', 'assignment', 'ödev'),
+    makeWord('w_2', 'depart', 'ayrılmak'),
+    makeWord('w_3', 'announce', 'duyurmak'),
+    makeWord('w_4', 'avoid', 'kaçınmak'),
+    makeWord('w_5', 'schedule', 'program'),
+    makeWord('w_6', 'confirm', 'onaylamak'),
+  ];
+
+  const wasPlan = buildRemedialLessonPlan('was_vs_were', null, richDeck, {}, 424242);
+  assert.equal(wasPlan.exercises.length, 8);
+  assert.equal(wasPlan.exercises[0]!.kind, 'cloze_blank', 'Grammar lesson should start with personalized cloze');
+  assert.equal(wasPlan.exercises[0]!.questionAudioId, undefined);
+  assert.equal(wasPlan.exercises[1]!.kind, 'contrast_duel', 'Followed immediately by ElevenLabs duel');
+  assert.ok(wasPlan.exercises[1]!.questionAudioId?.startsWith('was_vs_were__duel_'));
+  assert.equal(wasPlan.exercises[2]!.kind, 'spot_fix');
+  assert.equal(wasPlan.exercises[3]!.kind, 'word_bank', 'Mid-lesson personalized word_bank');
+  assert.equal(wasPlan.exercises[4]!.kind, 'contrast_duel');
+  assert.equal(wasPlan.exercises[5]!.kind, 'scenario_pick');
+  assert.equal(wasPlan.exercises[6]!.kind, 'spot_fix');
+  assert.equal(wasPlan.exercises[7]!.kind, 'free_translation', 'Final boss personalized translation');
+
+  // Verify shuffled duel keeps exact original template audioId
+  for (const seed of [1, 7, 99, 7777]) {
+    const p = buildRemedialLessonPlan('was_vs_were', null, richDeck, {}, seed);
+    const duels = p.exercises.filter((e) => e.kind === 'contrast_duel');
+    for (const dEx of duels) {
+      const idxMatch = /__duel_(\d+)$/.exec(dEx.questionAudioId ?? '');
+      assert.ok(idxMatch, `Invalid duel audioId: ${dEx.questionAudioId}`);
+      const origTemplate = REMEDIAL_SKILL_CATALOG.was_vs_were.duels[Number(idxMatch[1]) - 1]!;
+      assert.equal(dEx.promptText, origTemplate.promptSentence, 'audioId must always match its exact template');
+    }
+  }
+
+  // Verify trouble_vocab alternates personal vocab_recall and ElevenLabs drills when missed words exist
+  const tvProgress: Record<string, UserCardProgress> = {
+    w_1: {
+      cardId: 'w_1',
+      streak: 0,
+      intervalDays: 0,
+      nextDueAt: 0,
+      retryAt: null,
+      retryCount: 1,
+      lastReviewedAt: 1000,
+      totalCorrect: 0,
+      totalWrong: 3,
+    },
+    w_2: {
+      cardId: 'w_2',
+      streak: 0,
+      intervalDays: 0,
+      nextDueAt: 0,
+      retryAt: null,
+      retryCount: 1,
+      lastReviewedAt: 1000,
+      totalCorrect: 0,
+      totalWrong: 2,
+    },
+    w_3: {
+      cardId: 'w_3',
+      streak: 0,
+      intervalDays: 0,
+      nextDueAt: 0,
+      retryAt: null,
+      retryCount: 1,
+      lastReviewedAt: 1000,
+      totalCorrect: 0,
+      totalWrong: 2,
+    },
+  };
+  const tvPlan = buildRemedialLessonPlan('trouble_vocab', null, richDeck, tvProgress, 12345);
+  assert.equal(tvPlan.exercises[0]!.kind, 'vocab_recall');
+  assert.equal(tvPlan.exercises[1]!.kind, 'contrast_duel');
+  assert.ok(tvPlan.exercises[1]!.questionAudioId?.startsWith('trouble_vocab__duel_'));
+  assert.equal(tvPlan.exercises[2]!.kind, 'vocab_recall');
+  assert.equal(tvPlan.exercises[3]!.kind, 'spot_fix');
+  assert.equal(tvPlan.exercises[tvPlan.exercises.length - 1]!.kind, 'free_translation');
+
+  // Verify Roadmap sentence lookup resolves matching bundled question voiceovers
+  const hitBirds = findRemedialQuestionAudioForSentence('The birds are building a nest.');
+  assert.equal(hitBirds?.questionAudioId, 'word_order_syntax__duel_1');
+  const hitDog = findRemedialQuestionAudioForSentence('my dog has been missing for three days');
+  assert.equal(hitDog?.questionAudioId, 'listening_gap__duel_2');
+  assert.equal(findRemedialQuestionAudioForSentence('A completely unrelated sentence here.'), null);
 });

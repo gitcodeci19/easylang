@@ -277,12 +277,16 @@ class EnglishPiperRunner {
 
   async synthesizePcm(
     text: string,
-    options?: { embeddedCoach?: boolean }
+    options?: { embeddedCoach?: boolean; lengthScaleMultiplier?: number }
   ): Promise<{ pcm: Float32Array; sampleRate: number }> {
     await this.ensureReady();
     const cfg = this.modelConfig!;
     const session = this.ortSession!;
     const embeddedCoach = Boolean(options?.embeddedCoach);
+    const lengthScaleMultiplier =
+      typeof options?.lengthScaleMultiplier === 'number' && Number.isFinite(options.lengthScaleMultiplier)
+        ? Math.max(0.7, Math.min(1.45, options.lengthScaleMultiplier))
+        : 1.0;
     const normalizedText = formatTextForEnglishTts(text, true) || text.trim();
     const preparedText =
       embeddedCoach && normalizedText && !/[.!?]$/.test(normalizedText)
@@ -297,7 +301,7 @@ class EnglishPiperRunner {
       : cfg.inference.noise_scale;
     const lengthScale = embeddedCoach
       ? cfg.inference.length_scale * 1.12
-      : cfg.inference.length_scale;
+      : cfg.inference.length_scale * lengthScaleMultiplier;
     const noiseW = embeddedCoach
       ? Math.min(cfg.inference.noise_w, 0.6)
       : cfg.inference.noise_w;
@@ -736,7 +740,11 @@ function playWavBlob(
 
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
-  audio.playbackRate = Math.max(0.65, Math.min(1.5, Number.isFinite(rate) ? rate : 1.0));
+  const safeRate = Math.max(0.65, Math.min(1.5, Number.isFinite(rate) ? rate : 1.0));
+  // HTML5 audio.load() resets playbackRate to defaultPlaybackRate; set both so non-1.0x rates stick reliably
+  audio.defaultPlaybackRate = safeRate;
+  audio.playbackRate = safeRate;
+  audio.preservesPitch = true;
   activeAudio = audio;
   activeBlobUrl = url;
   activeCoachRequestId = coachRequestId ?? null;
@@ -803,6 +811,7 @@ function playWavBlob(
         return;
       }
       const dur = Number.isFinite(audio.duration) ? audio.duration : 0;
+      audio.playbackRate = safeRate;
       audio
         .play()
         .then(() => {
@@ -843,24 +852,32 @@ async function enqueueSynthesis<T>(fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
-function getOrSynthEnWav(cleaned: string, epoch: number): Promise<Blob | null> {
-  const cached = enWavCache.get(cleaned);
+function getOrSynthEnWav(
+  cleaned: string,
+  epoch: number,
+  lengthScaleMultiplier = 1.0
+): Promise<Blob | null> {
+  const multKey = lengthScaleMultiplier.toFixed(2);
+  const cacheKey = multKey === '1.00' ? cleaned : `${cleaned}@ls=${multKey}`;
+  const cached = enWavCache.get(cacheKey);
   if (cached) {
-    putLru(enWavCache, cleaned, cached, MAX_EN_WAV_CACHE);
+    putLru(enWavCache, cacheKey, cached, MAX_EN_WAV_CACHE);
     return Promise.resolve(cached);
   }
   return enqueueSynthesis(async () => {
     if (epoch !== activePlaySeq) return null;
-    const again = enWavCache.get(cleaned);
+    const again = enWavCache.get(cacheKey);
     if (again) {
-      putLru(enWavCache, cleaned, again, MAX_EN_WAV_CACHE);
+      putLru(enWavCache, cacheKey, again, MAX_EN_WAV_CACHE);
       return again;
     }
     await enRunner.ensureReady();
     if (epoch !== activePlaySeq) return null;
-    const { pcm, sampleRate } = await enRunner.synthesizePcm(cleaned);
+    const { pcm, sampleRate } = await enRunner.synthesizePcm(cleaned, {
+      lengthScaleMultiplier,
+    });
     const blob = new Blob([pcm2wav(pcm, sampleRate)], { type: 'audio/wav' });
-    putLru(enWavCache, cleaned, blob, MAX_EN_WAV_CACHE);
+    putLru(enWavCache, cacheKey, blob, MAX_EN_WAV_CACHE);
     return blob;
   });
 }
@@ -892,6 +909,13 @@ async function handleSpeakEnglish(text: string, rate: number, queue = false): Pr
   const cleaned = text.trim();
   if (!cleaned) return;
 
+  const safeRate = Math.max(0.65, Math.min(1.5, Number.isFinite(rate) ? rate : 1.0));
+  // For slow 0.75x dictation clicks, use Piper's native neural length_scale so slow articulation
+  // sounds natural without HTML5 time-stretch wobble, and play the resulting WAV at 1.0x.
+  const useNativeSlow = safeRate <= 0.85;
+  const lengthScaleMultiplier = useNativeSlow ? Math.min(1.45, 1 / safeRate) : 1.0;
+  const playbackRate = useNativeSlow ? 1.0 : safeRate;
+
   let myEpoch: number;
   if (!queue || activeCoachRequestId !== null) {
     myEpoch = ++activePlaySeq;
@@ -906,9 +930,9 @@ async function handleSpeakEnglish(text: string, rate: number, queue = false): Pr
   }
   enPlaybackQueue.push({
     text: cleaned,
-    rate,
+    rate: playbackRate,
     epoch: myEpoch,
-    wavPromise: getOrSynthEnWav(cleaned, myEpoch),
+    wavPromise: getOrSynthEnWav(cleaned, myEpoch, lengthScaleMultiplier),
   });
   void drainEnPlaybackQueue();
 }
@@ -1100,7 +1124,10 @@ function handleCoachControl(
   } else if (command === 'seek' && typeof value === 'number' && Number.isFinite(value)) {
     activeAudio.currentTime = Math.max(0, Math.min(dur || value, value));
   } else if (command === 'rate' && typeof value === 'number' && Number.isFinite(value)) {
-    activeAudio.playbackRate = Math.max(0.65, Math.min(1.5, value));
+    const safeRate = Math.max(0.65, Math.min(1.5, value));
+    activeAudio.defaultPlaybackRate = safeRate;
+    activeAudio.playbackRate = safeRate;
+    activeAudio.preservesPitch = true;
   }
 
   const statePayload: CoachPlaybackProgress = {

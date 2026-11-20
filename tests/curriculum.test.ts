@@ -167,24 +167,22 @@ test('buildUnitLessonExercises builds 8 varied scaffolded exercises per step wit
   assert.ok(!fallCard?.acceptedTr.includes('fahişe'));
 });
 
-test('completeRoadmapNodeStep requires 3 steps (1/3 -> 2/3 -> 3/3) to complete a node', () => {
+test('completeRoadmapNodeStep requires 5 steps (1/5 -> 2/5 -> 3/5 -> 4/5 -> 5/5) to complete a node', () => {
   let state = createInitialRoadmapState();
 
-  const s1 = completeRoadmapNodeStep(state, 'u01_basics', 0);
-  state = s1.nextState;
-  assert.equal(s1.completedSteps, 1);
-  assert.equal(s1.totalSteps, 3);
-  assert.equal(s1.nodeJustCompleted, false);
+  for (let expectedStep = 1; expectedStep <= 4; expectedStep += 1) {
+    const res = completeRoadmapNodeStep(state, 'u01_basics', 0);
+    state = res.nextState;
+    assert.equal(res.completedSteps, expectedStep);
+    assert.equal(res.totalSteps, 5);
+    assert.equal(res.nodeJustCompleted, false);
+  }
 
-  const s2 = completeRoadmapNodeStep(state, 'u01_basics', 0);
-  state = s2.nextState;
-  assert.equal(s2.completedSteps, 2);
-  assert.equal(s2.nodeJustCompleted, false);
-
-  const s3 = completeRoadmapNodeStep(state, 'u01_basics', 0);
-  state = s3.nextState;
-  assert.equal(s3.completedSteps, 3);
-  assert.equal(s3.nodeJustCompleted, true);
+  const s5 = completeRoadmapNodeStep(state, 'u01_basics', 0);
+  state = s5.nextState;
+  assert.equal(s5.completedSteps, 5);
+  assert.equal(s5.totalSteps, 5);
+  assert.equal(s5.nodeJustCompleted, true);
   assert.ok(state.completedNodeIds.includes('u01_basics:0'));
 });
 
@@ -660,18 +658,18 @@ test('spiral review releases recovered words after streak >= 2 and modern senten
       lastReviewedAt: Date.now(),
     },
   };
-  let appearancesAcross15Steps = 0;
+  let appearancesAcross25Steps = 0;
   for (let node = 0; node < 5; node += 1) {
-    for (let step = 0; step < 3; step += 1) {
+    for (let step = 0; step < 5; step += 1) {
       const exs = buildUnitLessonExercises('u02_animals', node, deckCards, recoveredProgress, 1795000000000 + node * 100 + step, step);
       for (const ex of exs) {
-        if (ex.card.id === recoveredWord.id) appearancesAcross15Steps += 1;
+        if (ex.card.id === recoveredWord.id) appearancesAcross25Steps += 1;
       }
     }
   }
   assert.ok(
-    appearancesAcross15Steps <= 6,
-    `Expected recovered word to appear <= 6 times across 15 steps (not locked into every lesson), got ${appearancesAcross15Steps}`
+    appearancesAcross25Steps <= 4,
+    `Expected recovered word to appear <= 4 times across 25 steps (not locked into every lesson), got ${appearancesAcross25Steps}`
   );
 
   // 4. Cloze blank properly masks irregular phrasal verb inflections ("break down" -> "broke down")

@@ -1476,17 +1476,22 @@ export async function generateAiGrammarCoach(
   const systemPrompt = [
     'You are a master Turkish English teacher creating independent mini voice-lessons for the MOST VALUABLE learning points inside one English sentence.',
     'Analyze the sentence independently — DO NOT just pick surface-level textbook tags. Think like a sharp Turkish learner reading this exact sentence for the first time and ask: "What is the REAL trap, hidden meaning, idiom, preposition nuance, or structural trick here?"',
+    'STRICT LINGUISTIC ACCURACY & GENERAL-TO-CONTEXTUAL TEACHING RULES (CRITICAL — ZERO MISINFORMATION):',
+    '- NEVER attribute a neighboring verb’s meaning to a preposition, particle, or noun! (BAD/WRONG: saying "against" means "yaslanmak" or calling "against" a verb in "He was leaning against the wall" — "lean" is the verb meaning "yaslanmak", NOT "against"!).',
+    '- NEVER mislabel parts of speech (never call an edat/preposition a "fiil", or a noun an "edat").',
+    '- ALWAYS teach a preposition or keyword’s GENERAL core meaning first, then explain how and why it works in this sentence! Example for "He was leaning against the wall": explain that [[against]] is a preposition (edat) whose general meaning is "-e karşı / zıt yönde" or "bir yüzeye temas ederek, dayanarak", whereas [[lean]] is the verb meaning "yaslanmak / eğilmek". Because Turkish says "duvara (-e) yaslanmak", learners mistakenly want to use [[to]], but English uses [[against]] whenever something presses onto or rests in physical contact with a surface (just like [[put the ladder against the wall]], alongside its general opposition sense [[against the rules]]).',
+    '- In any verb + preposition collocation (e.g. "lean against", "depend on", "apologize for", "talk over"), clearly separate what the verb means vs what the preposition generally does and why English pairs them together.',
     'STRICT PEDAGOGICAL PRIORITY (order items from #1 most insightful to #3):',
-    '1. FIRST PRIORITY — Non-literal meanings, idiomatic prepositions, phrasal verbs, collocations, and false traps that surprise Turkish learners (e.g., in "We talked over a cup of coffee.", #1 MUST be "over" / "talked over" because learners know "over" as "bitmek/üzerinde", whereas "over coffee/dinner" means "eşliğinde / içerken"; in "run out of milk", explain "run out of" = tükenmek vs literal "run"; in "instead of lunch", explain "instead of" = yerine).',
-    '2. SECOND PRIORITY — Meaningful grammar & phrase structures (tenses with nuance, modals, passive, conditionals, gerund/infinitive, relative/time clauses, measure phrases like "a cup of", contrast/cause linkers).',
-    '3. LOWEST PRIORITY — Basic A1 mechanics like plain "a/an/the" or simple regular "-ed" past tense. SKIP trivial "a/an" or plain "-ed" whenever the sentence already has richer idiomatic, prepositional, or structural teaching points!',
+    '1. FIRST PRIORITY — Preposition functions & nuances, verb+preposition collocations, phrasal verbs, non-literal usages, and Turkish-to-English interference traps (e.g., general meaning of "against" + why English says "lean against" instead of "lean to"; general meaning of "over" + why "over a cup of coffee" means "kahve eşliğinde"; "run out of" = tükenmek; "instead of" = yerine).',
+    '2. SECOND PRIORITY — Meaningful grammar & phrase structures (tenses with nuance like past continuous "was leaning" for an ongoing action at a past moment, modals, passive, conditionals, gerund/infinitive, relative/time clauses, measure phrases like "a cup of", contrast/cause linkers).',
+    '3. LOWEST PRIORITY — Basic A1 mechanics like plain "a/an/the" or simple regular "-ed" past tense. SKIP trivial "a/an" or plain "-ed" whenever the sentence already has richer prepositional, lexical, or structural teaching points!',
     'Return 1 to 3 DISTINCT, high-value items (never invent structures absent from the sentence). Each item is listened to SEPARATELY, so each must stand completely on its own without referring to other items and without greetings like "Merhaba!".',
     'For EACH item return:',
-    '- "ruleTitle": ultra-short 2-3 word Turkish tab title (e.g. "over: Eşliğinde", "a cup of Kalıbı", "Let\'s + Fiil Öneri").',
-    '- "focusPhrase": exact verbatim substring from the English sentence so the UI highlights it (e.g. "over", "over a cup of coffee", "instead of lunch").',
-    '- "headlineTr": 1 punchy golden takeaway sentence in natural Turkish (max 85 chars; use normal quotes for English words here, NO [[...]] brackets).',
-    '- "explanationTr": 2-3 clear, calm, natural Turkish sentences (NO anglicisms like "spesifikleştirmek" or "artikl"; NO bullet marks, NO markdown asterisks, NO emojis, NO codes like (V1)). This text is BOTH displayed AND read aloud verbatim. HIDDEN VOICE TAG RULE: wrap ONLY English words/phrases inside [[...]] (e.g. [[over]], [[a cup of]], [[cup]], [[a glass of water]]) — NEVER put quotes around [[...]]. For Turkish quoted words/meanings use normal double quotes "..." (e.g. "bir fincan kahve", "fincan", "eşliğinde"). The UI automatically hides [[...]] as clean quotes while our bilingual engine sends ONLY [[...]] to the English voice and EVERYTHING ELSE to the Turkish voice!',
-    '- "examples": 2 short, modern everyday examples fitting THIS exact usage: [{"en": "...", "tr": "..."}].',
+    '- "ruleTitle": ultra-short 2-4 word accurate Turkish tab title (e.g. "against: Karşı / Yüzeye Temas", "lean against: Duvara Yaslanmak", "over: Eşliğinde", "was leaning: Geçmişte Süreç"). NEVER write a false title like "against: Yaslanmak"!',
+    '- "focusPhrase": exact verbatim substring from the English sentence so the UI highlights it (e.g. "against the wall", "leaning against", "was leaning").',
+    '- "headlineTr": 1 punchy, linguistically accurate golden takeaway sentence in natural Turkish (max 95 chars; use normal quotes for English words here, NO [[...]] brackets).',
+    '- "explanationTr": 3-4 clear, calm, natural Turkish sentences (NO anglicisms like "spesifikleştirmek" or "artikl"; NO bullet marks, NO markdown asterisks, NO emojis, NO codes like (V1)). State BOTH the general meaning/function of the word or preposition AND how it combines with the verb/context in this sentence. This text is BOTH displayed AND read aloud verbatim. HIDDEN VOICE TAG RULE: wrap ONLY English words/phrases inside [[...]] (e.g. [[against]], [[lean]], [[lean against]], [[to]]) — NEVER put quotes around [[...]]. For Turkish quoted words/meanings use normal double quotes "..." (e.g. "-e karşı", "yaslanmak", "dayanarak"). The UI automatically hides [[...]] as clean quotes while our bilingual engine sends ONLY [[...]] to the English voice and EVERYTHING ELSE to the Turkish voice!',
+    '- "examples": 2 short, modern everyday examples fitting THIS usage: [{"en": "...", "tr": "..."}].',
     'Respond ONLY with valid JSON:',
     '{"items":[{"ruleTitle":"...","focusPhrase":"...","headlineTr":"...","explanationTr":"...","examples":[{"en":"...","tr":"..."}]}]}',
   ].join('\n');
@@ -1503,7 +1508,7 @@ export async function generateAiGrammarCoach(
     systemPrompt,
     userPrompt,
     24_000,
-    920
+    1050
   );
 
   const parsed = extractJsonObject(text);
@@ -1534,7 +1539,7 @@ export async function generateAiGrammarCoach(
             .replace(/[*#_`]/g, '')
             .replace(/\s+/g, ' ')
             .trim()
-            .slice(0, 460)
+            .slice(0, 560)
         : '';
     if (!ruleTitle || !rawExplanationTr) continue;
 

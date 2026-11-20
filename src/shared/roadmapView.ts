@@ -58,7 +58,12 @@ import {
   saveRoadmapState,
   saveRoadmapUiMode,
 } from './storage';
-import { openTeachMeDrawer, stopActiveRuleAudio } from './teachMeDrawer';
+import {
+  createQuestionVoiceCard,
+  openTeachMeDrawer,
+  type QuestionVoiceCardController,
+  stopActiveRuleAudio,
+} from './teachMeDrawer';
 import {
   ACTIVE_ROADMAP_SESSION_VERSION,
   type AiTutorChatTurn,
@@ -84,6 +89,7 @@ import {
   type AiDiagnosedOverlayItem,
   detectHelpSkillsForQuestion,
   diagnoseUserWeaknesses,
+  findRemedialQuestionAudioForSentence,
   getResolvedRemedialSkillIds,
   hasRichTeachMeSkills,
 } from './weaknessDetector';
@@ -1149,6 +1155,14 @@ export class RoadmapController {
     let currentTutorOpen = false;
     let currentTutorHistory: AiTutorChatTurn[] = [];
     let currentTutorDraft = '';
+    let activeQuestionVoiceCard: QuestionVoiceCardController | null = null;
+
+    const disposeRoadmapVoiceCard = (): void => {
+      if (activeQuestionVoiceCard) {
+        activeQuestionVoiceCard.dispose();
+        activeQuestionVoiceCard = null;
+      }
+    };
 
     const persistActiveSession = (
       idxToSave: number = currentIdx,
@@ -1199,6 +1213,7 @@ export class RoadmapController {
       tutorHistory?: AiTutorChatTurn[];
       tutorDraft?: string;
     }): void => {
+      disposeRoadmapVoiceCard();
       if (currentIdx >= queue.length) {
         cancelEnglishSpeech();
         stopActiveRuleAudio();
@@ -1228,6 +1243,7 @@ export class RoadmapController {
       exitBtn.textContent = '✕';
       exitBtn.title = L.closeBtn;
       exitBtn.addEventListener('click', () => {
+        disposeRoadmapVoiceCard();
         cancelEnglishSpeech();
         stopActiveRuleAudio();
         void (async () => {
@@ -1522,6 +1538,7 @@ export class RoadmapController {
           const choiceText = ex.choices![i]!;
           const cBtn = document.createElement('button');
           cBtn.type = 'button';
+          cBtn.dataset.choiceVal = choiceText;
           cBtn.className = `duo-choice-card ${selectedOption === choiceText ? 'selected' : ''}`;
           cBtn.innerHTML = `<span class="duo-choice-key">${i + 1}</span> <span class="duo-choice-label">${choiceText}</span>`;
           cBtn.addEventListener('click', () => {
@@ -1561,12 +1578,11 @@ export class RoadmapController {
         }
         let wbLocked = false;
 
-        const wbHint = document.createElement('div');
-        wbHint.className = 'duo-wb-hint';
-        wbHint.textContent = L.wordBankHint;
-
         const answerTray = document.createElement('div');
         answerTray.className = 'duo-wb-answer-tray';
+        answerTray.dataset.placeholder = isTr
+          ? 'Kelimeleri seçerek veya sürükleyerek cümleyi buraya kur…'
+          : 'Click or drag words here to build the sentence…';
 
         const bankTray = document.createElement('div');
         bankTray.className = 'duo-wb-bank-tray';
@@ -1682,7 +1698,7 @@ export class RoadmapController {
           wbLocked = true;
           renderWordBankState();
         };
-        stage.append(wbHint, answerTray, bankTray);
+        stage.append(answerTray, bankTray);
       } else {
         const input = document.createElement('input');
         input.type = 'text';
@@ -1714,6 +1730,20 @@ export class RoadmapController {
         }
       }
 
+      // If this Roadmap sentence matches one of our 92 bundled ElevenLabs question narrations,
+      // offer the same iridescent AI soundwave button below the question (manual click-only, never auto-played).
+      const matchedQuestionAudio = isSentencePrompt
+        ? findRemedialQuestionAudioForSentence(sentenceCandidate)
+        : null;
+      if (matchedQuestionAudio) {
+        activeQuestionVoiceCard = createQuestionVoiceCard({
+          questionAudioId: matchedQuestionAudio.questionAudioId,
+          scriptTr: matchedQuestionAudio.questionVoiceScriptTr,
+          isTr,
+        });
+        stage.appendChild(activeQuestionVoiceCard.element);
+      }
+
       sessionEl.appendChild(stage);
       refreshCheckDisabled();
 
@@ -1727,6 +1757,18 @@ export class RoadmapController {
         checkBtn.disabled = true;
 
         const effectiveCorrect = snap.isCorrect || Boolean(snap.overridden);
+        const expectedChoiceNorm = (ex.correctChoice ?? '').trim().toLowerCase();
+        const chosenNorm = (snap.userAnswer ?? '').trim().toLowerCase();
+        for (const btn of stage.querySelectorAll<HTMLButtonElement>('.duo-choice-card')) {
+          btn.classList.remove('is-result-correct', 'is-result-wrong');
+          const valNorm = (btn.dataset.choiceVal ?? '').trim().toLowerCase();
+          if (!valNorm) continue;
+          if (expectedChoiceNorm && valNorm === expectedChoiceNorm) {
+            btn.classList.add('is-result-correct');
+          } else if (!effectiveCorrect && chosenNorm && valNorm === chosenNorm) {
+            btn.classList.add('is-result-wrong');
+          }
+        }
         footerBar.className = `duo-lesson-footer ${effectiveCorrect ? 'is-correct' : 'is-wrong'}`;
         footerBar.replaceChildren();
 
@@ -1873,6 +1915,7 @@ export class RoadmapController {
             }
           } else {
             const expectedJoined = (ex.targetTokens ?? []).join(' ') || ex.expectedAnswers[0] || '';
+            const evalCardType = ex.kind === 'word_bank' ? 'sentence' : ex.card.type;
             let localCorrect = false;
             let localScore = 0;
             let needsAiCheck = false;
@@ -1886,7 +1929,7 @@ export class RoadmapController {
               const trCandidates = Array.from(
                 new Set([...ex.expectedAnswers, ...ex.card.acceptedTr].filter(Boolean))
               );
-              const localTr = evaluateTurkishAnswer(userAns, trCandidates, ex.card.type);
+              const localTr = evaluateTurkishAnswer(userAns, trCandidates, evalCardType);
               const dictMatch =
                 ex.kind === 'word_bank' && evaluateDictationAnswer(expectedJoined, userAns).isCorrect;
               localCorrect = dictMatch || localTr.isCorrect;
@@ -1905,7 +1948,7 @@ export class RoadmapController {
                   ...(ex.card.exampleEn ? [ex.card.exampleEn] : []),
                 ].filter(Boolean))
               );
-              const localEn = evaluateEnglishAnswer(userAns, enCandidates, ex.card.type);
+              const localEn = evaluateEnglishAnswer(userAns, enCandidates, evalCardType);
               const dictMatch =
                 ex.kind === 'word_bank' && evaluateDictationAnswer(expectedJoined, userAns).isCorrect;
               localCorrect = dictMatch || localEn.isCorrect;
