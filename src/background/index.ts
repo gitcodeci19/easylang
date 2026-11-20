@@ -1,3 +1,8 @@
+import {
+  buildOfflineDictionaryIndex,
+  lookupOfflineWord,
+  type OfflineDictionaryIndex,
+} from '../shared/offlineDictionary';
 import { shouldShowB1ReadinessPrompt } from '../shared/onboarding';
 import {
   mergePendingTutorReplyIntoHistory,
@@ -74,6 +79,18 @@ const CONTENT_SCRIPT_ID = 'en-tr-recall-content';
 const TRIGGER_COMMAND = 'trigger-question';
 const TRIGGER_PAGE_QUIZ_COMMAND = 'trigger-page-quiz';
 const TRIGGER_LISTENING_QUIZ_COMMAND = 'trigger-listening-quiz';
+
+let cachedOfflineDictCards: Card[] | null = null;
+let cachedOfflineDictIndex: OfflineDictionaryIndex | null = null;
+
+async function getBackgroundOfflineDictIndex(): Promise<OfflineDictionaryIndex> {
+  const cards = await getAllCards();
+  if (!cachedOfflineDictIndex || cachedOfflineDictCards !== cards) {
+    cachedOfflineDictIndex = buildOfflineDictionaryIndex(cards);
+    cachedOfflineDictCards = cards;
+  }
+  return cachedOfflineDictIndex;
+}
 
 async function syncActionBadge(): Promise<void> {
   try {
@@ -971,6 +988,12 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage & { target?: str
           requestId: message.requestId,
         });
         sendResponse(res ?? { ok: false });
+        break;
+      }
+      case 'LOOKUP_OFFLINE_WORD': {
+        const index = await getBackgroundOfflineDictIndex();
+        const entry = lookupOfflineWord(index, message.word);
+        sendResponse({ ok: true, entry });
         break;
       }
       default:

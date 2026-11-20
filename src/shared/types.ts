@@ -745,6 +745,10 @@ export type ExtensionMessage =
       command: 'pause' | 'resume' | 'stop' | 'seek' | 'rate';
       value?: number;
       requestId?: string;
+    }
+  | {
+      type: 'LOOKUP_OFFLINE_WORD';
+      word: string;
     };
 
 export interface AiTutorChatTurn {

@@ -1059,8 +1059,8 @@ export class RoadmapController {
 
       const txt = document.createElement('div');
       txt.innerHTML = `
-        <div class="duo-kp-en">${kp.en}</div>
-        <div class="duo-kp-tr">${kp.tr}</div>
+        <div class="duo-kp-en" data-word-lang="en">${kp.en}</div>
+        <div class="duo-kp-tr" data-word-lang="tr">${kp.tr}</div>
         <div class="duo-kp-note">${isTr ? kp.noteTr : kp.noteEn}</div>
       `;
       pRow.append(spk, txt);
@@ -1089,10 +1089,12 @@ export class RoadmapController {
       content.className = 'duo-guide-word-text';
       const enLine = document.createElement('div');
       enLine.className = 'duo-gw-en';
+      enLine.dataset.wordLang = 'en';
       enLine.textContent = `${card.en} ${card.phonetic ? `(${card.phonetic})` : ''}`;
 
       const trLine = document.createElement('div');
       trLine.className = 'duo-gw-tr';
+      trLine.dataset.wordLang = 'tr';
       trLine.textContent =
         card.type === 'sentence'
           ? (card.acceptedTr[0] ?? '')
@@ -1473,6 +1475,7 @@ export class RoadmapController {
 
         const pText = document.createElement('div');
         pText.className = 'duo-ex-prompt-text';
+        pText.dataset.wordLang = ex.direction === 'tr-to-en' ? 'tr' : 'en';
         pText.textContent = ex.promptText;
 
         promptMain.appendChild(pText);
@@ -1481,6 +1484,7 @@ export class RoadmapController {
         if (ex.promptSubtext) {
           const pSub = document.createElement('div');
           pSub.className = `duo-ex-prompt-sub${ex.kind === 'cloze_blank' ? ' is-meaning-cue' : ''}`;
+          pSub.dataset.wordLang = 'tr';
           if (!allowQuestionAudio) {
             pSub.style.paddingLeft = '0';
           }
@@ -1539,6 +1543,7 @@ export class RoadmapController {
           const cBtn = document.createElement('button');
           cBtn.type = 'button';
           cBtn.dataset.choiceVal = choiceText;
+          cBtn.dataset.wordLang = choicesAreEnglish ? 'en' : 'tr';
           cBtn.className = `duo-choice-card ${selectedOption === choiceText ? 'selected' : ''}`;
           cBtn.innerHTML = `<span class="duo-choice-key">${i + 1}</span> <span class="duo-choice-label">${choiceText}</span>`;
           cBtn.addEventListener('click', () => {
@@ -1604,10 +1609,14 @@ export class RoadmapController {
             const chip = document.createElement('button');
             chip.type = 'button';
             chip.className = 'duo-wb-tile placed';
+            chip.dataset.wordLang = ex.direction === 'en-to-tr' ? 'tr' : 'en';
             chip.disabled = wbLocked;
-            chip.title = isTr
-              ? 'Geri koymak için tıkla veya sürükleyip yerini değiştir'
-              : 'Click to put back or drag to reorder';
+            chip.setAttribute(
+              'aria-label',
+              isTr
+                ? `${word} — geri koymak için tıkla veya sürükleyip yerini değiştir`
+                : `${word} — click to put back or drag to reorder`
+            );
             chip.textContent = word;
             attachWordBankTileGesture({
               chip,
@@ -1660,9 +1669,13 @@ export class RoadmapController {
               });
             } else {
               chip.textContent = word;
-              chip.title = isTr
-                ? 'Eklemek için tıkla veya istediğin aralığa sürükle'
-                : 'Click to add or drag into any position';
+              chip.dataset.wordLang = ex.direction === 'en-to-tr' ? 'tr' : 'en';
+              chip.setAttribute(
+                'aria-label',
+                isTr
+                  ? `${word} — eklemek için tıkla veya istediğin aralığa sürükle`
+                  : `${word} — click to add or drag into any position`
+              );
               attachWordBankTileGesture({
                 chip,
                 word,
@@ -1802,6 +1815,7 @@ export class RoadmapController {
           solRow.className = 'duo-fb-solution';
           solRow.append(document.createTextNode(`${L.correctAnswerLabel} `));
           const strongAns = document.createElement('strong');
+          strongAns.dataset.wordLang = ex.direction === 'en-to-tr' ? 'tr' : 'en';
           strongAns.textContent = correctDisplay;
           solRow.appendChild(strongAns);
           fbText.appendChild(solRow);

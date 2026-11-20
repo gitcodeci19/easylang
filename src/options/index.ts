@@ -15,6 +15,11 @@ import {
 } from '../shared/guideAssistant';
 import { resolveSupportedLanguage } from '../shared/i18n';
 import {
+  buildOfflineDictionaryIndex,
+  lookupOfflineWord,
+  type OfflineDictionaryIndex,
+} from '../shared/offlineDictionary';
+import {
   applyB1PromotionDecision,
   buildInitialProfileForOnboarding,
   getOnboardingCopy,
@@ -67,6 +72,7 @@ import {
   getDashboardStrings,
   type DashboardStrings,
 } from './i18nDashboard';
+import { installWordHoverTooltip } from '../shared/wordHoverTooltip';
 
 const PAGE_SIZE = 40;
 
@@ -1216,9 +1222,11 @@ function renderCardsTable(): void {
     }
 
     const tdEn = document.createElement('td');
+    tdEn.dataset.wordLang = 'en';
     tdEn.textContent = card.en;
 
     const tdTr = document.createElement('td');
+    tdTr.dataset.wordLang = 'tr';
     tdTr.textContent = card.acceptedTr.join(', ');
 
     const tdStatus = document.createElement('td');
@@ -1859,5 +1867,23 @@ function initNeuralTtsControls(): void {
     }
   });
 }
+
+let optionsDictCardsRef: Card[] | null = null;
+let optionsDictIndex: OfflineDictionaryIndex | null = null;
+
+async function lookupOptionsOfflineWord(word: string) {
+  const cards = allCards.length > 0 ? allCards : await getAllCards();
+  if (!optionsDictIndex || optionsDictCardsRef !== cards) {
+    optionsDictIndex = buildOfflineDictionaryIndex(cards);
+    optionsDictCardsRef = cards;
+  }
+  return lookupOfflineWord(optionsDictIndex, word);
+}
+
+installWordHoverTooltip({
+  root: document,
+  delayMs: 1500,
+  lookupWord: lookupOptionsOfflineWord,
+});
 
 void initDashboard();

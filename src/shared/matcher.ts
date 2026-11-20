@@ -602,7 +602,7 @@ const EN_STOP_WORDS = new Set(['a', 'an', 'the', 'to', 'of', 'for', 'in', 'on', 
 
 const EN_NEGATION_WORDS = new Set(['not', 'never', 'no', 'nothing', 'nobody', 'none', 'neither', 'nowhere', 'cannot']);
 
-const EN_SYNONYM_GROUPS: string[][] = [
+export const EN_SYNONYM_GROUPS: string[][] = [
   ['movie', 'film', 'cinema'],
   ['movies', 'films'],
   ['tv', 'television'],

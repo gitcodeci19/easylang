@@ -8,14 +8,27 @@ import {
   toggleGuideAssistant,
 } from '../shared/guideAssistant';
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
+import {
+  buildOfflineDictionaryIndex,
+  lookupOfflineWord,
+  type OfflineDictionaryIndex,
+} from '../shared/offlineDictionary';
 import { RoadmapController } from '../shared/roadmapView';
 import { isUrlBlocked } from '../shared/siteFilter';
-import { getAiConfig, getSettings, saveAiConfig, saveSettings } from '../shared/storage';
+import {
+  getAiConfig,
+  getAllCards,
+  getSettings,
+  saveAiConfig,
+  saveSettings,
+} from '../shared/storage';
 import type {
+  Card,
   ExtensionMessage,
   FeedbackLanguageMode,
   StatusSnapshot,
 } from '../shared/types';
+import { installWordHoverTooltip } from '../shared/wordHoverTooltip';
 
 const enabledToggle = document.getElementById('enabled-toggle') as HTMLInputElement;
 const popupLangSelect = document.getElementById('popup-lang-select') as HTMLSelectElement;
@@ -851,5 +864,23 @@ async function initPopup(): Promise<void> {
     });
   }
 }
+
+let popupDictCardsRef: Card[] | null = null;
+let popupDictIndex: OfflineDictionaryIndex | null = null;
+
+async function lookupPopupOfflineWord(word: string) {
+  const cards = await getAllCards();
+  if (!popupDictIndex || popupDictCardsRef !== cards) {
+    popupDictIndex = buildOfflineDictionaryIndex(cards);
+    popupDictCardsRef = cards;
+  }
+  return lookupOfflineWord(popupDictIndex, word);
+}
+
+installWordHoverTooltip({
+  root: document,
+  delayMs: 1500,
+  lookupWord: lookupPopupOfflineWord,
+});
 
 void initPopup();

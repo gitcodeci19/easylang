@@ -11,7 +11,7 @@ export const WIDGET_CSS = `
   position: fixed;
   top: 14px;
   right: 14px;
-  z-index: 2147483647;
+  z-index: 2147483645;
   width: 376px;
   max-width: calc(100vw - 28px);
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

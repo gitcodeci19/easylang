@@ -708,6 +708,7 @@ export function createQuestionVoiceCard(options: {
 
   const scriptBody = document.createElement('p');
   scriptBody.className = 'ai-voice-script-body';
+  scriptBody.dataset.wordLang = 'tr';
 
   scriptBox.append(scriptStatus, scriptBody);
   inner.append(triggerBtn, controlsWrap, scriptBox);
@@ -1208,10 +1209,12 @@ function buildRuleWrittenBody(
 
     const enLine = document.createElement('div');
     enLine.className = 'tm-ex-en';
+    enLine.dataset.wordLang = 'en';
     enLine.textContent = ex.en;
 
     const trLine = document.createElement('div');
     trLine.className = 'tm-ex-tr';
+    trLine.dataset.wordLang = 'tr';
     trLine.textContent = ex.tr;
 
     row.append(top, enLine, trLine);

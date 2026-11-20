@@ -5,12 +5,21 @@ import type {
   ExtensionMessage,
   ListeningChallenge,
 } from '../shared/types';
-import { buildCloseSvg, renderToast } from './widget';
+import {
+  installWordHoverTooltip,
+  type WordHoverTooltipController,
+} from '../shared/wordHoverTooltip';
+import {
+  buildCloseSvg,
+  lookupOfflineWordFromBackground,
+  renderToast,
+} from './widget';
 
 const LISTENING_HOST_ID = 'etr-listening-quiz-host';
 const sessionAskedIds: string[] = [];
 let activeEscapeHandler: ((e: KeyboardEvent) => void) | null = null;
 let blurredCaptionContainer: HTMLElement | null = null;
+let activeListeningTooltip: WordHoverTooltipController | null = null;
 
 function sendBgMessage<T = unknown>(message: ExtensionMessage): Promise<T> {
   return chrome.runtime.sendMessage(message) as Promise<T>;
@@ -48,6 +57,8 @@ export function removeListeningQuiz(): void {
     window.removeEventListener('keydown', activeEscapeHandler);
     activeEscapeHandler = null;
   }
+  activeListeningTooltip?.dispose();
+  activeListeningTooltip = null;
   restoreBlurredYouTubeCaptions();
   cancelEnglishSpeech();
   document.getElementById(LISTENING_HOST_ID)?.remove();
@@ -111,7 +122,7 @@ const LISTENING_CSS = `
     position: fixed;
     top: 14px;
     right: 14px;
-    z-index: 2147483647;
+    z-index: 2147483645;
     width: min(382px, calc(100vw - 28px));
     background: #111117;
     color: #f4f4f6;
@@ -479,6 +490,11 @@ export async function launchListeningQuiz(): Promise<void> {
 
   card.append(head, audioBar, bodyWrap);
   shadow.append(style, card);
+  activeListeningTooltip = installWordHoverTooltip({
+    root: shadow,
+    delayMs: 1500,
+    lookupWord: lookupOfflineWordFromBackground,
+  });
   (document.body ?? document.documentElement).appendChild(host);
 
   const escHandler = (e: KeyboardEvent) => {
@@ -526,18 +542,23 @@ export async function launchListeningQuiz(): Promise<void> {
 
     const compareBox = createEl('div', 'etr-lq-compare');
     const userRow = createEl('div', 'etr-lq-compare-row');
+    const userValEl = createEl('div', 'etr-lq-compare-user', attempt);
+    userValEl.dataset.wordLang = 'en';
     userRow.append(
       createEl('span', 'etr-lq-compare-lbl', isTr ? 'Senin Cevabın' : 'Your Answer'),
-      createEl('div', 'etr-lq-compare-user', attempt)
+      userValEl
     );
     const refRow = createEl('div', 'etr-lq-compare-row');
+    const refValEl = createEl('div', 'etr-lq-compare-ref', sentenceEn);
+    refValEl.dataset.wordLang = 'en';
     refRow.append(
       createEl('span', 'etr-lq-compare-lbl', isTr ? 'Doğru Cümle' : 'Correct Sentence'),
-      createEl('div', 'etr-lq-compare-ref', sentenceEn)
+      refValEl
     );
     compareBox.append(userRow, refRow);
 
     const diffBox = createEl('div', 'etr-lq-diff');
+    diffBox.dataset.wordLang = 'en';
     for (const tok of evaluation.tokens) {
       if (tok.matched) {
         diffBox.appendChild(createEl('span', 'etr-lq-word-ok', tok.expected));
@@ -550,9 +571,13 @@ export async function launchListeningQuiz(): Promise<void> {
     bodyWrap.append(scoreLine, compareBox, diffBox);
 
     if (meaningTr) {
-      bodyWrap.appendChild(
-        createEl('div', 'etr-lq-meaning', isTr ? `Anlam: ${meaningTr}` : `Meaning: ${meaningTr}`)
+      const meaningEl = createEl(
+        'div',
+        'etr-lq-meaning',
+        isTr ? `Anlam: ${meaningTr}` : `Meaning: ${meaningTr}`
       );
+      meaningEl.dataset.wordLang = 'tr';
+      bodyWrap.appendChild(meaningEl);
     }
 
     const nextRow = createEl('div', 'etr-lq-actions');

@@ -16,7 +16,12 @@ import type {
   PageTranslationDirection,
   ValidatedPageChallenge,
 } from '../shared/types';
-import { buildCloseSvg, renderToast } from './widget';
+import { installWordHoverTooltip } from '../shared/wordHoverTooltip';
+import {
+  buildCloseSvg,
+  lookupOfflineWordFromBackground,
+  renderToast,
+} from './widget';
 
 const PAGE_QUIZ_HOST_ID = 'etr-page-quiz-host';
 const HIGHLIGHT_ATTR = 'data-etr-page-highlight';
@@ -471,7 +476,7 @@ const PAGE_QUIZ_CSS = `
     width: 100vw;
     height: 100vh;
     pointer-events: none;
-    z-index: 2147483646;
+    z-index: 2147483644;
     overflow: visible;
   }
 
@@ -501,7 +506,7 @@ const PAGE_QUIZ_CSS = `
 
   .etr-pq-card {
     position: fixed;
-    z-index: 2147483647;
+    z-index: 2147483645;
     width: min(388px, calc(100vw - 24px));
     background: #111117;
     color: #f4f4f6;
@@ -950,6 +955,11 @@ function renderAnchoredQuizBox(
 
   card.append(head, bodyContainer);
   shadow.append(style, connectorSvg, card);
+  const pageQuizTooltip = installWordHoverTooltip({
+    root: shadow,
+    delayMs: 1500,
+    lookupWord: lookupOfflineWordFromBackground,
+  });
   (document.body ?? document.documentElement).appendChild(host);
 
   const reposition = () => {
@@ -1044,6 +1054,7 @@ function renderAnchoredQuizBox(
   window.addEventListener('keydown', escapeHandler);
 
   activeCleanup = () => {
+    pageQuizTooltip.dispose();
     card.removeEventListener('keydown', escapeHandler);
     window.removeEventListener('scroll', reposition);
     window.removeEventListener('resize', reposition);
@@ -1115,6 +1126,8 @@ function renderAnchoredQuizBox(
         'div',
         `etr-pq-bubble ${evaluation.isCorrect ? 'etr-pq-bubble-good' : 'etr-pq-bubble-bad'}`
       );
+      const userTextEl = createEl('div', undefined, userAnswer);
+      userTextEl.dataset.wordLang = challenge.direction === 'tr-to-en' ? 'en' : 'tr';
       userBubble.append(
         createEl(
           'span',
@@ -1127,7 +1140,7 @@ function renderAnchoredQuizBox(
               ? '✕ SENİN CEVABIN'
               : '✕ YOUR ANSWER'
         ),
-        createEl('div', undefined, userAnswer)
+        userTextEl
       );
 
       const refBubble = createEl(
@@ -1136,6 +1149,8 @@ function renderAnchoredQuizBox(
           ? 'etr-pq-bubble etr-pq-bubble-ref'
           : 'etr-pq-bubble etr-pq-bubble-good'
       );
+      const refTextEl = createEl('div', undefined, evaluation.referenceTranslation);
+      refTextEl.dataset.wordLang = challenge.direction === 'tr-to-en' ? 'en' : 'tr';
       refBubble.append(
         createEl(
           'span',
@@ -1148,7 +1163,7 @@ function renderAnchoredQuizBox(
               ? '✓ DOĞRU ANLAM / ÖRNEK ÇEVİRİ'
               : '✓ REFERENCE TRANSLATION'
         ),
-        createEl('div', undefined, evaluation.referenceTranslation)
+        refTextEl
       );
 
       const aiBubble = createEl('div', 'etr-pq-bubble etr-pq-bubble-ai');

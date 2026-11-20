@@ -2,10 +2,15 @@ import { sanitizeConceptExplanationForCard } from '../shared/concepts';
 import { createGuideHelpButton, stopGuideAssistant } from '../shared/guideAssistant';
 import { renderHighlightedPhrase, renderHighlightedSentence } from '../shared/grammarHighlighter';
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
+import type { OfflineWordEntry } from '../shared/offlineDictionary';
 import { speakEnglishText as speakEnglish } from '../shared/speech';
 import { isAiApiConfigured } from '../shared/storage';
 import { buildInlineTeachMePanel, stopActiveRuleAudio } from '../shared/teachMeDrawer';
 import { detectHelpSkillsForQuestion, hasRichTeachMeSkills } from '../shared/weaknessDetector';
+import {
+  installWordHoverTooltip,
+  type WordHoverTooltipController,
+} from '../shared/wordHoverTooltip';
 import type {
   ActivePrompt,
   AnswerOutcomeResult,
@@ -20,12 +25,41 @@ const TOAST_HOST_ID = 'en-tr-recall-toast-host';
 
 let escapeKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 let activeTeachCleanup: (() => void) | null = null;
+let activeWordTooltip: WordHoverTooltipController | null = null;
+const contentWordLookupCache = new Map<string, OfflineWordEntry | null>();
+
+/** Lookup an English word in the extension's offline dictionary via local background IPC. */
+export async function lookupOfflineWordFromBackground(
+  word: string
+): Promise<OfflineWordEntry | null> {
+  const key = word.trim().toLowerCase();
+  if (!key) return null;
+  if (contentWordLookupCache.has(key)) {
+    return contentWordLookupCache.get(key) ?? null;
+  }
+  try {
+    const res = (await chrome.runtime.sendMessage({
+      type: 'LOOKUP_OFFLINE_WORD',
+      word,
+    } satisfies ExtensionMessage)) as { ok?: boolean; entry?: OfflineWordEntry | null } | undefined;
+    const entry = res?.ok ? (res.entry ?? null) : null;
+    if (contentWordLookupCache.size > 400) {
+      contentWordLookupCache.clear();
+    }
+    contentWordLookupCache.set(key, entry);
+    return entry;
+  } catch {
+    return null;
+  }
+}
 
 export function removeRecallWidget(): void {
   if (escapeKeyHandler) {
     window.removeEventListener('keydown', escapeKeyHandler);
     escapeKeyHandler = null;
   }
+  activeWordTooltip?.dispose();
+  activeWordTooltip = null;
   activeTeachCleanup?.();
   activeTeachCleanup = null;
   stopActiveRuleAudio();
@@ -186,6 +220,7 @@ export function renderRecallWidget(
       card.type === 'sentence' ? 'etr-en is-sentence' : 'etr-en',
       card.en
     );
+    enEl.dataset.wordLang = 'en';
     const speakBtn = createEl('button', 'etr-icon-btn', '▶');
     speakBtn.type = 'button';
     speakBtn.title = isTr ? 'Sesli oku' : 'Pronounce aloud';
@@ -387,6 +422,7 @@ export function renderRecallWidget(
       card.type === 'sentence' ? 'etr-en is-sentence' : 'etr-en',
       card.en
     );
+    enEl.dataset.wordLang = 'en';
 
     const feedbackBox = createEl('div', 'etr-feedback-box');
 
@@ -429,7 +465,9 @@ export function renderRecallWidget(
             : '✓ Correct Meaning'
       )
     );
-    ansBubble.appendChild(createEl('div', undefined, card.acceptedTr.join(', ')));
+    const acceptedTextEl = createEl('div', undefined, card.acceptedTr.join(', '));
+    acceptedTextEl.dataset.wordLang = 'tr';
+    ansBubble.appendChild(acceptedTextEl);
     feedbackBox.appendChild(ansBubble);
 
     const lowerDetails = createEl('div', 'etr-lower-details');
@@ -483,9 +521,13 @@ export function renderRecallWidget(
       card.exampleEn.trim().toLowerCase() !== card.en.trim().toLowerCase()
     ) {
       const exDiv = createEl('div', 'etr-example');
-      exDiv.appendChild(createEl('div', undefined, `"${card.exampleEn}"`));
+      const exEnEl = createEl('div', undefined, `"${card.exampleEn}"`);
+      exEnEl.dataset.wordLang = 'en';
+      exDiv.appendChild(exEnEl);
       if (card.exampleTr) {
-        exDiv.appendChild(createEl('div', 'etr-example-tr', card.exampleTr));
+        const exTrEl = createEl('div', 'etr-example-tr', card.exampleTr);
+        exTrEl.dataset.wordLang = 'tr';
+        exDiv.appendChild(exTrEl);
       }
       lowerDetails.appendChild(exDiv);
     }
@@ -772,5 +814,10 @@ export function renderRecallWidget(
 
   wrap.appendChild(cardEl);
   shadow.append(style, wrap);
+  activeWordTooltip = installWordHoverTooltip({
+    root: shadow,
+    delayMs: 1500,
+    lookupWord: lookupOfflineWordFromBackground,
+  });
   (document.body ?? document.documentElement).appendChild(host);
 }

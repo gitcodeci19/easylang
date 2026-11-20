@@ -710,6 +710,7 @@ export function renderRemedialBriefing(
 
     const enEl = document.createElement('div');
     enEl.className = 'rem-ex-en';
+    enEl.dataset.wordLang = 'en';
     appendHighlightedText(enEl, ex.en, ex.highlight);
 
     topLine.append(tag, enEl);
@@ -726,6 +727,7 @@ export function renderRemedialBriefing(
 
     const trEl = document.createElement('div');
     trEl.className = 'rem-ex-tr';
+    trEl.dataset.wordLang = 'tr';
     trEl.textContent = ex.isTrap ? (isTr ? ex.tr : ex.trapNoteEn || ex.tr) : ex.tr;
 
     card.append(topLine, trEl);
@@ -1238,6 +1240,7 @@ export function startRemedialLessonSession(
       promptCard.className = 'duo-ex-prompt-card rem-duel-prompt';
       const pText = document.createElement('div');
       pText.className = 'duo-ex-prompt-text';
+      pText.dataset.wordLang = 'en';
       const parts = ex.promptText.split('___');
       if (parts.length === 2) {
         pText.append(document.createTextNode(parts[0]!));
@@ -1253,6 +1256,7 @@ export function startRemedialLessonSession(
       if (ex.promptSubtext) {
         const sub = document.createElement('div');
         sub.className = 'rem-prompt-sub-plain is-meaning-cue';
+        sub.dataset.wordLang = 'tr';
         sub.textContent = ex.promptSubtext;
         promptCard.appendChild(sub);
       }
@@ -1267,6 +1271,7 @@ export function startRemedialLessonSession(
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.dataset.choiceVal = ch;
+        btn.dataset.wordLang = 'en';
         btn.className = `duo-choice-card rem-duel-btn ${selectedChoice === ch ? 'selected' : ''}`;
         btn.innerHTML = `<span class="duo-choice-key">${i + 1}</span><span class="rem-duel-val"></span>`;
         btn.querySelector('.rem-duel-val')!.textContent = ch;
@@ -1342,9 +1347,11 @@ export function startRemedialLessonSession(
 
       const sentenceBox = document.createElement('div');
       sentenceBox.className = `rem-bug-sentence ${spotBugFound ? 'is-resolved-step1' : ''}`;
+      sentenceBox.dataset.wordLang = 'en';
 
       const meaningRow = document.createElement('div');
       meaningRow.className = 'rem-proofread-meaning';
+      meaningRow.dataset.wordLang = 'tr';
       if (ex.promptSubtext) {
         const langPill = document.createElement('span');
         langPill.className = 'rem-proofread-lang';
@@ -1381,6 +1388,7 @@ export function startRemedialLessonSession(
 
       const fixRow = document.createElement('div');
       fixRow.className = 'rem-fix-row';
+      fixRow.dataset.wordLang = 'en';
       fixWrap.append(fixLabel, fixRow);
 
       const renderTokenDiff = (btn: HTMLButtonElement, original: string, replacement: string | null): void => {
@@ -1509,6 +1517,7 @@ export function startRemedialLessonSession(
     } else if (ex.kind === 'scenario_pick') {
       const scenBox = document.createElement('div');
       scenBox.className = 'rem-scenario-box';
+      scenBox.dataset.wordLang = isTr ? 'tr' : 'en';
       const scenEyebrow = document.createElement('div');
       scenEyebrow.className = 'rem-scenario-eyebrow';
       scenEyebrow.textContent = isTr ? '💬 DURUM' : '💬 SITUATION';
@@ -1527,6 +1536,7 @@ export function startRemedialLessonSession(
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.dataset.choiceVal = ch;
+        btn.dataset.wordLang = 'en';
         btn.className = `duo-choice-card rem-scenario-btn ${selectedChoice === ch ? 'selected' : ''}`;
         btn.innerHTML = `<span class="duo-choice-key">${i + 1}</span><span class="rem-scen-val"></span>`;
         btn.querySelector('.rem-scen-val')!.textContent = ch;
@@ -1576,12 +1586,14 @@ export function startRemedialLessonSession(
       }
       const pText = document.createElement('div');
       pText.className = 'duo-ex-prompt-text';
+      pText.dataset.wordLang = ex.direction === 'tr-to-en' ? 'tr' : 'en';
       pText.textContent = ex.promptText;
       promptMain.appendChild(pText);
       promptCard.appendChild(promptMain);
       if (ex.promptSubtext) {
         const sub = document.createElement('div');
         sub.className = `rem-prompt-sub-plain${ex.kind === 'cloze_blank' ? ' is-meaning-cue' : ''}`;
+        sub.dataset.wordLang = 'tr';
         sub.textContent = ex.promptSubtext;
         promptCard.appendChild(sub);
       }
@@ -1589,12 +1601,14 @@ export function startRemedialLessonSession(
 
       const grid = document.createElement('div');
       grid.className = 'duo-choices-grid';
+      const choicesAreEnglish = ex.kind === 'cloze_blank' || ex.direction === 'tr-to-en';
       const btns: HTMLButtonElement[] = [];
       for (let i = 0; i < (ex.choices?.length ?? 0); i += 1) {
         const ch = ex.choices![i]!;
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.dataset.choiceVal = ch;
+        btn.dataset.wordLang = choicesAreEnglish ? 'en' : 'tr';
         btn.className = `duo-choice-card ${selectedChoice === ch ? 'selected' : ''}`;
         btn.innerHTML = `<span class="duo-choice-key">${i + 1}</span><span class="duo-choice-val"></span>`;
         btn.querySelector('.duo-choice-val')!.textContent = ch;
@@ -1635,17 +1649,20 @@ export function startRemedialLessonSession(
       promptCard.className = 'duo-ex-prompt-card';
       const pText = document.createElement('div');
       pText.className = 'duo-ex-prompt-text';
+      pText.dataset.wordLang = ex.direction === 'en-to-tr' ? 'en' : 'tr';
       pText.textContent = ex.promptText;
       promptCard.appendChild(pText);
       stage.appendChild(promptCard);
 
       const answerTray = document.createElement('div');
       answerTray.className = 'duo-wb-answer-tray';
+      answerTray.dataset.wordLang = ex.direction === 'en-to-tr' ? 'tr' : 'en';
       answerTray.dataset.placeholder = isTr
         ? 'Kelimeleri seçerek veya sürükleyerek cümleyi buraya kur…'
         : 'Click or drag words here to build the sentence…';
       const bankTray = document.createElement('div');
       bankTray.className = 'duo-wb-bank-tray';
+      bankTray.dataset.wordLang = ex.direction === 'en-to-tr' ? 'tr' : 'en';
 
       const commitPlacedTilesChange = (): void => {
         currentDraft.placedTileIndices = placedTiles.map((p) => p.bankIdx);
@@ -1664,9 +1681,12 @@ export function startRemedialLessonSession(
           chip.type = 'button';
           chip.className = 'duo-wb-tile placed';
           chip.textContent = item.text;
-          chip.title = isTr
-            ? 'Geri koymak için tıkla veya sürükleyip yerini değiştir'
-            : 'Click to put back or drag to reorder';
+          chip.setAttribute(
+            'aria-label',
+            isTr
+              ? `${item.text} — geri koymak için tıkla veya sürükleyip yerini değiştir`
+              : `${item.text} — click to put back or drag to reorder`
+          );
           attachWordBankTileGesture({
             chip,
             word: item.text,
@@ -1708,9 +1728,12 @@ export function startRemedialLessonSession(
           lbl.textContent = tok;
           chip.appendChild(lbl);
           if (!used) {
-            chip.title = isTr
-              ? 'Eklemek için tıkla veya istediğin aralığa sürükle'
-              : 'Click to add or drag into any position';
+            chip.setAttribute(
+              'aria-label',
+              isTr
+                ? `${tok} — eklemek için tıkla veya istediğin aralığa sürükle`
+                : `${tok} — click to add or drag into any position`
+            );
             attachWordBankTileGesture({
               chip,
               word: tok,
@@ -1743,11 +1766,13 @@ export function startRemedialLessonSession(
       promptCard.className = 'duo-ex-prompt-card';
       const pText = document.createElement('div');
       pText.className = 'duo-ex-prompt-text';
+      pText.dataset.wordLang = ex.direction === 'en-to-tr' ? 'en' : 'tr';
       pText.textContent = ex.promptText;
       promptCard.appendChild(pText);
       if (ex.promptSubtext) {
         const sub = document.createElement('div');
         sub.className = 'rem-prompt-sub-plain';
+        sub.dataset.wordLang = 'tr';
         sub.textContent = ex.promptSubtext;
         promptCard.appendChild(sub);
       }
@@ -1858,6 +1883,8 @@ export function startRemedialLessonSession(
         solRow.className = 'duo-fb-solution';
         solRow.append(document.createTextNode(isTr ? 'Doğrusu: ' : 'Solution: '));
         const strong = document.createElement('strong');
+        strong.dataset.wordLang =
+          ex.kind === 'vocab_recall' && ex.direction === 'en-to-tr' ? 'tr' : 'en';
         strong.textContent = solutionText;
         solRow.appendChild(strong);
         fbText.appendChild(solRow);
