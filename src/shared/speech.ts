@@ -1,4 +1,4 @@
-import type { ExtensionSettings, TtsVoiceMode } from './types.ts';
+import type { TtsVoiceMode } from './types.ts';
 
 const SINGLE_TOKEN_CONTRACTIONS: Record<string, string> = {
   "i'm": 'I am',
@@ -172,96 +172,27 @@ export function hasBrowserNaturalEnglishVoice(voices: SpeechSynthesisVoice[]): b
 }
 
 /**
- * Decide whether a speech request should be routed to the local Piper AI neural engine
- * instead of `window.speechSynthesis`.
+ * Piper AI neural voice (`en_US-hfc_female-medium`) is the permanent English voice
+ * across all browsers and surfaces; browser `speechSynthesis` is never used for English.
  */
 export function shouldUseNeuralTts(
-  mode: TtsVoiceMode,
-  voices: SpeechSynthesisVoice[],
-  isQuickTile: boolean = false
+  _mode: TtsVoiceMode = 'neural',
+  _voices: SpeechSynthesisVoice[] = [],
+  _isQuickTile: boolean = false
 ): boolean {
-  if (mode === 'local') return false;
-  if (mode === 'neural') return true;
-  if (mode === 'natural') return !hasBrowserNaturalEnglishVoice(voices);
-  // hybrid: sentences use Piper automatically when browser lacks a natural English voice (e.g. Brave)
-  return !isQuickTile && !hasBrowserNaturalEnglishVoice(voices);
-}
-
-let cachedTtsMode: TtsVoiceMode = 'hybrid';
-let storageListenerAttached = false;
-let neuralTtsUsedRecently = false;
-
-function isValidTtsMode(value: unknown): value is TtsVoiceMode {
-  return value === 'hybrid' || value === 'neural' || value === 'natural' || value === 'local';
-}
-
-function initTtsPreferenceSync(): void {
-  if (storageListenerAttached || typeof chrome === 'undefined' || !chrome.storage?.sync) {
-    return;
-  }
-  storageListenerAttached = true;
-
-  try {
-    void chrome.storage.sync.get('settings', (res) => {
-      const s = res?.settings as Partial<ExtensionSettings> | undefined;
-      if (isValidTtsMode(s?.ttsVoiceMode)) {
-        cachedTtsMode = s.ttsVoiceMode;
-      }
-    });
-    chrome.storage.onChanged?.addListener((changes, areaName) => {
-      if (areaName !== 'sync' || !changes.settings?.newValue) return;
-      const s = changes.settings.newValue as Partial<ExtensionSettings>;
-      if (isValidTtsMode(s?.ttsVoiceMode)) {
-        cachedTtsMode = s.ttsVoiceMode;
-      }
-    });
-  } catch {
-    // Ignore storage access errors in non-extension test environments
-  }
+  return true;
 }
 
 let speakRequestSeq = 0;
-let activeUtteranceRef: SpeechSynthesisUtterance | null = null;
-let pendingSpeakTimer: ReturnType<typeof setTimeout> | null = null;
-
-function waitForVoicesOnce(synth: SpeechSynthesis, maxWaitMs: number = 300): Promise<void> {
-  if (synth.getVoices().length > 0) {
-    return Promise.resolve();
-  }
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      if (typeof synth.removeEventListener === 'function') {
-        synth.removeEventListener('voiceschanged', finish);
-      }
-      resolve();
-    };
-    if (typeof synth.addEventListener === 'function') {
-      synth.addEventListener('voiceschanged', finish, { once: true });
-    }
-    setTimeout(finish, maxWaitMs);
-  });
-}
+let activeSpeechKind: 'none' | 'normal' | 'tile' = 'none';
+let neuralTtsUsedRecently = false;
 
 /**
- * Cancel any queued or currently playing English TTS utterance (browser or Piper neural).
+ * Cancel any queued or currently playing English Piper neural TTS utterance.
  */
 export function cancelEnglishSpeech(): void {
   speakRequestSeq += 1;
-  if (pendingSpeakTimer) {
-    clearTimeout(pendingSpeakTimer);
-    pendingSpeakTimer = null;
-  }
-  activeUtteranceRef = null;
-  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    try {
-      window.speechSynthesis.cancel();
-    } catch {
-      // Ignore cancel errors
-    }
-  }
+  activeSpeechKind = 'none';
   if (neuralTtsUsedRecently && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
     try {
       void chrome.runtime.sendMessage({ type: 'CANCEL_NEURAL_TTS' }).catch(() => {
@@ -275,129 +206,53 @@ export function cancelEnglishSpeech(): void {
 
 export interface SpeakOptions {
   isQuickTile?: boolean;
+  /**
+   * When true, queue behind currently speaking quick-tile utterances instead of cancelling
+   * the previous word. Defaults to `true` when `isQuickTile` is true.
+   */
+  queue?: boolean;
   mode?: TtsVoiceMode;
 }
 
-function speakWithBrowserSynth(
-  synth: SpeechSynthesis,
-  text: string,
-  rate: number,
-  preferNatural: boolean,
-  reqId: number
-): void {
-  if (reqId !== speakRequestSeq) return;
-  try {
-    const voice = pickBestEnglishVoice(synth.getVoices(), preferNatural);
-    const spoken = formatTextForEnglishTts(text, Boolean(voice));
-    if (!spoken) return;
-
-    const utter = new SpeechSynthesisUtterance(spoken);
-    activeUtteranceRef = utter;
-    utter.onend = () => {
-      if (activeUtteranceRef === utter) activeUtteranceRef = null;
-    };
-    utter.onerror = () => {
-      if (activeUtteranceRef === utter) activeUtteranceRef = null;
-    };
-    if (voice) {
-      utter.voice = voice;
-      utter.lang = voice.lang;
-    } else {
-      utter.lang = 'en-US';
-    }
-    utter.rate = rate;
-    synth.speak(utter);
-  } catch {
-    // Ignore speech synthesis errors when audio context is blocked
-  }
-}
-
 /**
- * Speak English text using Chrome/Edge's realistic natural voice (`Google US English` /
- * `Microsoft Natural`) when available, automatically upgrading to the local Piper AI
- * neural voice (`en_US-hfc_female-medium`) on browsers without natural cloud voices
- * (e.g. Brave) or whenever the user selects `neural` mode.
+ * Speak English text exclusively using the local Piper AI neural voice (`en_US-hfc_female-medium`).
+ * Browser `window.speechSynthesis` is never used.
+ *
+ * Rapid word-bank tile taps (`isQuickTile: true`) queue sequentially instead of cutting off
+ * the previous word, while normal sentence playback interrupts immediately.
  */
 export function speakEnglishText(
   text: string,
   rate: number = 1.0,
   options: SpeakOptions = {}
 ): void {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  initTtsPreferenceSync();
+  const spoken = formatTextForEnglishTts(text, true);
+  if (!spoken) return;
+  if (typeof chrome === 'undefined' || typeof chrome.runtime?.sendMessage !== 'function') return;
 
-  const synth = window.speechSynthesis;
-  const reqId = ++speakRequestSeq;
-  const effectiveMode = options.mode ?? cachedTtsMode;
   const isQuickTile = Boolean(options.isQuickTile);
-  const preferNatural =
-    effectiveMode === 'natural' || effectiveMode === 'neural'
-      ? true
-      : effectiveMode === 'local'
-        ? false
-        : !isQuickTile;
+  const queueRequested = options.queue ?? isQuickTile;
+  const interruptingNormal = activeSpeechKind === 'normal';
+  const shouldInterrupt = !queueRequested || interruptingNormal;
+  const shouldQueue = !shouldInterrupt;
 
-  if (pendingSpeakTimer) {
-    clearTimeout(pendingSpeakTimer);
-    pendingSpeakTimer = null;
-  }
+  activeSpeechKind = isQuickTile ? 'tile' : 'normal';
+  const reqId = ++speakRequestSeq;
+  neuralTtsUsedRecently = true;
 
-  const wasBusy = synth.speaking || synth.pending;
-  if (wasBusy) {
-    try {
-      synth.cancel();
-    } catch {
-      // Ignore cancel errors
-    }
-  }
-  if (neuralTtsUsedRecently && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-    try {
-      void chrome.runtime.sendMessage({ type: 'CANCEL_NEURAL_TTS' }).catch(() => {
-        // Ignore cancel errors
+  try {
+    void chrome.runtime
+      .sendMessage({
+        type: 'SPEAK_NEURAL_TTS',
+        text: spoken,
+        rate,
+        reqId,
+        queue: shouldQueue,
+      })
+      .catch(() => {
+        // Ignore when background worker is restarting
       });
-    } catch {
-      // Ignore messaging errors
-    }
+  } catch {
+    // Ignore messaging errors
   }
-
-  const dispatchNow = () => {
-    if (reqId !== speakRequestSeq) return;
-    const voices = synth.getVoices();
-    const canMessageBg = typeof chrome !== 'undefined' && typeof chrome.runtime?.sendMessage === 'function';
-
-    if (canMessageBg && shouldUseNeuralTts(effectiveMode, voices, isQuickTile)) {
-      const spoken = formatTextForEnglishTts(text, true);
-      if (!spoken) return;
-      neuralTtsUsedRecently = true;
-      chrome.runtime
-        .sendMessage({ type: 'SPEAK_NEURAL_TTS', text: spoken, rate, reqId })
-        .then((res: { ok?: boolean } | undefined) => {
-          if (reqId !== speakRequestSeq) return;
-          if (!res?.ok) {
-            speakWithBrowserSynth(synth, text, rate, preferNatural, reqId);
-          }
-        })
-        .catch(() => {
-          if (reqId !== speakRequestSeq) return;
-          speakWithBrowserSynth(synth, text, rate, preferNatural, reqId);
-        });
-      return;
-    }
-
-    speakWithBrowserSynth(synth, text, rate, preferNatural, reqId);
-  };
-
-  if (effectiveMode === 'neural' || synth.getVoices().length > 0) {
-    if (wasBusy) {
-      pendingSpeakTimer = setTimeout(dispatchNow, 30);
-    } else {
-      dispatchNow();
-    }
-    return;
-  }
-
-  void waitForVoicesOnce(synth, 300).then(() => {
-    if (reqId !== speakRequestSeq) return;
-    dispatchNow();
-  });
 }

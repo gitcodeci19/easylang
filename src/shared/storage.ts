@@ -70,7 +70,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   levels: ['A1', 'A2', 'B1', 'B2', 'C1'],
   includeUserCards: true,
   autoSpeak: false,
-  ttsVoiceMode: 'hybrid',
+  ttsVoiceMode: 'neural',
   skipFullscreen: true,
   autoCloseCorrectSeconds: 0,
   quietHoursStart: null,
@@ -177,12 +177,12 @@ export async function loadBuiltinCards(): Promise<Card[]> {
 export async function getSettings(): Promise<ExtensionSettings> {
   const res = await chrome.storage.sync.get(STORAGE_KEYS.SETTINGS);
   const raw = res[STORAGE_KEYS.SETTINGS] as Partial<ExtensionSettings> | undefined;
-  return { ...DEFAULT_SETTINGS, ...(raw ?? {}) };
+  return { ...DEFAULT_SETTINGS, ...(raw ?? {}), ttsVoiceMode: 'neural' };
 }
 
 export async function saveSettings(partial: Partial<ExtensionSettings>): Promise<ExtensionSettings> {
   const current = await getSettings();
-  const merged: ExtensionSettings = { ...current, ...partial };
+  const merged: ExtensionSettings = { ...current, ...partial, ttsVoiceMode: 'neural' };
   await chrome.storage.sync.set({ [STORAGE_KEYS.SETTINGS]: merged });
   return merged;
 }

@@ -329,19 +329,46 @@ export function generateSeededGaussianNoise(
   return out;
 }
 
-/** Clean linear resampler to align 22,050 Hz English Piper clips with 48,000 Hz EMA Lightning audio. */
+/**
+ * 4-point Catmull-Rom cubic Hermite resampler to upsample 22,050 Hz English Piper (`HFC Female`)
+ * clips to 48,000 Hz EMA Lightning audio smoothly without linear-stepping metallic artifacts.
+ */
 export function resampleLinear(pcm: Float32Array, fromRate: number, toRate: number): Float32Array {
   if (fromRate === toRate || pcm.length === 0) return pcm;
   const ratio = fromRate / toRate;
   const outLen = Math.max(1, Math.round(pcm.length / ratio));
   const out = new Float32Array(outLen);
   const lastIdx = pcm.length - 1;
+
+  if (pcm.length < 4) {
+    for (let i = 0; i < outLen; i += 1) {
+      const srcPos = i * ratio;
+      const i0 = Math.floor(srcPos);
+      const i1 = Math.min(lastIdx, i0 + 1);
+      const frac = srcPos - i0;
+      out[i] = pcm[i0]! * (1 - frac) + pcm[i1]! * frac;
+    }
+    return out;
+  }
+
   for (let i = 0; i < outLen; i += 1) {
     const srcPos = i * ratio;
-    const i0 = Math.floor(srcPos);
-    const i1 = Math.min(lastIdx, i0 + 1);
-    const frac = srcPos - i0;
-    out[i] = pcm[i0]! * (1 - frac) + pcm[i1]! * frac;
+    const i1 = Math.floor(srcPos);
+    const t = srcPos - i1;
+    const i0 = Math.max(0, i1 - 1);
+    const i2 = Math.min(lastIdx, i1 + 1);
+    const i3 = Math.min(lastIdx, i1 + 2);
+
+    const y0 = pcm[i0]!;
+    const y1 = pcm[i1]!;
+    const y2 = pcm[i2]!;
+    const y3 = pcm[i3]!;
+
+    const c0 = y1;
+    const c1 = 0.5 * (y2 - y0);
+    const c2 = y0 - 2.5 * y1 + 2.0 * y2 - 0.5 * y3;
+    const c3 = 0.5 * (y3 - y0) + 1.5 * (y1 - y2);
+    out[i] = ((c3 * t + c2) * t + c1) * t + c0;
   }
   return out;
 }

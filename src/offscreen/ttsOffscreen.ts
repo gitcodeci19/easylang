@@ -1,6 +1,7 @@
 import * as ort from 'onnxruntime-web/wasm';
 import { createPiperPhonemize } from 'piper-phonemize';
 import { splitBilingualCoachSegments, stripCoachMarkupForDisplay } from '../shared/bilingualTtsSplit.ts';
+import { formatTextForEnglishTts } from '../shared/speech.ts';
 import {
   buildEmaPieceInputs,
   buildEmaTimeline,
@@ -13,7 +14,7 @@ import type { CoachPlaybackProgress, NeuralTtsStatus } from '../shared/types.ts'
 
 const EN_VOICE_ID = 'en_US-hfc_female-medium' as const;
 const TR_VOICE_ID = 'tr_TR-ema-lightning' as const;
-const MAX_EN_WAV_CACHE = 32;
+const MAX_EN_WAV_CACHE = 96;
 const MAX_COACH_WAV_CACHE = 6;
 const MAX_PIPER_CHUNK_CHARS = 360;
 
@@ -57,6 +58,7 @@ interface OffscreenTtsMessage {
   action?: 'SPEAK' | 'CANCEL' | 'PREPARE' | 'STATUS' | 'COACH_SPEAK' | 'COACH_CONTROL';
   text?: string;
   rate?: number;
+  queue?: boolean;
   requestId?: string;
   command?: 'pause' | 'resume' | 'stop' | 'seek' | 'rate';
   value?: number;
@@ -273,13 +275,32 @@ class EnglishPiperRunner {
     return this.initPromise;
   }
 
-  async synthesizePcm(text: string): Promise<{ pcm: Float32Array; sampleRate: number }> {
+  async synthesizePcm(
+    text: string,
+    options?: { embeddedCoach?: boolean }
+  ): Promise<{ pcm: Float32Array; sampleRate: number }> {
     await this.ensureReady();
     const cfg = this.modelConfig!;
     const session = this.ortSession!;
-    const chunks = splitPiperChunks(text);
+    const embeddedCoach = Boolean(options?.embeddedCoach);
+    const normalizedText = formatTextForEnglishTts(text, true) || text.trim();
+    const preparedText =
+      embeddedCoach && normalizedText && !/[.!?]$/.test(normalizedText)
+        ? `${normalizedText}.`
+        : normalizedText;
+    const chunks = splitPiperChunks(preparedText);
     const urls = getLocalWasmUrls();
     const parts: Float32Array[] = [];
+
+    const noiseScale = embeddedCoach
+      ? Math.min(cfg.inference.noise_scale, 0.52)
+      : cfg.inference.noise_scale;
+    const lengthScale = embeddedCoach
+      ? cfg.inference.length_scale * 1.12
+      : cfg.inference.length_scale;
+    const noiseW = embeddedCoach
+      ? Math.min(cfg.inference.noise_w, 0.6)
+      : cfg.inference.noise_w;
 
     for (const chunk of chunks) {
       const phonemeIds = await new Promise<number[]>((resolve, reject) => {
@@ -324,11 +345,7 @@ class EnglishPiperRunner {
         input_lengths: new ortRuntime.Tensor('int64', BigInt64Array.from([BigInt(phonemeIds.length)]), [1]),
         scales: new ortRuntime.Tensor(
           'float32',
-          new Float32Array([
-            cfg.inference.noise_scale,
-            cfg.inference.length_scale,
-            cfg.inference.noise_w,
-          ]),
+          new Float32Array([noiseScale, lengthScale, noiseW]),
           [3]
         ),
       };
@@ -350,8 +367,44 @@ class EnglishPiperRunner {
       merged.set(p, offset);
       offset += p.length;
     }
-    return { pcm: merged, sampleRate: cfg.audio.sample_rate || 22050 };
+    const sampleRate = cfg.audio.sample_rate || 22050;
+    return {
+      pcm: embeddedCoach ? trimAndFadeEmbeddedEnglishPcm(merged, sampleRate) : merged,
+      sampleRate,
+    };
   }
+}
+
+function trimAndFadeEmbeddedEnglishPcm(pcm: Float32Array, sampleRate: number): Float32Array {
+  if (pcm.length === 0) return pcm;
+  const threshold = 0.004;
+  let first = 0;
+  while (first < pcm.length && Math.abs(pcm[first]!) < threshold) {
+    first += 1;
+  }
+  if (first >= pcm.length) return pcm;
+  let last = pcm.length - 1;
+  while (last > first && Math.abs(pcm[last]!) < threshold) {
+    last -= 1;
+  }
+  const leadPad = Math.round(sampleRate * 0.018);
+  const trailPad = Math.round(sampleRate * 0.028);
+  const start = Math.max(0, first - leadPad);
+  const end = Math.min(pcm.length, last + 1 + trailPad);
+  const out = pcm.slice(start, end);
+
+  const fadeInLen = Math.min(Math.round(sampleRate * 0.012), Math.floor(out.length / 4));
+  for (let i = 0; i < fadeInLen; i += 1) {
+    const w = 0.5 * (1 - Math.cos((Math.PI * i) / fadeInLen));
+    out[i] = out[i]! * w;
+  }
+  const fadeOutLen = Math.min(Math.round(sampleRate * 0.016), Math.floor(out.length / 4));
+  for (let i = 0; i < fadeOutLen; i += 1) {
+    const idx = out.length - 1 - i;
+    const w = 0.5 * (1 - Math.cos((Math.PI * i) / fadeOutLen));
+    out[idx] = out[idx]! * w;
+  }
+  return out;
 }
 
 /**
@@ -583,14 +636,33 @@ const trRunner = new EmaLightningRunner(broadcastTrStatus);
 
 let synthQueue: Promise<void> = Promise.resolve();
 let activePlaySeq = 0;
+let explicitCancelEpoch = 0;
 let activeAudio: HTMLAudioElement | null = null;
 let activeBlobUrl: string | null = null;
 let activeCoachRequestId: string | null = null;
 let coachProgressTimer: ReturnType<typeof setInterval> | null = null;
+let activeAudioEndResolver: (() => void) | null = null;
+
+interface QueuedEnSpeech {
+  text: string;
+  rate: number;
+  epoch: number;
+  wavPromise: Promise<Blob | null>;
+}
+
+const MAX_EN_QUEUE = 12;
+const enPlaybackQueue: QueuedEnSpeech[] = [];
+let enQueueDraining = false;
 
 const enWavCache = new Map<string, Blob>();
 const coachWavCache = new Map<string, { blob: Blob; wordTimings: Array<[number, number]> }>();
 const EMA_TEACHER_SPEED = 0.87;
+
+function resolveActiveAudioEnd(): void {
+  const resolver = activeAudioEndResolver;
+  activeAudioEndResolver = null;
+  resolver?.();
+}
 
 function putLru<T>(cache: Map<string, T>, key: string, value: T, maxSize: number): void {
   if (cache.has(key)) cache.delete(key);
@@ -641,6 +713,7 @@ function stopCurrentPlayback(notifyCoachEnded = false): void {
     }
     activeBlobUrl = null;
   }
+  resolveActiveAudioEnd();
   if (notifyCoachEnded && prevCoachId) {
     emitCoachPlayback({
       requestId: prevCoachId,
@@ -657,8 +730,8 @@ function playWavBlob(
   rate: number,
   seq: number,
   coachRequestId?: string
-): Promise<{ durationSec: number }> {
-  if (seq !== activePlaySeq) return Promise.resolve({ durationSec: 0 });
+): Promise<{ durationSec: number; ended: Promise<void> }> {
+  if (seq !== activePlaySeq) return Promise.resolve({ durationSec: 0, ended: Promise.resolve() });
   stopCurrentPlayback(Boolean(activeCoachRequestId && activeCoachRequestId !== coachRequestId));
 
   const url = URL.createObjectURL(blob);
@@ -667,6 +740,12 @@ function playWavBlob(
   activeAudio = audio;
   activeBlobUrl = url;
   activeCoachRequestId = coachRequestId ?? null;
+
+  let myEndResolver: (() => void) | null = null;
+  const endedPromise = new Promise<void>((res) => {
+    myEndResolver = res;
+    activeAudioEndResolver = res;
+  });
 
   const cleanup = (ended = false) => {
     clearCoachProgressTimer();
@@ -683,6 +762,13 @@ function playWavBlob(
     if (activeAudio === audio) activeAudio = null;
     if (activeBlobUrl === url) activeBlobUrl = null;
     if (activeCoachRequestId === coachRequestId) activeCoachRequestId = null;
+    if (myEndResolver && activeAudioEndResolver === myEndResolver) {
+      resolveActiveAudioEnd();
+    } else if (myEndResolver) {
+      const fn = myEndResolver;
+      myEndResolver = null;
+      fn();
+    }
     try {
       URL.revokeObjectURL(url);
     } catch {
@@ -711,6 +797,11 @@ function playWavBlob(
 
   return new Promise((resolve, reject) => {
     const startPlay = () => {
+      if (seq !== activePlaySeq) {
+        cleanup(true);
+        resolve({ durationSec: 0, ended: Promise.resolve() });
+        return;
+      }
       const dur = Number.isFinite(audio.duration) ? audio.duration : 0;
       audio
         .play()
@@ -723,7 +814,7 @@ function playWavBlob(
               durationSec: dur,
             });
           }
-          resolve({ durationSec: dur });
+          resolve({ durationSec: dur, ended: endedPromise });
         })
         .catch((err) => {
           cleanup(true);
@@ -752,46 +843,110 @@ async function enqueueSynthesis<T>(fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
-async function handleSpeakEnglish(text: string, rate: number): Promise<void> {
-  const cleaned = text.trim();
-  if (!cleaned) return;
-
-  const mySeq = ++activePlaySeq;
-  stopCurrentPlayback(true);
-
+function getOrSynthEnWav(cleaned: string, epoch: number): Promise<Blob | null> {
   const cached = enWavCache.get(cleaned);
   if (cached) {
     putLru(enWavCache, cleaned, cached, MAX_EN_WAV_CACHE);
-    await playWavBlob(cached, rate, mySeq);
-    return;
+    return Promise.resolve(cached);
+  }
+  return enqueueSynthesis(async () => {
+    if (epoch !== activePlaySeq) return null;
+    const again = enWavCache.get(cleaned);
+    if (again) {
+      putLru(enWavCache, cleaned, again, MAX_EN_WAV_CACHE);
+      return again;
+    }
+    await enRunner.ensureReady();
+    if (epoch !== activePlaySeq) return null;
+    const { pcm, sampleRate } = await enRunner.synthesizePcm(cleaned);
+    const blob = new Blob([pcm2wav(pcm, sampleRate)], { type: 'audio/wav' });
+    putLru(enWavCache, cleaned, blob, MAX_EN_WAV_CACHE);
+    return blob;
+  });
+}
+
+async function drainEnPlaybackQueue(): Promise<void> {
+  if (enQueueDraining) return;
+  enQueueDraining = true;
+  try {
+    while (enPlaybackQueue.length > 0) {
+      const item = enPlaybackQueue.shift()!;
+      if (item.epoch !== activePlaySeq) continue;
+      const wavBlob = await item.wavPromise;
+      if (item.epoch !== activePlaySeq || !wavBlob) continue;
+      const playRes = await playWavBlob(wavBlob, item.rate, item.epoch);
+      if (item.epoch !== activePlaySeq) continue;
+      await playRes.ended;
+    }
+  } catch {
+    // Keep queue healthy if an utterance is aborted or blocked
+  } finally {
+    enQueueDraining = false;
+    if (enPlaybackQueue.length > 0) {
+      void drainEnPlaybackQueue();
+    }
+  }
+}
+
+async function handleSpeakEnglish(text: string, rate: number, queue = false): Promise<void> {
+  const cleaned = text.trim();
+  if (!cleaned) return;
+
+  let myEpoch: number;
+  if (!queue || activeCoachRequestId !== null) {
+    myEpoch = ++activePlaySeq;
+    enPlaybackQueue.length = 0;
+    stopCurrentPlayback(true);
+  } else {
+    myEpoch = activePlaySeq;
   }
 
-  await enRunner.ensureReady();
-  if (mySeq !== activePlaySeq) return;
-
-  const wavBlob = await enqueueSynthesis(async () => {
-    if (mySeq !== activePlaySeq) return null;
-    const { pcm, sampleRate } = await enRunner.synthesizePcm(cleaned);
-    return new Blob([pcm2wav(pcm, sampleRate)], { type: 'audio/wav' });
+  if (enPlaybackQueue.length >= MAX_EN_QUEUE) {
+    enPlaybackQueue.shift();
+  }
+  enPlaybackQueue.push({
+    text: cleaned,
+    rate,
+    epoch: myEpoch,
+    wavPromise: getOrSynthEnWav(cleaned, myEpoch),
   });
+  void drainEnPlaybackQueue();
+}
 
-  if (mySeq !== activePlaySeq || !wavBlob) return;
-  putLru(enWavCache, cleaned, wavBlob, MAX_EN_WAV_CACHE);
-  await playWavBlob(wavBlob, rate, mySeq);
+function measureActiveRms(pcm: Float32Array): { rms: number; peak: number } {
+  if (pcm.length === 0) return { rms: 0, peak: 0 };
+  let sumSq = 0;
+  let activeCount = 0;
+  let allSumSq = 0;
+  let peak = 0;
+  for (let i = 0; i < pcm.length; i += 1) {
+    const v = pcm[i]!;
+    const abs = Math.abs(v);
+    if (abs > peak) peak = abs;
+    const sq = v * v;
+    allSumSq += sq;
+    if (abs >= 0.012) {
+      sumSq += sq;
+      activeCount += 1;
+    }
+  }
+  const rms =
+    activeCount >= 32
+      ? Math.sqrt(sumSq / activeCount)
+      : Math.sqrt(allSumSq / pcm.length);
+  return { rms, peak };
 }
 
 function normalizeRmsToward(pcm: Float32Array, targetRms: number): Float32Array {
   if (pcm.length === 0 || targetRms <= 0) return pcm;
-  let sumSq = 0;
-  for (let i = 0; i < pcm.length; i += 1) {
-    sumSq += pcm[i]! * pcm[i]!;
-  }
-  const rms = Math.sqrt(sumSq / pcm.length);
-  if (rms < 1e-4) return pcm;
-  const gain = Math.max(0.55, Math.min(1.65, targetRms / rms));
+  const { rms, peak } = measureActiveRms(pcm);
+  if (rms < 1e-4 || peak < 1e-4) return pcm;
+  const desiredGain = (targetRms * 0.9) / rms;
+  const maxSafeGain = 0.88 / peak;
+  const gain = Math.max(0.55, Math.min(1.35, desiredGain, maxSafeGain));
   const out = new Float32Array(pcm.length);
   for (let i = 0; i < pcm.length; i += 1) {
-    out[i] = Math.max(-0.98, Math.min(0.98, pcm[i]! * gain));
+    out[i] = pcm[i]! * gain;
   }
   return out;
 }
@@ -810,6 +965,8 @@ async function handleSpeakTurkishCoach(
   if (!cleaned) return { durationSec: 0, wordTimings: [] };
 
   const mySeq = ++activePlaySeq;
+  explicitCancelEpoch += 1;
+  enPlaybackQueue.length = 0;
   stopCurrentPlayback(true);
 
   const cached = coachWavCache.get(cleaned);
@@ -854,18 +1011,14 @@ async function handleSpeakTurkishCoach(
       const seg = segments[i]!;
       let pcm48: Float32Array;
       if (seg.lang === 'en' && canUseEnglishVoice) {
-        const { pcm, sampleRate } = await enRunner.synthesizePcm(seg.text);
+        const { pcm, sampleRate } = await enRunner.synthesizePcm(seg.text, { embeddedCoach: true });
         pcm48 = resampleLinear(pcm, sampleRate, targetSampleRate);
-        if (observedEmaRms > 0) {
-          pcm48 = normalizeRmsToward(pcm48, observedEmaRms);
-        }
+        pcm48 = normalizeRmsToward(pcm48, observedEmaRms > 0 ? observedEmaRms : 0.14);
       } else {
         const { pcm, sampleRate } = await trRunner.synthesizePcm(seg.text, EMA_TEACHER_SPEED);
         pcm48 = sampleRate === targetSampleRate ? pcm : resampleLinear(pcm, sampleRate, targetSampleRate);
         if (observedEmaRms === 0 && pcm48.length > 0) {
-          let sumSq = 0;
-          for (let s = 0; s < pcm48.length; s += 1) sumSq += pcm48[s]! * pcm48[s]!;
-          observedEmaRms = Math.sqrt(sumSq / pcm48.length);
+          observedEmaRms = measureActiveRms(pcm48).rms;
         }
       }
 
@@ -929,6 +1082,8 @@ function handleCoachControl(
 ): { ok: boolean; playing: boolean; currentSec: number; durationSec: number } {
   if (command === 'stop') {
     activePlaySeq += 1;
+    explicitCancelEpoch += 1;
+    enPlaybackQueue.length = 0;
     stopCurrentPlayback(true);
     return { ok: true, playing: false, currentSec: 0, durationSec: 0 };
   }
@@ -965,6 +1120,8 @@ chrome.runtime.onMessage.addListener((message: OffscreenTtsMessage, _sender, sen
     switch (message.action) {
       case 'CANCEL': {
         activePlaySeq += 1;
+        explicitCancelEpoch += 1;
+        enPlaybackQueue.length = 0;
         stopCurrentPlayback(true);
         sendResponse({ ok: true });
         break;
@@ -984,7 +1141,7 @@ chrome.runtime.onMessage.addListener((message: OffscreenTtsMessage, _sender, sen
         break;
       }
       case 'SPEAK': {
-        await handleSpeakEnglish(message.text ?? '', message.rate ?? 1.0);
+        await handleSpeakEnglish(message.text ?? '', message.rate ?? 1.0, Boolean(message.queue));
         sendResponse({ ok: true, status: { ...enRunner.status } });
         break;
       }

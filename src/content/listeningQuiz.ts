@@ -1,5 +1,5 @@
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
-import { speakEnglishText as speakSentence } from '../shared/speech';
+import { cancelEnglishSpeech, speakEnglishText as speakSentence } from '../shared/speech';
 import { evaluateDictationAnswer } from '../shared/srs';
 import type {
   ExtensionMessage,
@@ -49,9 +49,7 @@ export function removeListeningQuiz(): void {
     activeEscapeHandler = null;
   }
   restoreBlurredYouTubeCaptions();
-  if (typeof window.speechSynthesis !== 'undefined') {
-    window.speechSynthesis.cancel();
-  }
+  cancelEnglishSpeech();
   document.getElementById(LISTENING_HOST_ID)?.remove();
 }
 

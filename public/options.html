@@ -319,14 +319,11 @@
               <div class="field">
                 <label for="ttsVoiceMode">Seslendirme Kalitesi (TTS)</label>
                 <select id="ttsVoiceMode" class="select-compact">
-                  <option value="hybrid">Hibrit: Tarayıcıda Yoksa Otomatik Yapay Zeka Sesi (Önerilen)</option>
-                  <option value="neural">Yapay Zeka Sesi (Piper · Her Tarayıcıda En Doğal)</option>
-                  <option value="natural">Tarayıcı Doğal Sesi (Google / Edge, yoksa Piper)</option>
-                  <option value="local">Çevrimdışı Yerel Sistem Sesi (0ms)</option>
+                  <option value="neural" selected>Yapay Zeka Sesi (Piper · HFC Female)</option>
                 </select>
                 <div class="neural-tts-bar" id="neural-tts-bar">
-                  <span class="neural-tts-status" id="neural-tts-status">Yapay Zeka Sesi (Piper · 60 MB): Durum kontrol ediliyor…</span>
-                  <button type="button" class="btn btn-secondary btn-xs" id="neural-tts-test-btn">▶ Test Et</button>
+                  <span class="neural-tts-status" id="neural-tts-status">✓ Yapay Zeka Sesi (Piper · HFC Female) çevrimdışı önbellekte hazır.</span>
+                  <button type="button" class="btn btn-secondary btn-xs" id="neural-tts-test-btn">▶ Sesi Dinle</button>
                 </div>
               </div>
 

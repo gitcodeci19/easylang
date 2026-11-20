@@ -11,10 +11,31 @@ const COMMON_TURKISH_ASCII_WORDS = new Set([
   've', 'veya', 'ile', 'ama', 'fakat', 'ancak', 'gibi', 'icin', 'olarak', 'burada', 'orada',
   'bu', 'su', 'bir', 'cok', 'daha', 'en', 'her', 'hic', 'var', 'yok', 'degil', 'zaman',
   'cumle', 'kelime', 'fiil', 'ozne', 'gecmis', 'simdi', 'gelecek', 'tekil', 'cogul', 'olumsuz',
-  'soru', 'ornek', 'mesela', 'yani', 'kural', 'anlam', 'hayir', 'evet', 'tamam', 'yerine',
+  'soru', 'ornek', 'mesela', 'yani', 'kural', 'anlam', 'anlami', 'anlamina', 'hayir', 'evet', 'tamam', 'yerine',
   'gidelim', 'yapalim', 'edelim', 'olur', 'oldu', 'isim', 'sifat', 'zarf', 'hal', 'hali',
   'fincan', 'kahve', 'bardak', 'cay', 'yemek', 'ev', 'okul', 'masa', 'kitap', 'kalem', 'gun',
+  'arka', 'geri', 'on', 'yan', 'ust', 'alt', 'ic', 'dis', 'araba', 'arac', 'ayna', 'aynasi',
+  'kavram', 'terim', 'ifade', 'kadar', 'sonra', 'once', 'beraber', 'birlikte', 'esliginde',
+  'durum', 'olay', 'kisi', 'insan', 'cocuk', 'kiz', 'erkek', 'kadin', 'adam', 'arkadas',
+  'baba', 'anne', 'kardes', 'abi', 'abla', 'bebek', 'es', 'koca', 'kari', 'aile', 'oda',
+  'kapi', 'pencere', 'duvar', 'yatak', 'koltuk', 'sandalye', 'bahce', 'sokak', 'cadde', 'sehir',
+  'ulke', 'dunya', 'hava', 'deniz', 'yol', 'tren', 'ucak', 'otobus', 'bilet', 'para', 'fiyat',
+  'hesap', 'kart', 'telefon', 'bilgisayar', 'ekran', 'oyun', 'film', 'muzik', 'ses', 'resim',
+  'renk', 'beyaz', 'siyah', 'kirmizi', 'mavi', 'yesil', 'sari', 'uzun', 'kisa', 'yeni', 'eski',
+  'buyuk', 'kucuk', 'guzel', 'iyi', 'kotu', 'kolay', 'zor', 'hizli', 'yavas', 'sicak', 'soguk',
+  'temiz', 'kirli', 'dolu', 'bos', 'acik', 'kapali', 'dogru', 'yanlis', 'fark', 'farkli', 'ayni',
+  'tane', 'parca', 'kisim', 'taraf', 'yon', 'sekil', 'bicim', 'tur', 'cesit', 'miktar', 'sayi',
 ]);
+
+const TURKISH_ASCII_SUFFIX_RE =
+  /(?:lar|ler|dan|den|tan|ten|nda|nde|nin|nun|mak|mek|iyor|acak|ecek|dir|dur|tir|tur|lik|luk|siz|suz|살)$/i;
+
+function isLikelyTurkishAsciiToken(word: string): boolean {
+  const low = word.toLowerCase();
+  if (COMMON_TURKISH_ASCII_WORDS.has(low)) return true;
+  if (low.length >= 6 && TURKISH_ASCII_SUFFIX_RE.test(low) && !/[wxq]/i.test(low)) return true;
+  return false;
+}
 
 function normalizeMarkupQuotes(input: string): string {
   return input
@@ -37,6 +58,53 @@ export function stripCoachMarkupForDisplay(input: string): string {
     .trim();
 }
 
+/**
+ * Automatically wrap any quoted English words/phrases (`"Rear"`, `"view"`, `'rear-view mirror'`)
+ * inside `[[...]]` using the known English tokens from `sentenceEn`, `focusPhrase`, and `examples`,
+ * while leaving Turkish quoted phrases (`'geri aynası'`, `'arka'`, `"bir fincan kahve"`) untouched.
+ */
+export function autoTagEnglishQuotesForCoach(
+  explanationTr: string,
+  englishContextTexts: string[] = []
+): string {
+  const normalized = normalizeMarkupQuotes(explanationTr);
+  if (!normalized) return '';
+
+  const contextWords = new Set<string>();
+  for (const txt of englishContextTexts) {
+    const tokens = txt
+      .toLowerCase()
+      .replace(/[^a-z0-9'\-\s]/g, ' ')
+      .split(/[\s\-]+/)
+      .filter(Boolean);
+    for (const tok of tokens) {
+      contextWords.add(tok);
+    }
+  }
+
+  return normalized.replace(
+    /(?<!\[)"([^"\[\]\n]{1,120})"(?!\])|(?<=^|[\s(,;:])'([A-Za-z][A-Za-z0-9\s\-']{0,80}[A-Za-z0-9])'(?=$|[\s.,;:!?)])/g,
+    (fullMatch, dblInner?: string, sglInner?: string) => {
+      const inner = (dblInner ?? sglInner ?? '').trim();
+      if (!inner || TURKISH_ONLY_CHARS_RE.test(inner)) return fullMatch;
+
+      const words = inner
+        .toLowerCase()
+        .replace(/[^a-z'\-\s]/g, ' ')
+        .split(/[\s\-]+/)
+        .filter(Boolean);
+      if (words.length === 0) return fullMatch;
+      if (words.every((w) => isLikelyTurkishAsciiToken(w))) return fullMatch;
+
+      const matchesContext = words.some((w) => contextWords.has(w));
+      if (matchesContext || looksEnglishQuotedSegment(inner)) {
+        return `[[${inner}]]`;
+      }
+      return fullMatch;
+    }
+  );
+}
+
 function looksEnglishQuotedSegment(raw: string): boolean {
   const cleaned = raw.trim();
   if (!cleaned || !/[A-Za-z]/.test(cleaned)) return false;
@@ -48,7 +116,7 @@ function looksEnglishQuotedSegment(raw: string): boolean {
     .split(/\s+/)
     .filter(Boolean);
   if (words.length === 0) return false;
-  if (words.every((w) => COMMON_TURKISH_ASCII_WORDS.has(w))) return false;
+  if (words.every((w) => isLikelyTurkishAsciiToken(w))) return false;
   return true;
 }
 
@@ -61,7 +129,7 @@ function looksEnglishQuotedSegment(raw: string): boolean {
  * route to the English voice — quoted Turkish words like `"bir fincan kahve"` stay 100% Turkish!
  */
 export function splitBilingualCoachSegments(input: string): BilingualTtsSegment[] {
-  const raw = normalizeMarkupQuotes(input);
+  const raw = autoTagEnglishQuotesForCoach(input);
   if (!raw) return [];
 
   const hasExplicitTags = /\[\[[^\[\]\n]{1,140}\]\]/.test(raw);

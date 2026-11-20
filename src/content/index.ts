@@ -12,6 +12,7 @@ declare global {
 }
 
 async function initContentScript(): Promise<void> {
+  document.getElementById('etr-pinned-popup-host')?.remove();
   if (window.__enTrRecallInitialized) return;
 
   const initialSettings = await getSettings();

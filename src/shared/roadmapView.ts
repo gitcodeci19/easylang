@@ -31,6 +31,7 @@ import {
 } from './roadmapCoach';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
 import { evaluateDictationAnswer } from './srs';
+import { attachWordBankTileGesture } from './wordBankDrag';
 import {
   appendRoadmapLessonRecord,
   clearActiveRemedialSession,
@@ -177,7 +178,7 @@ function getRoadmapLabels(langMode: FeedbackLanguageMode | undefined): {
         skipBtn: 'Geç',
         newWordBadge: 'YENİ KELİME',
         retryBadge: 'HATA TEKRARI',
-        wordBankHint: 'Kelimelere sırayla tıklayarak cümleyi kur:',
+        wordBankHint: 'Kelimelere tıklayarak veya sürükleyerek cümleyi kur:',
         typeAnswerPlaceholder: 'Türkçe çeviriyi yazın...',
         typeEnglishPlaceholder: 'İngilizce karşılığını yazın...',
         correctHeader: 'Doğru Cevap',
@@ -236,7 +237,7 @@ function getRoadmapLabels(langMode: FeedbackLanguageMode | undefined): {
       skipBtn: 'Skip',
       newWordBadge: 'NEW WORD',
       retryBadge: 'MISTAKE REVIEW',
-      wordBankHint: 'Tap word tiles in order to build the sentence:',
+      wordBankHint: 'Tap or drag word tiles to build the sentence:',
       typeAnswerPlaceholder: 'Type Turkish translation...',
       typeEnglishPlaceholder: 'Type English translation...',
       correctHeader: 'Correct',
@@ -1199,11 +1200,13 @@ export class RoadmapController {
       tutorDraft?: string;
     }): void => {
       if (currentIdx >= queue.length) {
+        cancelEnglishSpeech();
         stopActiveRuleAudio();
         persistActiveSession(currentIdx, true);
         void finishLesson();
         return;
       }
+      cancelEnglishSpeech();
       stopActiveRuleAudio();
 
       currentDraft = restored?.draft ? { ...restored.draft } : {};
@@ -1461,7 +1464,7 @@ export class RoadmapController {
 
         if (ex.promptSubtext) {
           const pSub = document.createElement('div');
-          pSub.className = 'duo-ex-prompt-sub';
+          pSub.className = `duo-ex-prompt-sub${ex.kind === 'cloze_blank' ? ' is-meaning-cue' : ''}`;
           if (!allowQuestionAudio) {
             pSub.style.paddingLeft = '0';
           }
@@ -1512,6 +1515,8 @@ export class RoadmapController {
         const choicesGrid = document.createElement('div');
         choicesGrid.className = 'duo-choices-grid';
 
+        const choicesAreEnglish =
+          ex.kind === 'select_en' || ex.kind === 'cloze_blank' || ex.direction === 'tr-to-en';
         const optionBtns: HTMLButtonElement[] = [];
         for (let i = 0; i < (ex.choices ?? []).length; i += 1) {
           const choiceText = ex.choices![i]!;
@@ -1524,6 +1529,11 @@ export class RoadmapController {
             currentDraft.selectedChoice = choiceText;
             for (const b of optionBtns) b.classList.remove('selected');
             cBtn.classList.add('selected');
+            if (choicesAreEnglish) {
+              cancelAutoPlay();
+              const isShortChoice = choiceText.trim().split(/\s+/).length <= 3;
+              speakEnglish(choiceText, 1.0, { isQuickTile: isShortChoice });
+            }
             refreshCheckDisabled();
             persistActiveSession(currentIdx, false);
           });
@@ -1561,6 +1571,13 @@ export class RoadmapController {
         const bankTray = document.createElement('div');
         bankTray.className = 'duo-wb-bank-tray';
 
+        const commitUsedIndicesChange = (): void => {
+          currentDraft.placedTileIndices = [...usedIndices];
+          renderWordBankState();
+          refreshCheckDisabled();
+          persistActiveSession(currentIdx, false);
+        };
+
         const renderWordBankState = (): void => {
           answerTray.replaceChildren();
           bankTray.replaceChildren();
@@ -1572,15 +1589,33 @@ export class RoadmapController {
             chip.type = 'button';
             chip.className = 'duo-wb-tile placed';
             chip.disabled = wbLocked;
-            chip.title = isTr ? 'Geri koymak için tıkla' : 'Click to put back';
+            chip.title = isTr
+              ? 'Geri koymak için tıkla veya sürükleyip yerini değiştir'
+              : 'Click to put back or drag to reorder';
             chip.textContent = word;
-            chip.addEventListener('click', () => {
-              if (wbLocked) return;
-              usedIndices.splice(pos, 1);
-              currentDraft.placedTileIndices = [...usedIndices];
-              renderWordBankState();
-              refreshCheckDisabled();
-              persistActiveSession(currentIdx, false);
+            attachWordBankTileGesture({
+              chip,
+              word,
+              source: 'answer',
+              answerTray,
+              bankTray,
+              isLocked: () => wbLocked,
+              onTap: () => {
+                usedIndices.splice(pos, 1);
+                commitUsedIndicesChange();
+              },
+              onDropIntoAnswer: (insertIndex) => {
+                const [moved] = usedIndices.splice(pos, 1);
+                if (typeof moved === 'number') {
+                  const clamped = Math.max(0, Math.min(usedIndices.length, insertIndex));
+                  usedIndices.splice(clamped, 0, moved);
+                  commitUsedIndicesChange();
+                }
+              },
+              onDropBackToBank: () => {
+                usedIndices.splice(pos, 1);
+                commitUsedIndicesChange();
+              },
             });
             answerTray.appendChild(chip);
           }
@@ -1605,23 +1640,35 @@ export class RoadmapController {
               chip.addEventListener('click', () => {
                 if (wbLocked) return;
                 usedIndices.splice(usedPos, 1);
-                currentDraft.placedTileIndices = [...usedIndices];
-                renderWordBankState();
-                refreshCheckDisabled();
-                persistActiveSession(currentIdx, false);
+                commitUsedIndicesChange();
               });
             } else {
               chip.textContent = word;
-              chip.addEventListener('click', () => {
-                if (wbLocked) return;
-                usedIndices.push(idx);
-                currentDraft.placedTileIndices = [...usedIndices];
-                if (ex.direction !== 'en-to-tr') {
-                  speakEnglish(word, 1.0, { isQuickTile: true });
-                }
-                renderWordBankState();
-                refreshCheckDisabled();
-                persistActiveSession(currentIdx, false);
+              chip.title = isTr
+                ? 'Eklemek için tıkla veya istediğin aralığa sürükle'
+                : 'Click to add or drag into any position';
+              attachWordBankTileGesture({
+                chip,
+                word,
+                source: 'bank',
+                answerTray,
+                bankTray,
+                isLocked: () => wbLocked,
+                onTap: () => {
+                  usedIndices.push(idx);
+                  if (ex.direction !== 'en-to-tr') {
+                    speakEnglish(word, 1.0, { isQuickTile: true });
+                  }
+                  commitUsedIndicesChange();
+                },
+                onDropIntoAnswer: (insertIndex) => {
+                  const clamped = Math.max(0, Math.min(usedIndices.length, insertIndex));
+                  usedIndices.splice(clamped, 0, idx);
+                  if (ex.direction !== 'en-to-tr') {
+                    speakEnglish(word, 1.0, { isQuickTile: true });
+                  }
+                  commitUsedIndicesChange();
+                },
               });
             }
             bankTray.appendChild(chip);

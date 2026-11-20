@@ -1182,10 +1182,10 @@ body {
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
-  padding: 10px 12px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .duo-ex-prompt-main {
@@ -1195,15 +1195,28 @@ body {
 }
 
 .duo-ex-prompt-text {
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 700;
+  line-height: 1.4;
   color: var(--text-primary);
 }
 
 .duo-ex-prompt-sub {
-  font-size: 11px;
-  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.42;
+  color: #b8bed0;
   padding-left: 33px;
+}
+
+.duo-ex-prompt-sub.is-meaning-cue,
+.rem-prompt-sub-plain.is-meaning-cue {
+  margin-top: 6px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #d6dcf0;
 }
 
 /* Audio Exercise Hero — Emerald/Teal Listening identity */
@@ -1321,8 +1334,14 @@ body {
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 600;
-  cursor: pointer;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
   transition: border-color 0.1s ease, background 0.1s ease;
+}
+
+.duo-wb-tile:active {
+  cursor: grabbing;
 }
 
 .duo-wb-tile:hover {
@@ -1351,6 +1370,75 @@ body {
 
 .duo-wb-tile.ghost .duo-wb-ghost-label {
   visibility: hidden;
+}
+
+.duo-wb-tile.is-dragging-source {
+  background: var(--bg-input);
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  color: transparent !important;
+  opacity: 0.65;
+}
+
+.duo-wb-tile.is-dragging-hidden {
+  display: none !important;
+}
+
+.duo-wb-answer-tray.is-drop-target {
+  border-color: rgba(167, 139, 250, 0.45);
+}
+
+.duo-wb-answer-tray.is-drop-active {
+  border-color: var(--accent-purple);
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.duo-lesson-session.is-remedial-crimson .duo-wb-answer-tray.is-drop-active {
+  border-color: var(--accent-crimson);
+  background: rgba(225, 29, 72, 0.06);
+}
+
+.duo-wb-drop-slot {
+  display: inline-block;
+  min-width: 24px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  border: 1.5px dashed #a78bfa;
+  background: rgba(139, 92, 246, 0.2);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.28);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.duo-lesson-session.is-remedial-crimson .duo-wb-drop-slot {
+  border-color: #fb7185;
+  background: rgba(225, 29, 72, 0.2);
+  box-shadow: 0 0 10px rgba(225, 29, 72, 0.28);
+}
+
+.duo-wb-drag-floating {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2147483647;
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid #a78bfa;
+  background: #231d38;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.65), 0 0 12px rgba(139, 92, 246, 0.42);
+  will-change: transform;
+}
+
+.duo-wb-drag-floating.is-crimson {
+  border-color: #fb7185;
+  background: #351624;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.65), 0 0 12px rgba(225, 29, 72, 0.42);
 }
 
 .duo-free-input {
@@ -2693,8 +2781,9 @@ body.remedial-crimson-active .rank-chip {
 }
 
 .rem-prompt-sub-plain {
-  font-size: 11px;
-  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.42;
+  color: #b8bed0;
 }
 
 .rem-duel-blank {

@@ -17,10 +17,12 @@ import {
   summarizeRecentRoadmapLessons,
 } from '../src/shared/roadmapCoach.ts';
 import {
+  cancelEnglishSpeech,
   formatTextForEnglishTts,
   hasBrowserNaturalEnglishVoice,
   pickBestEnglishVoice,
   shouldUseNeuralTts,
+  speakEnglishText,
 } from '../src/shared/speech.ts';
 import {
   ACTIVE_ROADMAP_SESSION_VERSION,
@@ -29,6 +31,7 @@ import {
   type RoadmapLessonRecord,
   type UserCardProgress,
 } from '../src/shared/types.ts';
+import { computeTrayInsertionIndex } from '../src/shared/wordBankDrag.ts';
 
 const deckCards = JSON.parse(
   fs.readFileSync(path.resolve('public/data/cards.json'), 'utf8')
@@ -508,18 +511,90 @@ test('formatTextForEnglishTts expands awkward contractions like "we\'ve" and pic
   assert.equal(hasBrowserNaturalEnglishVoice(braveOfflineVoices), false);
   assert.equal(hasBrowserNaturalEnglishVoice(trOnly), false);
 
-  // Hybrid: Brave/offline auto-upgrades sentences to Piper neural, Chrome/Edge stay native
+  // Piper neural voice is permanently active for all English speech across every browser and mode
   assert.equal(shouldUseNeuralTts('hybrid', braveOfflineVoices, false), true);
-  assert.equal(shouldUseNeuralTts('hybrid', braveOfflineVoices, true), false);
-  assert.equal(shouldUseNeuralTts('hybrid', mixedLocalAndCloud, false), false);
-  assert.equal(shouldUseNeuralTts('hybrid', edgeNaturalVoices, false), false);
-
-  // Neural mode forces Piper on every browser including Chrome
+  assert.equal(shouldUseNeuralTts('hybrid', braveOfflineVoices, true), true);
+  assert.equal(shouldUseNeuralTts('hybrid', mixedLocalAndCloud, false), true);
+  assert.equal(shouldUseNeuralTts('hybrid', edgeNaturalVoices, false), true);
   assert.equal(shouldUseNeuralTts('neural', mixedLocalAndCloud, false), true);
   assert.equal(shouldUseNeuralTts('neural', mixedLocalAndCloud, true), true);
+  assert.equal(shouldUseNeuralTts('local', braveOfflineVoices, false), true);
+});
 
-  // Local mode never invokes Piper
-  assert.equal(shouldUseNeuralTts('local', braveOfflineVoices, false), false);
+test('speakEnglishText permanently routes through Piper neural TTS and queues rapid quick-tile clicks', () => {
+  const g = globalThis as unknown as {
+    chrome?: unknown;
+    window?: unknown;
+  };
+  const origChrome = g.chrome;
+  const origWindow = g.window;
+
+  const sentMessages: Array<{ type: string; text?: string; queue?: boolean }> = [];
+  let browserSpeakCalls = 0;
+
+  g.window = {
+    speechSynthesis: {
+      speak: () => {
+        browserSpeakCalls += 1;
+      },
+      cancel: () => {},
+    },
+  };
+  g.chrome = {
+    runtime: {
+      sendMessage: (msg: { type: string; text?: string; queue?: boolean }) => {
+        sentMessages.push(msg);
+        return Promise.resolve({ ok: true });
+      },
+    },
+  };
+
+  try {
+    cancelEnglishSpeech();
+    sentMessages.length = 0;
+
+    // 1. Rapid consecutive tile taps queue via SPEAK_NEURAL_TTS without touching browser speechSynthesis
+    speakEnglishText('This', 1.0, { isQuickTile: true });
+    speakEnglishText('tea', 1.0, { isQuickTile: true });
+    speakEnglishText('is', 1.0, { isQuickTile: true });
+
+    assert.equal(browserSpeakCalls, 0, 'Browser speechSynthesis.speak must never be called');
+    assert.deepEqual(
+      sentMessages.map((m) => ({ type: m.type, text: m.text, queue: m.queue })),
+      [
+        { type: 'SPEAK_NEURAL_TTS', text: 'This', queue: true },
+        { type: 'SPEAK_NEURAL_TTS', text: 'tea', queue: true },
+        { type: 'SPEAK_NEURAL_TTS', text: 'is', queue: true },
+      ]
+    );
+
+    // 2. Normal sentence playback interrupts queued tiles (queue: false)
+    speakEnglishText('This tea is very nice.', 1.0);
+    assert.deepEqual(sentMessages[sentMessages.length - 1], {
+      type: 'SPEAK_NEURAL_TTS',
+      text: 'This tea is very nice.',
+      rate: 1,
+      reqId: sentMessages[sentMessages.length - 1] && (sentMessages[sentMessages.length - 1] as { reqId?: number }).reqId,
+      queue: false,
+    });
+
+    // 3. Tapping two tiles rapidly after a normal sentence interrupts the sentence on tile 1 (queue: false)
+    // and queues tile 2 right behind tile 1 (queue: true)
+    sentMessages.length = 0;
+    speakEnglishText('This', 1.0, { isQuickTile: true });
+    speakEnglishText('tea', 1.0, { isQuickTile: true });
+    assert.deepEqual(
+      sentMessages.map((m) => ({ type: m.type, text: m.text, queue: m.queue })),
+      [
+        { type: 'SPEAK_NEURAL_TTS', text: 'This', queue: false },
+        { type: 'SPEAK_NEURAL_TTS', text: 'tea', queue: true },
+      ]
+    );
+  } finally {
+    cancelEnglishSpeech();
+    g.chrome = origChrome;
+    g.window = origWindow;
+  }
 });
 
 test('multiple-choice answer positions are well-distributed for large Date.now()-style seeds', () => {
@@ -610,4 +685,38 @@ test('spiral review releases recovered words after streak >= 2 and modern senten
     assert.equal(ex.correctChoice?.toLowerCase(), 'broke down');
     assert.ok(ex.promptText.includes('_______'));
   }
+});
+
+test('computeTrayInsertionIndex allows dropping word-bank tiles into any position (start, middle gaps, end, and multi-row)', () => {
+  // Empty tray -> index 0
+  assert.equal(computeTrayInsertionIndex([], 120, 200), 0);
+
+  // Single row: [My] (20..60), [uncle's] (66..136), [was] (142..190), [teaching] (196..276) at y=180..208
+  const rowRects = [
+    { left: 20, top: 180, width: 40, height: 28 }, // midX = 40
+    { left: 66, top: 180, width: 70, height: 28 }, // midX = 101
+    { left: 142, top: 180, width: 48, height: 28 }, // midX = 166
+    { left: 196, top: 180, width: 80, height: 28 }, // midX = 236
+  ];
+
+  // Before "My"
+  assert.equal(computeTrayInsertionIndex(rowRects, 25, 194), 0);
+  // Between "My" and "uncle's"
+  assert.equal(computeTrayInsertionIndex(rowRects, 75, 194), 1);
+  // Between "uncle's" and "was" (e.g., inserting "job" -> "My uncle's job was teaching")
+  assert.equal(computeTrayInsertionIndex(rowRects, 138, 194), 2);
+  // Between "was" and "teaching"
+  assert.equal(computeTrayInsertionIndex(rowRects, 192, 194), 3);
+  // After "teaching"
+  assert.equal(computeTrayInsertionIndex(rowRects, 260, 194), 4);
+
+  // Wrapped 2nd row at y=216..244
+  const multiRowRects = [
+    ...rowRects,
+    { left: 20, top: 216, width: 64, height: 28 }, // index 4, midX = 52
+    { left: 90, top: 216, width: 60, height: 28 }, // index 5, midX = 120
+  ];
+  assert.equal(computeTrayInsertionIndex(multiRowRects, 30, 230), 4);
+  assert.equal(computeTrayInsertionIndex(multiRowRects, 80, 230), 5);
+  assert.equal(computeTrayInsertionIndex(multiRowRects, 145, 230), 6);
 });

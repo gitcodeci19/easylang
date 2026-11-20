@@ -1,4 +1,5 @@
 import type { AnalyticsSummary } from '../shared/analytics';
+import { autoTagEnglishQuotesForCoach } from '../shared/bilingualTtsSplit.ts';
 import {
   getAiLanguagePromptName,
   resolveSupportedLanguage,
@@ -1527,7 +1528,7 @@ export async function generateAiGrammarCoach(
       typeof obj.headlineTr === 'string' && obj.headlineTr.trim()
         ? stripBrackets(obj.headlineTr).slice(0, 110)
         : ruleTitle;
-    const explanationTr =
+    const rawExplanationTr =
       typeof obj.explanationTr === 'string'
         ? obj.explanationTr
             .replace(/[*#_`]/g, '')
@@ -1535,7 +1536,7 @@ export async function generateAiGrammarCoach(
             .trim()
             .slice(0, 460)
         : '';
-    if (!ruleTitle || !explanationTr) continue;
+    if (!ruleTitle || !rawExplanationTr) continue;
 
     const rawExamples = Array.isArray(obj.examples) ? obj.examples : [];
     const examples: Array<{ en: string; tr: string }> = [];
@@ -1546,6 +1547,12 @@ export async function generateAiGrammarCoach(
       const tr = typeof eObj.tr === 'string' ? eObj.tr.trim().slice(0, 180) : '';
       if (en && tr) examples.push({ en, tr });
     }
+
+    const explanationTr = autoTagEnglishQuotesForCoach(rawExplanationTr, [
+      sentenceEn,
+      focusPhrase,
+      ...examples.map((e) => e.en),
+    ]);
 
     items.push({ ruleTitle, focusPhrase, headlineTr, explanationTr, examples });
   }

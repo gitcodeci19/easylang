@@ -485,7 +485,7 @@ async function loadSettingsIntoForm(): Promise<void> {
   includeUserCardsInput.checked = s.includeUserCards;
   skipFullscreenInput.checked = s.skipFullscreen;
   autoSpeakInput.checked = s.autoSpeak;
-  ttsVoiceModeSelect.value = s.ttsVoiceMode ?? 'hybrid';
+  ttsVoiceModeSelect.value = 'neural';
   autoTranslateInput.checked = s.autoTranslateContextMenu;
 
   const boxes = Array.from(levelsGroup.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
@@ -1061,7 +1061,7 @@ settingsForm.addEventListener('submit', async (e) => {
     includeUserCards: includeUserCardsInput.checked,
     skipFullscreen: skipFullscreenInput.checked,
     autoSpeak: autoSpeakInput.checked,
-    ttsVoiceMode: (ttsVoiceModeSelect.value || 'hybrid') as 'hybrid' | 'neural' | 'natural' | 'local',
+    ttsVoiceMode: 'neural',
     autoTranslateContextMenu: autoTranslateInput.checked,
   });
 

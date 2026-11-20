@@ -719,7 +719,7 @@ export type ExtensionMessage =
   | { type: 'RUN_STORAGE_HYGIENE' }
   | { type: 'GET_STATUS' }
   | { type: 'SETTINGS_UPDATED' }
-  | { type: 'SPEAK_NEURAL_TTS'; text: string; rate?: number; reqId?: number }
+  | { type: 'SPEAK_NEURAL_TTS'; text: string; rate?: number; reqId?: number; queue?: boolean }
   | { type: 'CANCEL_NEURAL_TTS' }
   | { type: 'PREPARE_NEURAL_TTS' }
   | { type: 'GET_NEURAL_TTS_STATUS' }

@@ -487,11 +487,13 @@ async function ensureTtsOffscreenDocument(): Promise<void> {
 }
 
 let lastCoachTabId: number | null = null;
+let offscreenSpeakChain: Promise<Record<string, unknown>> = Promise.resolve({ ok: true });
 
-async function sendToTtsOffscreen(payload: {
+async function dispatchToTtsOffscreenNow(payload: {
   action: 'SPEAK' | 'CANCEL' | 'PREPARE' | 'STATUS' | 'COACH_SPEAK' | 'COACH_CONTROL';
   text?: string;
   rate?: number;
+  queue?: boolean;
   requestId?: string;
   command?: 'pause' | 'resume' | 'stop' | 'seek' | 'rate';
   value?: number;
@@ -507,6 +509,25 @@ async function sendToTtsOffscreen(payload: {
     target: 'tts-offscreen',
     ...payload,
   });
+}
+
+async function sendToTtsOffscreen(payload: {
+  action: 'SPEAK' | 'CANCEL' | 'PREPARE' | 'STATUS' | 'COACH_SPEAK' | 'COACH_CONTROL';
+  text?: string;
+  rate?: number;
+  queue?: boolean;
+  requestId?: string;
+  command?: 'pause' | 'resume' | 'stop' | 'seek' | 'rate';
+  value?: number;
+}): Promise<Record<string, unknown>> {
+  if (payload.action === 'SPEAK' || payload.action === 'CANCEL') {
+    const next = offscreenSpeakChain
+      .catch(() => ({ ok: false }))
+      .then(() => dispatchToTtsOffscreenNow(payload));
+    offscreenSpeakChain = next;
+    return next;
+  }
+  return dispatchToTtsOffscreenNow(payload);
 }
 
 chrome.runtime.onMessage.addListener((message: ExtensionMessage & { target?: string }, sender, sendResponse) => {
@@ -897,6 +918,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage & { target?: str
           action: 'SPEAK',
           text: message.text,
           rate: message.rate,
+          queue: message.queue,
         });
         sendResponse(res ?? { ok: false, error: 'No response from TTS offscreen' });
         break;

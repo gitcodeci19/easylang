@@ -9,6 +9,7 @@ import { resolveSupportedLanguage } from './i18n';
 import { evaluateEnglishAnswer, evaluateTurkishAnswer } from './matcher';
 import { REMEDIAL_SKILL_CATALOG, REMEDIAL_VOICE_TRANSCRIPTS } from './remedialCatalog';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
+import { attachWordBankTileGesture } from './wordBankDrag';
 import {
   clearActiveRemedialSession,
   clearActiveRoadmapSession,
@@ -892,8 +893,8 @@ function getExerciseBadgeInfo(
       return {
         badge: isTr ? '🧱 CÜMLE İNŞASI' : '🧱 SENTENCE BUILDER',
         instruction: isTr
-          ? 'Kelimelere sırayla tıklayarak İngilizce cümleyi kur:'
-          : 'Tap tiles in order to build the English sentence:',
+          ? 'Kelimelere tıklayarak veya sürükleyerek İngilizce cümleyi kur:'
+          : 'Tap or drag tiles to build the English sentence:',
       };
     case 'free_translation':
       return {
@@ -1231,7 +1232,7 @@ export function startRemedialLessonSession(
 
       if (ex.promptSubtext) {
         const sub = document.createElement('div');
-        sub.className = 'rem-prompt-sub-plain';
+        sub.className = 'rem-prompt-sub-plain is-meaning-cue';
         sub.textContent = ex.promptSubtext;
         promptCard.appendChild(sub);
       }
@@ -1255,6 +1256,7 @@ export function startRemedialLessonSession(
           btns.forEach((b) => b.classList.toggle('selected', b === btn));
           const blankEl = promptCard.querySelector('.rem-duel-blank');
           if (blankEl) blankEl.textContent = ch;
+          speakEnglish(ch, 1.0, { isQuickTile: ch.trim().split(/\s+/).length <= 3 });
           updateCheckEnabled();
           persistLesson(false);
         });
@@ -1454,6 +1456,7 @@ export function startRemedialLessonSession(
           if (targetTokBtn) {
             renderTokenDiff(targetTokBtn, buggyTok, fChoice);
           }
+          speakEnglish(fChoice, 1.0, { isQuickTile: fChoice.trim().split(/\s+/).length <= 3 });
           syncStepper();
           updateCheckEnabled();
           persistLesson(false);
@@ -1506,6 +1509,7 @@ export function startRemedialLessonSession(
           selectedChoice = ch;
           currentDraft.selectedChoice = ch;
           btns.forEach((b) => b.classList.toggle('selected', b === btn));
+          speakEnglish(ch, 1.0);
           updateCheckEnabled();
           persistLesson(false);
         });
@@ -1551,7 +1555,7 @@ export function startRemedialLessonSession(
       promptCard.appendChild(promptMain);
       if (ex.promptSubtext) {
         const sub = document.createElement('div');
-        sub.className = 'rem-prompt-sub-plain';
+        sub.className = `rem-prompt-sub-plain${ex.kind === 'cloze_blank' ? ' is-meaning-cue' : ''}`;
         sub.textContent = ex.promptSubtext;
         promptCard.appendChild(sub);
       }
@@ -1572,6 +1576,9 @@ export function startRemedialLessonSession(
           selectedChoice = ch;
           currentDraft.selectedChoice = ch;
           btns.forEach((b) => b.classList.toggle('selected', b === btn));
+          if (ex.kind === 'cloze_blank' || ex.direction === 'tr-to-en') {
+            speakEnglish(ch, 1.0, { isQuickTile: ch.trim().split(/\s+/).length <= 3 });
+          }
           updateCheckEnabled();
           persistLesson(false);
         });
@@ -1610,6 +1617,13 @@ export function startRemedialLessonSession(
       const bankTray = document.createElement('div');
       bankTray.className = 'duo-wb-bank-tray';
 
+      const commitPlacedTilesChange = (): void => {
+        currentDraft.placedTileIndices = placedTiles.map((p) => p.bankIdx);
+        renderTrays();
+        updateCheckEnabled();
+        persistLesson(false);
+      };
+
       const renderTrays = (): void => {
         answerTray.replaceChildren();
         bankTray.replaceChildren();
@@ -1620,13 +1634,32 @@ export function startRemedialLessonSession(
           chip.type = 'button';
           chip.className = 'duo-wb-tile placed';
           chip.textContent = item.text;
-          chip.addEventListener('click', () => {
-            if (locked) return;
-            placedTiles.splice(i, 1);
-            currentDraft.placedTileIndices = placedTiles.map((p) => p.bankIdx);
-            renderTrays();
-            updateCheckEnabled();
-            persistLesson(false);
+          chip.title = isTr
+            ? 'Geri koymak için tıkla veya sürükleyip yerini değiştir'
+            : 'Click to put back or drag to reorder';
+          attachWordBankTileGesture({
+            chip,
+            word: item.text,
+            source: 'answer',
+            answerTray,
+            bankTray,
+            isLocked: () => locked,
+            onTap: () => {
+              placedTiles.splice(i, 1);
+              commitPlacedTilesChange();
+            },
+            onDropIntoAnswer: (insertIndex) => {
+              const [moved] = placedTiles.splice(i, 1);
+              if (moved) {
+                const clamped = Math.max(0, Math.min(placedTiles.length, insertIndex));
+                placedTiles.splice(clamped, 0, moved);
+                commitPlacedTilesChange();
+              }
+            },
+            onDropBackToBank: () => {
+              placedTiles.splice(i, 1);
+              commitPlacedTilesChange();
+            },
           });
           answerTray.appendChild(chip);
         }
@@ -1645,14 +1678,27 @@ export function startRemedialLessonSession(
           lbl.textContent = tok;
           chip.appendChild(lbl);
           if (!used) {
-            chip.addEventListener('click', () => {
-              if (locked) return;
-              speakEnglish(tok, 1.0, { isQuickTile: true });
-              placedTiles.push({ bankIdx: i, text: tok });
-              currentDraft.placedTileIndices = placedTiles.map((p) => p.bankIdx);
-              renderTrays();
-              updateCheckEnabled();
-              persistLesson(false);
+            chip.title = isTr
+              ? 'Eklemek için tıkla veya istediğin aralığa sürükle'
+              : 'Click to add or drag into any position';
+            attachWordBankTileGesture({
+              chip,
+              word: tok,
+              source: 'bank',
+              answerTray,
+              bankTray,
+              isLocked: () => locked,
+              onTap: () => {
+                speakEnglish(tok, 1.0, { isQuickTile: true });
+                placedTiles.push({ bankIdx: i, text: tok });
+                commitPlacedTilesChange();
+              },
+              onDropIntoAnswer: (insertIndex) => {
+                speakEnglish(tok, 1.0, { isQuickTile: true });
+                const clamped = Math.max(0, Math.min(placedTiles.length, insertIndex));
+                placedTiles.splice(clamped, 0, { bankIdx: i, text: tok });
+                commitPlacedTilesChange();
+              },
             });
           }
           bankTray.appendChild(chip);

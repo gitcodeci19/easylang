@@ -365,12 +365,22 @@ test('splitBilingualCoachSegments routes Turkish prose to EMA and quoted English
       { lang: 'en', text: 'was' },
       { lang: 'tr', text: 'kelimesi tekil geçmiş zamanı anlatır; örneğin' },
       { lang: 'en', text: "Let's go" },
-      { lang: 'tr', text: 'gibi. hayır veya örnek ise Türkçe kalır.' },
+      { lang: 'tr', text: 'gibi. "hayır" veya "örnek" ise Türkçe kalır.' },
     ]
   );
   assert.equal(segs[0]!.startWordIdx, 0);
   assert.equal(segs[1]!.startWordIdx, 2);
   assert.equal(segs[1]!.endWordIdx, 3);
+
+  // Mixed single-quoted Turkish glosses ('geri aynası', 'arka') + double-quoted English ("rear-view mirror", "Rear", "view")
+  const rearViewSegs = splitBilingualCoachSegments(
+    'Türkçede \'geri aynası\' veya \'arka aynası\' dediğimiz araç aynası, İngilizcede "rear-view mirror" olarak geçer. "Rear" kelimesi \'arka\' anlamına gelir ve "view" ile birleşerek \'arka görüş\' kavramını oluşturur.'
+  );
+  assert.deepEqual(
+    rearViewSegs.filter((s) => s.lang === 'en').map((s) => s.text),
+    ['rear-view mirror', 'Rear', 'view']
+  );
+  assert.ok(rearViewSegs.filter((s) => s.lang === 'tr').some((s) => s.text.includes('arka')));
 });
 
 test('EMA Lightning Turkish frontend normalizes numbers/Turkish casing, builds valid timeline, and resamples cleanly', () => {
