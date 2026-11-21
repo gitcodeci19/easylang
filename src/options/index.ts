@@ -837,7 +837,9 @@ wireProviderPreset(
 function syncDashboardGuideButtons(mode: FeedbackLanguageMode): void {
   const isTr = resolveSupportedLanguage(mode) === 'tr';
   document
-    .querySelectorAll<HTMLButtonElement>('.tab-guide-row .el-help-trigger[data-guide-id]')
+    .querySelectorAll<HTMLButtonElement>(
+      '.tab-header-row .el-help-trigger[data-guide-id], .tab-guide-row .el-help-trigger[data-guide-id]'
+    )
     .forEach((btn) => {
       const gid = btn.dataset.guideId as AssistantGuideId | undefined;
       if (!gid || !(gid in ASSISTANT_GUIDE_LABELS)) return;
@@ -853,7 +855,9 @@ function syncDashboardGuideButtons(mode: FeedbackLanguageMode): void {
 }
 
 document
-  .querySelectorAll<HTMLButtonElement>('.tab-guide-row .el-help-trigger[data-guide-id]')
+  .querySelectorAll<HTMLButtonElement>(
+    '.tab-header-row .el-help-trigger[data-guide-id], .tab-guide-row .el-help-trigger[data-guide-id]'
+  )
   .forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
