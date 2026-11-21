@@ -449,9 +449,46 @@ function generateMorphologicalCandidates(word: string): StemCandidate[] {
     const base = word.slice(0, -2);
     add(base, 'zarf (-ly)');
     add(`${base}e`, 'zarf (-ly)');
+    if (!word.endsWith('lly')) {
+      // e.g. gently -> gentle, simply -> simple, terribly -> terrible
+      add(`${word.slice(0, -1)}e`, 'zarf (-ly)');
+    }
     if (base.endsWith('l')) {
       add(`${base}e`, 'zarf (-ly)');
     }
+  }
+
+  // Derivational suffixes (-able/-ible, -ful, -less, -ness, -ity, -al)
+  if (word.endsWith('ness') && word.length > 6) {
+    const base = word.slice(0, -4);
+    add(base, 'isim türetme (-ness)');
+    if (base.endsWith('i')) add(`${base.slice(0, -1)}y`, 'isim türetme (-ness)');
+  }
+  if (word.endsWith('ful') && word.length > 5) {
+    const base = word.slice(0, -3);
+    add(base, 'sıfat (-ful)');
+    if (base.endsWith('i')) add(`${base.slice(0, -1)}y`, 'sıfat (-ful)');
+  }
+  if (word.endsWith('less') && word.length > 6) {
+    const base = word.slice(0, -4);
+    add(base, 'olumsuz sıfat (-less / -siz)');
+    if (base.endsWith('i')) add(`${base.slice(0, -1)}y`, 'olumsuz sıfat (-less / -siz)');
+  }
+  if ((word.endsWith('able') || word.endsWith('ible')) && word.length > 6) {
+    const base = word.slice(0, -4);
+    add(base, 'sıfat (-able / -ebilir)');
+    add(`${base}e`, 'sıfat (-able / -ebilir)');
+    if (base.endsWith('i')) add(`${base.slice(0, -1)}y`, 'sıfat (-able / -ebilir)');
+  }
+  if (word.endsWith('ity') && word.length > 5) {
+    const base = word.slice(0, -3);
+    add(base, 'isim türetme (-ity)');
+    add(`${base}e`, 'isim türetme (-ity)');
+  }
+  if (word.endsWith('al') && word.length > 5) {
+    const base = word.slice(0, -2);
+    add(base, 'sıfat (-al)');
+    add(`${base}e`, 'sıfat (-al)');
   }
 
   return out;
@@ -658,5 +695,109 @@ export function lookupOfflineWord(
     }
   }
 
+  // 6. Productive English prefix fallback (e.g. "reuse", "redesign", "overbooked", "unreadable")
+  const prefixHit = resolvePrefixedWord(index, rawWord, norm);
+  if (prefixHit) return prefixHit;
+
+  // 7. Automatic compound word splitter (e.g. "starlight" -> star + light, "snowfall" -> snow + fall)
+  const compoundHit = resolveCompoundWord(index, rawWord, norm);
+  if (compoundHit) return compoundHit;
+
   return null;
+}
+
+const PRODUCTIVE_PREFIXES: ReadonlyArray<readonly [string, string]> = [
+  ['under', 'yetersiz / alt (under-)'],
+  ['over', 'aşırı / fazla (over-)'],
+  ['anti', 'karşıt (anti-)'],
+  ['auto', 'otomatik / öz (auto-)'],
+  ['multi', 'çoklu (multi-)'],
+  ['semi', 'yarı (semi-)'],
+  ['non', 'olumsuz / -sız (non-)'],
+  ['pre', 'önceden (pre-)'],
+  ['mis', 'yanlış (mis-)'],
+  ['dis', 'olumsuz / ters (dis-)'],
+  ['out', 'dış / aşma (out-)'],
+  ['sub', 'alt (sub-)'],
+  ['re', 'yeniden / tekrar (re-)'],
+  ['un', 'olumsuz (un-)'],
+  ['co', 'ortak / birlikte (co-)'],
+];
+
+function resolveDirectOrMorphRecord(
+  index: OfflineDictionaryIndex,
+  token: string
+): { record: IndexedWordRecord; noteTr?: string } | null {
+  const direct = findDirectOrSpellingRecord(index, token);
+  if (direct) return { record: direct };
+
+  const irr = IRREGULAR_LEMMAS[token];
+  if (irr) {
+    const rec = findDirectOrSpellingRecord(index, irr[0]);
+    if (rec) return { record: rec, noteTr: irr[1] };
+  }
+
+  for (const cand of generateMorphologicalCandidates(token)) {
+    const rec = findDirectOrSpellingRecord(index, cand.stem);
+    if (rec) return { record: rec, noteTr: cand.noteTr };
+  }
+  return null;
+}
+
+function resolvePrefixedWord(
+  index: OfflineDictionaryIndex,
+  rawWord: string,
+  norm: string
+): OfflineWordEntry | null {
+  if (!/^[a-z]{5,}$/.test(norm)) return null;
+  for (const [prefix, prefixNote] of PRODUCTIVE_PREFIXES) {
+    if (!norm.startsWith(prefix)) continue;
+    const root = norm.slice(prefix.length);
+    if (root.length < 3) continue;
+    const hit = resolveDirectOrMorphRecord(index, root);
+    if (!hit) continue;
+    const combinedNote = hit.noteTr ? `${prefixNote} · ${hit.noteTr}` : prefixNote;
+    return materializeEntry(rawWord, hit.record, combinedNote);
+  }
+  return null;
+}
+
+function resolveCompoundWord(
+  index: OfflineDictionaryIndex,
+  rawWord: string,
+  norm: string
+): OfflineWordEntry | null {
+  if (!/^[a-z]{6,}$/.test(norm)) return null;
+  let bestSplit: { left: IndexedWordRecord; right: IndexedWordRecord; score: number } | null = null;
+
+  for (let i = 3; i <= norm.length - 3; i += 1) {
+    const leftPart = norm.slice(0, i);
+    const rightPart = norm.slice(i);
+    const leftRec = findDirectOrSpellingRecord(index, leftPart);
+    if (!leftRec || leftRec.meaningsTr.length === 0) continue;
+
+    const rightHit = resolveDirectOrMorphRecord(index, rightPart);
+    if (!rightHit || rightHit.record.meaningsTr.length === 0) continue;
+
+    // Prefer more balanced splits (avoiding 3-letter fragments when a 4+4 or 4+6 split exists)
+    const minPart = Math.min(leftPart.length, rightPart.length);
+    const directBonus = rightHit.noteTr ? 0 : 2;
+    const score = minPart * 10 + directBonus;
+    if (!bestSplit || score > bestSplit.score) {
+      bestSplit = { left: leftRec, right: rightHit.record, score };
+    }
+  }
+
+  if (!bestSplit) return null;
+  const leftTr = bestSplit.left.meaningsTr[0] ?? '';
+  const rightTr = bestSplit.right.meaningsTr[0] ?? '';
+  if (!leftTr || !rightTr) return null;
+
+  return {
+    query: rawWord.trim(),
+    lemma: `${bestSplit.left.lemma} + ${bestSplit.right.lemma}`,
+    inflectionNoteTr: 'bileşik kelime',
+    posTr: bestSplit.right.posList[0] ?? 'isim',
+    meaningsTr: [`${leftTr} + ${rightTr}`],
+  };
 }

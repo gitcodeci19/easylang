@@ -911,7 +911,7 @@ export async function exportFullBackupJson(): Promise<{ json: string; filename: 
 
   return {
     json: JSON.stringify(payload, null, 2),
-    filename: `easylang-backup-${getLocalDateKey(new Date(now))}.json`,
+    filename: `lingoex-backup-${getLocalDateKey(new Date(now))}.json`,
   };
 }
 

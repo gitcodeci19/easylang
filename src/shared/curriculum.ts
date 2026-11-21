@@ -54,6 +54,17 @@ export interface CurriculumUnit {
   nodes: UnitNodeDefinition[];
 }
 
+export interface RoadmapPlacementResult {
+  level: CefrLevel;
+  score: number;
+  total: number;
+  targetUnitId: string;
+  unlockedCount: number;
+  completedAt: number;
+  /** Total completed placement attempts; attempts 1-2 have no cooldown, attempt 3+ requires a 7-day cooldown. */
+  attemptsCount: number;
+}
+
 export interface RoadmapState {
   xp: number;
   dailyXp: number;
@@ -73,6 +84,8 @@ export interface RoadmapState {
   unlockedUnitIds: string[];
   /** 0 = active/locked, 1 = unit completed, 2 = legendary gold */
   unitCrownLevels: Record<string, number>;
+  /** Latest completed Roadmap Placement Test ("Gerçek Seviyemi Belirle") result */
+  placementResult?: RoadmapPlacementResult;
 }
 
 function makeStandardNodes(unitTitleTr: string, unitTitleEn: string): UnitNodeDefinition[] {
@@ -927,6 +940,34 @@ export function normalizeRoadmapState(
   const unlocked = new Set<string>(unlockedUnitIds);
   unlocked.add(CURRICULUM_UNITS[0]!.id);
 
+  const rawPlacement = raw.placementResult;
+  const placementResult: RoadmapPlacementResult | undefined =
+    rawPlacement &&
+    typeof rawPlacement === 'object' &&
+    typeof rawPlacement.level === 'string' &&
+    typeof rawPlacement.score === 'number' &&
+    typeof rawPlacement.total === 'number' &&
+    typeof rawPlacement.targetUnitId === 'string' &&
+    typeof rawPlacement.completedAt === 'number'
+      ? {
+          level: rawPlacement.level,
+          score: Math.max(0, rawPlacement.score),
+          total: Math.max(1, rawPlacement.total),
+          targetUnitId: CURRICULUM_UNITS.some((u) => u.id === rawPlacement.targetUnitId)
+            ? rawPlacement.targetUnitId
+            : activeUnitId,
+          unlockedCount:
+            typeof rawPlacement.unlockedCount === 'number'
+              ? Math.max(1, rawPlacement.unlockedCount)
+              : unlocked.size,
+          completedAt: rawPlacement.completedAt,
+          attemptsCount:
+            typeof rawPlacement.attemptsCount === 'number' && rawPlacement.attemptsCount >= 1
+              ? Math.floor(rawPlacement.attemptsCount)
+              : 1,
+        }
+      : undefined;
+
   return {
     xp: rawXp,
     dailyXp: isSameDay && typeof raw.dailyXp === 'number' ? Math.max(0, raw.dailyXp) : 0,
@@ -948,6 +989,7 @@ export function normalizeRoadmapState(
       : [],
     unlockedUnitIds: [...unlocked],
     unitCrownLevels,
+    ...(placementResult ? { placementResult } : {}),
   };
 }
 

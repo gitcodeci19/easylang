@@ -345,7 +345,7 @@ export interface OnboardingCopy {
 
 const ONBOARDING_COPY_MAP: Partial<Record<SupportedLanguageCode, OnboardingCopy>> = {
   tr: {
-    title: 'EasyLang’e Hoş Geldin',
+    title: 'LingoEx’e Hoş Geldin',
     subtitle: 'Başlamak için sana uygun seçeneği seç:',
     btnFirstTime: 'İLK DEFA KULLANIYORUM',
     btnFirstTimeSub: 'Seviyene göre dengeli başlangıç ayarla',
@@ -364,7 +364,7 @@ const ONBOARDING_COPY_MAP: Partial<Record<SupportedLanguageCode, OnboardingCopy>
     restoreUploadBtn: 'Dosya Seç (.json)',
     restorePlaceholder: 'Yedek JSON içeriğini buraya yapıştırabilirsin...',
     restoreConfirmBtn: 'Yedeği Yükle ve Devam Et',
-    restoreError: 'Geçerli bir EasyLang yedeği (.json) veya kart listesi bulunamadı.',
+    restoreError: 'Geçerli bir LingoEx yedeği (.json) veya kart listesi bulunamadı.',
     restoreSkipBtn: 'Yedeksiz Devam Et',
     b1ReadyTitle: 'Elo puanın B1 seviyesine ulaştı!',
     b1ReadyDesc: 'Kendini B1 seviyesindeki kelimeleri ve cümleleri öğrenmek için hazır hissediyor musun?',
@@ -382,7 +382,7 @@ const ONBOARDING_COPY_MAP: Partial<Record<SupportedLanguageCode, OnboardingCopy>
     backupKeyNotice: 'Not: API anahtarları güvenlik nedeniyle yedek dosyasına dahil edilmez.',
   },
   en: {
-    title: 'Welcome to EasyLang',
+    title: 'Welcome to LingoEx',
     subtitle: 'Choose how you would like to get started:',
     btnFirstTime: "I'M USING THIS FOR THE FIRST TIME",
     btnFirstTimeSub: 'Set your language, level, and safe starting pace',
@@ -400,7 +400,7 @@ const ONBOARDING_COPY_MAP: Partial<Record<SupportedLanguageCode, OnboardingCopy>
     restoreUploadBtn: 'Choose Backup (.json)',
     restorePlaceholder: 'Paste your backup JSON content here...',
     restoreConfirmBtn: 'Restore Backup & Continue',
-    restoreError: 'Could not parse a valid EasyLang backup (.json) or card list.',
+    restoreError: 'Could not parse a valid LingoEx backup (.json) or card list.',
     restoreSkipBtn: 'Continue Without Backup',
     b1ReadyTitle: 'Your Elo reached B1 readiness!',
     b1ReadyDesc: 'Do you feel ready to unlock B1 words and sentences now?',
@@ -418,7 +418,7 @@ const ONBOARDING_COPY_MAP: Partial<Record<SupportedLanguageCode, OnboardingCopy>
     backupKeyNotice: 'Note: API keys are excluded from backups for your security.',
   },
   de: {
-    title: 'Willkommen bei EasyLang',
+    title: 'Willkommen bei LingoEx',
     subtitle: 'Wähle deinen Startmodus:',
     btnFirstTime: 'ERSTE NUTZUNG',
     btnFirstTimeSub: 'Sprache und passendes Startniveau festlegen',
@@ -453,7 +453,7 @@ const ONBOARDING_COPY_MAP: Partial<Record<SupportedLanguageCode, OnboardingCopy>
     backupKeyNotice: 'Hinweis: API-Schlüssel werden aus Sicherheitsgründen nicht exportiert.',
   },
   fr: {
-    title: 'Bienvenue sur EasyLang',
+    title: 'Bienvenue sur LingoEx',
     subtitle: 'Choisissez comment commencer :',
     btnFirstTime: 'PREMIÈRE UTILISATION',
     btnFirstTimeSub: 'Configurer votre langue et votre niveau de départ',
@@ -488,7 +488,7 @@ const ONBOARDING_COPY_MAP: Partial<Record<SupportedLanguageCode, OnboardingCopy>
     backupKeyNotice: 'Note : les clés API sont exclues des sauvegardes par sécurité.',
   },
   es: {
-    title: 'Bienvenido a EasyLang',
+    title: 'Bienvenido a LingoEx',
     subtitle: 'Elige cómo quieres empezar:',
     btnFirstTime: 'PRIMERA VEZ QUE LO USO',
     btnFirstTimeSub: 'Configura tu idioma y nivel inicial',

@@ -62,6 +62,7 @@ const TR_STOP_WORDS = new Set([
  * "2009 yılında" vs "2009'da", "kız çocuğu" vs "kız evlat") converge cleanly.
  */
 const TR_PHRASE_CANONICAL_RULES: Array<[RegExp, string]> = [
+  [/\bwi\s+fi\b/g, 'wifi'],
   [/\bhayatini\s+kaybet(ti|mistir|mis|tiler)\b/g, 'oldu'],
   [/\bvefat\s+et(ti|mistir|mis|tiler)\b/g, 'oldu'],
   [/\byasama\s+veda\s+et(ti|mistir)\b/g, 'oldu'],
@@ -70,6 +71,8 @@ const TR_PHRASE_CANONICAL_RULES: Array<[RegExp, string]> = [
   [/\bkiz\s+evla(di|t|dim)\b/g, 'kizcocuk'],
   [/\berkek\s+cocu(gu|k|gum|gun)\b/g, 'erkekcocuk'],
   [/\berkek\s+evla(di|t|dim)\b/g, 'erkekcocuk'],
+  [/\byatak\s+oda(si|sinda|sina|sindan|yi|m|mda|ma)?\b/g, 'yatakodasi'],
+  [/\boturma\s+oda(si|sinda|sina|sindan|yi|m|mda|ma)?\b/g, 'salon'],
   [/\balisveris\s+merkezi(nde|ne|nden|ni|nin)?\b/g, 'avm'],
   [/\byazilim\s+hata(si|lari)\b/g, 'bug'],
   [/\bcep\s+telefon(u|um|un|una|unda|undan)?\b/g, 'telefon'],
@@ -77,9 +80,18 @@ const TR_PHRASE_CANONICAL_RULES: Array<[RegExp, string]> = [
   [/\be\s+posta(yi|ya|da|dan)?\b/g, 'eposta'],
   [/\bev\s+odev(i|im|ini|in|leri)?\b/g, 'odev'],
   [/\bsatin\s+al(mak|di|dim|din|dik|dilar|iyor|iyorum|acak|acagim|mis)\b/g, 'al$1'],
+  [/\bmonte\s+et(mek|ti|tim|tin|tik|tiler|mistir|mis|iyor|iyorum|ecek|ecegim)?\b/g, 'kur$1'],
+  [/\bbir\s+araya\s+getir(mek|di|dim|din|dik|ebildi|iyor|ecek)?\b/g, 'birlestir$1'],
   [/\byardim\s+et(mek|ti|tim|tin|tik|iyor|iyorum|ecek)\b/g, 'yardim'],
   [/\byardimci\s+ol(mak|du|dum|dun|duk|uyor|uyorum|acak)\b/g, 'yardim'],
   [/\bdevam\s+et(mek|ti|tim|tik|iyor|ecek)\b/g, 'surdur'],
+  [/\bher\s+zaman\b/g, 'daima'],
+  [/\bsu\s+an(da)?\b/g, 'simdi'],
+  [/\bpek\s+cok\b/g, 'bircok'],
+  [/\bara\s+sira\b/g, 'bazen'],
+  [/\bgeri\s+don(mek|du|dum|dun|duk|uyor|ecek)?\b/g, 'don$1'],
+  [/\bfark\s+et(mek|ti|tim|tin|tik|mistir|mis|iyor|ecek)?\b/g, 'anla$1'],
+  [/\bkarar\s+ver(mek|di|dim|din|dik|mistir|mis|iyor|ecek)?\b/g, 'kararlas$1'],
 ];
 
 /**
@@ -188,7 +200,7 @@ const TR_SYNONYM_GROUPS: string[][] = [
   ['konusmak', 'soylemek', 'anlatmak', 'demek'],
   ['tanistirmak', 'tanitmak', 'takdim'],
   ['kazanmak', 'yenmek', 'galip'],
-  ['kaybetmek', 'yenilmek', 'yitirmek', 'unuttum', 'unutmak'],
+  ['kaybetmek', 'yenilmek', 'yitirmek'],
   ['sik', 'genellikle', 'cogunlukla'],
   ['aliskanlik', 'rutin', 'duzen', 'adet', 'aliski'],
   ['emekli', 'cekilmek'],
@@ -204,6 +216,29 @@ const TR_SYNONYM_GROUPS: string[][] = [
   ['varis', 'hedef', 'istikamet', 'rota'],
   ['sicaklik', 'hararet', 'derece'],
   ['tahmin', 'ongoru'],
+  ['ama', 'fakat', 'ancak', 'lakin'],
+  ['cunku', 'zira'],
+  ['tekrar', 'yine', 'yeniden'],
+  ['sonunda', 'nihayet'],
+  ['butun', 'tum', 'tamami'],
+  ['daima', 'hep', 'surekli'],
+  ['simdi', 'hemen', 'derhal'],
+  ['zayif', 'dusuk', 'gucsuz'],
+  ['kur', 'kurmak', 'birlestir', 'birlestirmek'],
+  ['bircok', 'cogu', 'fazla'],
+  ['vakit', 'zaman', 'sure'],
+  ['tuken', 'tukenmek', 'bit', 'bitmek'],
+  ['basla', 'baslamak', 'giris', 'girismek'],
+  ['bitir', 'bitirmek', 'tamamla', 'tamamlamak'],
+  ['anla', 'anlamak', 'kavra', 'kavramak', 'coz', 'cozmek'],
+  ['dusun', 'dusunmek', 'san', 'sanmak', 'zannet', 'zannetmek'],
+  ['iste', 'istemek', 'arzula', 'arzulamak', 'dile', 'dilemek'],
+  ['bak', 'bakmak', 'incele', 'incelemek'],
+  ['bul', 'bulmak', 'kesfet', 'kesfetmek'],
+  ['ver', 'vermek', 'sun', 'sunmak', 'sagla', 'saglamak'],
+  ['bazen', 'zamanla'],
+  ['kitaplik', 'raf'],
+  ['wifi', 'internet', 'kablosuz'],
 ];
 
 const TR_SYNONYM_MAP = new Map<string, Set<number>>();
@@ -218,22 +253,62 @@ TR_SYNONYM_GROUPS.forEach((group, groupIdx) => {
   }
 });
 
+const TR_NUMBER_WORD_RULES: Array<[RegExp, string]> = [
+  [/\bon\s+bir\b/g, '11'],
+  [/\bon\s+iki\b/g, '12'],
+  [/\bon\s+üç\b/g, '13'],
+  [/\bon\s+dört\b/g, '14'],
+  [/\bon\s+beş\b/g, '15'],
+  [/\bon\s+altı\b/g, '16'],
+  [/\bon\s+yedi\b/g, '17'],
+  [/\bon\s+sekiz\b/g, '18'],
+  [/\bon\s+dokuz\b/g, '19'],
+  [/\bsıfır\b/g, '0'],
+  [/\biki\b/g, '2'],
+  [/\büç\b/g, '3'],
+  [/\bdört\b/g, '4'],
+  [/\bbeş\b/g, '5'],
+  [/\baltı\s+(saat|dakika|gün|hafta|ay|yıl|sene|kişi|tane|adet|lira|dolar|euro|fincan|bardak|kilometre|metre)\b/g, '6 $1'],
+  [/\byedi\b/g, '7'],
+  [/\bsekiz\b/g, '8'],
+  [/\bdokuz\b/g, '9'],
+  [/\bon\b/g, '10'],
+  [/\byirmi\b/g, '20'],
+  [/\botuz\b/g, '30'],
+  [/\bkırk\b/g, '40'],
+  [/\belli\b/g, '50'],
+  [/\baltmış\b/g, '60'],
+  [/\byetmiş\b/g, '70'],
+  [/\bseksen\b/g, '80'],
+  [/\bdoksan\b/g, '90'],
+];
+
 /**
  * Normalize Turkish text for comparison: lowercase using tr-TR locale,
+ * preserve Turkish apostrophe-inflected proper nouns as single tokens,
  * remove parenthetical notes and punctuation, and collapse whitespace.
  */
 export function normalizeTurkish(input: string): string {
   return input
     .toLocaleLowerCase('tr-TR')
     .replace(/\([^)]*\)/g, ' ')
+    .replace(
+      /(\d+)['’](?:da|de|ta|te|dan|den|tan|ten|a|e|i|ı|u|ü|ya|ye|yi|yı|yu|yü|nin|nın|nun|nün|in|ın|un|ün)\b/g,
+      '$1'
+    )
+    .replace(/([a-zçğıöşü])['’]([a-zçğıöşü]{1,5})\b/g, '$1$2')
     .replace(/['"`’“”.,!?;:()\[\]{}\-_/\\]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-/** Fold Turkish diacritics to ASCII equivalents so minor keyboard misses still match. */
+/** Fold Turkish diacritics to ASCII equivalents (after normalizing unambiguous Turkish number words). */
 export function foldTurkishDiacritics(input: string): string {
-  return normalizeTurkish(input).replace(/[çğıİöşüâîû]/g, (ch) => TR_DIACRITIC_MAP[ch] ?? ch);
+  let s = normalizeTurkish(input);
+  for (const [re, rep] of TR_NUMBER_WORD_RULES) {
+    s = s.replace(re, rep);
+  }
+  return s.replace(/[çğıİöşüâîû]/g, (ch) => TR_DIACRITIC_MAP[ch] ?? ch);
 }
 
 function canonicalizeTurkishPhrases(foldedInput: string): string {
@@ -245,7 +320,7 @@ function canonicalizeTurkishPhrases(foldedInput: string): string {
 }
 
 const TR_SUFFIX_RE =
-  /(?:mistir|mustur|mektedir|maktadir|larimiz|lerimiz|larindan|lerinden|siniz|sunuz|sini|sunu|lari|leri|ndan|nden|inin|unun|imin|umun|ina|ine|una|une|dan|den|tan|ten|dir|dur|tir|tur|mak|mek|iyor|uyor|acak|ecek|mis|mus|di|du|ti|tu|im|um|in|un|yi|yu|ya|ye|da|de|ta|te|i|u)$/;
+  /(?:mistir|mustur|mektedir|maktadir|iyordum|uyorum|iyorum|iyorsun|uyorsun|iyoruz|uyoruz|iyorlar|uyorlar|acagim|ecegim|acaksin|eceksin|acagiz|ecegiz|acaklar|ecekler|larimiz|lerimiz|larindan|lerinden|sinda|sinde|sindan|sinden|siniz|sunuz|dilar|diler|dular|tilar|tiler|tular|mistim|mustum|misti|mustu|acak|ecek|iyor|uyor|yorum|yorsun|yoruz|yorlar|larin|lerin|imiz|umuz|iniz|unuz|sina|sine|sini|sunu|lari|leri|ndan|nden|inin|unun|imin|umun|ina|ine|una|une|dan|den|tan|ten|dir|dur|tir|tur|mak|mek|dim|dum|tim|tum|din|dun|tin|tun|dik|duk|tik|tuk|sin|sun|lar|ler|lik|luk|mis|mus|yor|di|du|ti|tu|im|um|in|un|yi|yu|ya|ye|da|de|ta|te|si|su|i|u|a|e)$/;
 
 /**
  * Generate root/stem candidates for a folded Turkish token, including
@@ -349,8 +424,34 @@ function isAdjacentTransposition(a: string, b: string): boolean {
   return foundSwap;
 }
 
+const TR_FUTURE_NOUN_EXCLUSIONS = new Set([
+  'bacak', 'kucak', 'ocak', 'sicak', 'ucak', 'sancak', 'oyuncak', 'salincak',
+]);
+
+function isTurkishFutureVerbToken(tok: string): boolean {
+  if (tok.length < 5 || TR_FUTURE_NOUN_EXCLUSIONS.has(tok)) return false;
+  return /(?:acag|eceg|acak|ecek)(?:im|in|iz|sin|siniz|lar|ler|ti|tim|tin|tik)?$/.test(tok);
+}
+
+function isTurkishPastVerbToken(tok: string): boolean {
+  if (tok.length < 4) return false;
+  return /(?:mistir|mustur|misti|mustu|mistim|mustum|dilar|diler|dular|tilar|tiler|tular|dim|dum|tim|tum|din|dun|tin|tun|dik|duk|tik|tuk|di|du|ti|tu)$/.test(
+    tok
+  );
+}
+
 function tokensMatchTurkish(userTok: string, targetTok: string): boolean {
   if (userTok === targetTok) return true;
+
+  // Block matching the same verb across opposite tenses (e.g. "katılacağım" vs "katıldım")
+  const userFut = isTurkishFutureVerbToken(userTok);
+  const targetFut = isTurkishFutureVerbToken(targetTok);
+  const userPast = !userFut && isTurkishPastVerbToken(userTok);
+  const targetPast = !targetFut && isTurkishPastVerbToken(targetTok);
+  if ((userFut && targetPast) || (targetFut && userPast)) {
+    return false;
+  }
+
   if (areTurkishTokensSynonymous(userTok, targetTok)) return true;
 
   const stemsU = getTurkishStemCandidates(userTok);
@@ -362,13 +463,10 @@ function tokensMatchTurkish(userTok: string, targetTok: string): boolean {
   }
 
   const minLen = Math.min(userTok.length, targetTok.length);
-  if (minLen >= 4) {
-    const prefixLen = Math.min(4, minLen);
-    if (userTok.slice(0, prefixLen) === targetTok.slice(0, prefixLen)) {
-      return true;
-    }
+  if (minLen >= 5 && (levenshteinDistance(userTok, targetTok) <= 1 || isAdjacentTransposition(userTok, targetTok))) {
+    return true;
   }
-  return levenshteinDistance(userTok, targetTok) <= 1 && minLen >= 4;
+  return false;
 }
 
 const TR_EXPLICIT_NEG_WORDS = new Set([
@@ -382,40 +480,189 @@ const TR_EXPLICIT_NEG_WORDS = new Set([
   'yok',
   'yoktur',
   'asla',
+  'hicbir',
+  'hicbiri',
+  'hicbirini',
+  'hicbirimiz',
 ]);
 
-/** Allow prefix, stem, softening-reversal, and synonym matching for Turkish words/sentences. */
-function stemOverlapScore(userTokens: string[], targetTokens: string[]): number {
-  const userHasNeg = userTokens.some((t) => TR_EXPLICIT_NEG_WORDS.has(t));
-  const targetHasNeg = targetTokens.some((t) => TR_EXPLICIT_NEG_WORDS.has(t));
-  if (userHasNeg !== targetHasNeg) return 0;
+const TR_NEG_MAZ_NOUN_EXCLUSIONS = new Set([
+  'namaz', 'bogaz', 'kiraz', 'ayaz', 'maraz', 'pekmez', 'comez', 'biraz',
+]);
+
+const TR_NEG_MAD_NOUN_EXCLUSIONS = new Set([
+  'damadi', 'damadim', 'damadin', 'damadimiz',
+]);
+
+/**
+ * Detect Turkish sentence negation reliably from BOTH standalone negation words
+ * and unambiguous negative verb inflections (without false-triggering on nouns
+ * or verbal nouns like "alışmam", "elma", "sinema", "tamam", "devam").
+ */
+function hasTurkishNegation(tokens: readonly string[]): boolean {
+  for (const tok of tokens) {
+    if (TR_EXPLICIT_NEG_WORDS.has(tok)) return true;
+    if (tok.length < 5) continue;
+    // Progressive negative: gelmiyor, gitmiyorum, bilmiyordu, cekmiyor, sevmiyor
+    if (/(?:miy|muy|may|mey)(?:or|ordu|ordun|orduk|ordunuz|ordular|orum|orsun|oruz|orsunuz|orlar|ormus)$/.test(tok)) {
+      return true;
+    }
+    // Past negative: gitmedim, yapmadi, almadik, gelmediler
+    if (!TR_NEG_MAD_NOUN_EXCLUSIONS.has(tok) && /(?:mad|med)(?:i|im|in|ik|iniz|ilar|iler)$/.test(tok)) {
+      return true;
+    }
+    // Evidential past negative: gitmemis, yapmamistir
+    if (/(?:mamis|memis)(?:tir|tur|im|in|iz|sin|siniz|lar|ler|ti|tim|tin|tik)?$/.test(tok)) {
+      return true;
+    }
+    // Future negative: gitmeyecegim, yapmayacak, katilmayacagim
+    if (/(?:mayacag|meyeceg|mayacak|meyecek)(?:im|in|iz|sin|siniz|lar|ler|ti|tim|tin|tik)?$/.test(tok)) {
+      return true;
+    }
+    // Aorist negative: yapmaz, gelmez, ucamaz, sevmezdi
+    if (
+      !TR_NEG_MAZ_NOUN_EXCLUSIONS.has(tok) &&
+      /(?:maz|mez)(?:im|in|sin|siniz|lar|ler|di|dim|din|dik|lerdi|mis)?$/.test(tok)
+    ) {
+      return true;
+    }
+    // Necessitative negative: kalmamaliydin, gitmemelisin, yapmamali
+    if (/(?:mamali|memeli)(?:yim|sin|yiz|siniz|lar|ler|ydi|ydim|ydin|ydik)?$/.test(tok)) {
+      return true;
+    }
+    // Plural negative imperative: unutmayin, yapmayiniz
+    if (/(?:mayin|meyin|mayiniz|meyiniz)$/.test(tok)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const TR_EXPLICIT_PAST_ADVERBS = new Set(['dun', 'eskiden']);
+const TR_EXPLICIT_FUTURE_ADVERBS = new Set(['yarin', 'haftaya', 'seneye']);
+
+function hasPastVsFutureTimeConflict(
+  userTokens: readonly string[],
+  targetTokens: readonly string[]
+): boolean {
+  const userPast = userTokens.some((t) => TR_EXPLICIT_PAST_ADVERBS.has(t));
+  const userFuture = userTokens.some((t) => TR_EXPLICIT_FUTURE_ADVERBS.has(t));
+  const targetPast = targetTokens.some((t) => TR_EXPLICIT_PAST_ADVERBS.has(t));
+  const targetFuture = targetTokens.some((t) => TR_EXPLICIT_FUTURE_ADVERBS.has(t));
+  return (
+    (userPast && !userFuture && targetFuture && !targetPast) ||
+    (userFuture && !userPast && targetPast && !targetFuture)
+  );
+}
+
+/**
+ * Compute 1-to-1 greedy content-token F1 overlap between Turkish sentences,
+ * guarded by negation polarity and explicit past/future time-adverb checks.
+ */
+function stemOverlapScore(
+  userTokens: string[],
+  targetTokens: string[]
+): { score: number; contentLen: number } {
+  if (hasTurkishNegation(userTokens) !== hasTurkishNegation(targetTokens)) {
+    return { score: 0, contentLen: Math.max(userTokens.length, targetTokens.length) };
+  }
+  if (hasPastVsFutureTimeConflict(userTokens, targetTokens)) {
+    return { score: 0, contentLen: Math.max(userTokens.length, targetTokens.length) };
+  }
 
   const filteredUser = userTokens.filter((t) => !TR_STOP_WORDS.has(t));
   const filteredTarget = targetTokens.filter((t) => !TR_STOP_WORDS.has(t));
   const u = filteredUser.length > 0 ? filteredUser : userTokens;
   const t = filteredTarget.length > 0 ? filteredTarget : targetTokens;
 
-  if (u.length === 0 || t.length === 0) return 0;
+  if (u.length === 0 || t.length === 0) return { score: 0, contentLen: 0 };
 
-  let matchedTarget = 0;
-  for (const targetTok of t) {
-    if (u.some((userTok) => tokensMatchTurkish(userTok, targetTok))) {
-      matchedTarget += 1;
+  // Pass 1: exact matches 1-to-1; Pass 2: synonym/stem/typo matches 1-to-1 (prevents repeated-word gaming)
+  const usedU = new Set<number>();
+  const usedT = new Set<number>();
+  let matchedPairs = 0;
+
+  for (let ti = 0; ti < t.length; ti += 1) {
+    for (let ui = 0; ui < u.length; ui += 1) {
+      if (usedU.has(ui)) continue;
+      if (u[ui] === t[ti]) {
+        usedU.add(ui);
+        usedT.add(ti);
+        matchedPairs += 1;
+        break;
+      }
     }
   }
 
-  let matchedUser = 0;
-  for (const userTok of u) {
-    if (t.some((targetTok) => tokensMatchTurkish(userTok, targetTok))) {
-      matchedUser += 1;
+  for (let ti = 0; ti < t.length; ti += 1) {
+    if (usedT.has(ti)) continue;
+    for (let ui = 0; ui < u.length; ui += 1) {
+      if (usedU.has(ui)) continue;
+      if (tokensMatchTurkish(u[ui]!, t[ti]!)) {
+        usedU.add(ui);
+        usedT.add(ti);
+        matchedPairs += 1;
+        break;
+      }
     }
   }
 
-  // Symmetric recall + precision harmonic mean so single lucky word doesn't pass a long sentence
-  const recall = matchedTarget / t.length;
-  const precision = matchedUser / u.length;
-  if (recall + precision === 0) return 0;
-  return (2 * recall * precision) / (recall + precision);
+  const recall = matchedPairs / t.length;
+  const precision = matchedPairs / u.length;
+  if (recall + precision === 0) return { score: 0, contentLen: Math.max(u.length, t.length) };
+  return {
+    score: (2 * recall * precision) / (recall + precision),
+    contentLen: Math.max(u.length, t.length),
+  };
+}
+
+function extractRequiredEntitiesFromCandidate(
+  rawCandidate: string,
+  canonCandTokens: readonly string[]
+): string[] {
+  const required = new Set<string>();
+  // 1. All numeric values (including normalized Turkish number words like iki -> 2, kirk -> 40)
+  for (const tok of canonCandTokens) {
+    if (/^\d+$/.test(tok)) {
+      required.add(tok);
+    }
+  }
+  // 2. Interior capitalized proper nouns in the reference sentence (e.g. "İstanbul'a", "IKEA", "Jackson")
+  const rawWords = rawCandidate.trim().split(/\s+/).filter(Boolean);
+  for (let i = 1; i < rawWords.length; i += 1) {
+    const prev = rawWords[i - 1] ?? '';
+    if (/[.!?]$/.test(prev)) continue; // Start of a new sentence, not an interior proper noun
+    const w = rawWords[i]!.replace(/^["'(«]+|["')».,!?;:]+$/g, '');
+    if (!w || w.length < 3) continue;
+    // Detect uppercase Turkish initial (A-Z, ÇĞİÖŞÜ)
+    if (/^[A-ZÇĞİÖŞÜ]/.test(w)) {
+      const folded = canonicalizeTurkishPhrases(foldTurkishDiacritics(w));
+      for (const tok of folded.split(' ').filter((x) => x.length >= 3)) {
+        required.add(tok);
+      }
+    }
+  }
+  return Array.from(required);
+}
+
+function hasMissingRequiredNumberOrProperNoun(
+  userTokens: readonly string[],
+  rawCandidate: string,
+  canonCandTokens: readonly string[]
+): boolean {
+  const required = extractRequiredEntitiesFromCandidate(rawCandidate, canonCandTokens);
+  if (required.length === 0) return false;
+  for (const req of required) {
+    const found = userTokens.some((ut) => tokensMatchTurkish(ut, req));
+    if (!found) return true;
+  }
+  return false;
+}
+
+function getSentenceOverlapThreshold(contentLen: number): number {
+  if (contentLen <= 2) return 0.9;
+  if (contentLen <= 4) return 0.78;
+  return 0.74;
 }
 
 /**
@@ -499,7 +746,19 @@ function evaluateSingleTurkishSegment(
       };
     }
 
-    // Typo tolerance on folded strings
+    const userTokens = canonUser.split(' ').filter(Boolean);
+    const candTokens = canonCand.split(' ').filter(Boolean);
+    const hasPolarityConflict =
+      hasTurkishNegation(userTokens) !== hasTurkishNegation(candTokens) ||
+      hasPastVsFutureTimeConflict(userTokens, candTokens) ||
+      (cardType === 'sentence' &&
+        hasMissingRequiredNumberOrProperNoun(userTokens, candidate, candTokens));
+
+    if (hasPolarityConflict) {
+      continue;
+    }
+
+    // Typo tolerance on folded strings (never bypasses negation/time polarity guards)
     const maxLen = Math.max(foldedUser.length, foldedCand.length);
     const dist = levenshteinDistance(foldedUser, foldedCand);
     const similarity = maxLen > 0 ? 1 - dist / maxLen : 0;
@@ -509,8 +768,16 @@ function evaluateSingleTurkishSegment(
       bestTarget = candidate;
     }
 
-    const allowedEdits = cardType === 'word' ? (maxLen >= 8 ? 2 : maxLen >= 4 ? 1 : 0) : Math.floor(maxLen * 0.18);
-    if ((dist <= allowedEdits && similarity >= 0.78) || isAdjacentTransposition(foldedUser, foldedCand)) {
+    const allowedEdits =
+      cardType === 'word'
+        ? maxLen >= 8
+          ? 2
+          : maxLen >= 4
+            ? 1
+            : 0
+        : Math.min(3, Math.floor(maxLen * 0.1));
+    const minFuzzySim = cardType === 'word' ? 0.78 : 0.88;
+    if ((dist <= allowedEdits && similarity >= minFuzzySim) || isAdjacentTransposition(foldedUser, foldedCand)) {
       return {
         isCorrect: true,
         matchKind: 'fuzzy',
@@ -521,14 +788,12 @@ function evaluateSingleTurkishSegment(
 
     // Sentence or multi-word phrase token overlap (using both raw-folded and phrase-canonicalized tokens)
     if (cardType === 'sentence' || normCand.includes(' ') || normUser.includes(' ')) {
-      const userTokens = canonUser.split(' ').filter(Boolean);
-      const candTokens = canonCand.split(' ').filter(Boolean);
-      const overlap = stemOverlapScore(userTokens, candTokens);
+      const { score: overlap, contentLen } = stemOverlapScore(userTokens, candTokens);
       if (overlap > bestScore) {
         bestScore = overlap;
         bestTarget = candidate;
       }
-      if (overlap >= 0.65) {
+      if (overlap >= getSentenceOverlapThreshold(contentLen)) {
         return {
           isCorrect: true,
           matchKind: 'overlap',

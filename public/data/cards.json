@@ -19365,8 +19365,8 @@
     "acceptedTr": [
       "öldürmek"
     ],
-    "exampleEn": "I'd be unhappy, but I wouldn't kill myself.",
-    "exampleTr": "Mutsuz olurdum ama kendimi öldürmezdim.",
+    "exampleEn": "Heavy frost can kill young garden plants.",
+    "exampleTr": "Şiddetli don bahçedeki genç bitkileri öldürebilir.",
     "source": "builtin"
   },
   {
@@ -20013,8 +20013,8 @@
     "acceptedTr": [
       "erkek"
     ],
-    "exampleEn": "The penis is one of the male reproductive organs.",
-    "exampleTr": "Penis, erkek üreme organlarından biridir.",
+    "exampleEn": "The male lion has a thick mane around its head.",
+    "exampleTr": "Erkek aslanın başının çevresinde gür bir yelesi vardır.",
     "source": "builtin"
   },
   {
@@ -25137,8 +25137,8 @@
       "mutsuz",
       "üzgün"
     ],
-    "exampleEn": "I'd be unhappy, but I wouldn't kill myself.",
-    "exampleTr": "Mutsuz olurdum ama kendimi öldürmezdim.",
+    "exampleEn": "She felt unhappy after missing the morning train.",
+    "exampleTr": "Sabah trenini kaçırdıktan sonra kendini mutsuz hissetti.",
     "source": "builtin",
     "unitId": "u12_emotions"
   },
@@ -35761,20 +35761,6 @@
     ],
     "exampleEn": "Sex is important to me.",
     "exampleTr": "Seks benim için önemli.",
-    "source": "builtin"
-  },
-  {
-    "id": "w_sexual",
-    "type": "word",
-    "level": "B1",
-    "pos": "adjective",
-    "en": "sexual",
-    "phonetic": "/ˈsekʃuəl/",
-    "acceptedTr": [
-      "cinsel"
-    ],
-    "exampleEn": "The penis is one of the masculine sexual organs.",
-    "exampleTr": "Penis, erkek cinsel organlarından biridir.",
     "source": "builtin"
   },
   {
@@ -53335,8 +53321,8 @@
     "acceptedTr": [
       "hap"
     ],
-    "exampleEn": "Dalida died from an overdose of sleeping pills.",
-    "exampleTr": "Dalida aşırı dozda uyku hapından öldü.",
+    "exampleEn": "The doctor told her to take one pill after breakfast.",
+    "exampleTr": "Doktor ona kahvaltıdan sonra bir hap almasını söyledi.",
     "source": "builtin",
     "unitId": "u11_health"
   },
@@ -56406,21 +56392,6 @@
     ],
     "exampleEn": "I got scolded severely by that teacher.",
     "exampleTr": "O öğretmen tarafından şiddetle azarlandım.",
-    "source": "builtin"
-  },
-  {
-    "id": "w_sexy",
-    "type": "word",
-    "level": "B2",
-    "pos": "adjective",
-    "en": "sexy",
-    "phonetic": "/ˈseksi/",
-    "acceptedTr": [
-      "çekici",
-      "seksi"
-    ],
-    "exampleEn": "Do you think I'm sexy?",
-    "exampleTr": "Benim seksi olduğumu düşünüyor musunuz?",
     "source": "builtin"
   },
   {
@@ -73874,8 +73845,8 @@
       "uyum eğitimi",
       "oryantasyon"
     ],
-    "exampleEn": "Your sexual orientation is not something you can change.",
-    "exampleTr": "Cinsel yöneliminiz değiştirebileceğiniz bir şey değildir.",
+    "exampleEn": "The company holds a short orientation session for new employees.",
+    "exampleTr": "Şirket yeni çalışanlar için kısa bir uyum eğitimi oturumu düzenler.",
     "source": "builtin"
   },
   {
@@ -75205,8 +75176,8 @@
       "korunma",
       "engelleme"
     ],
-    "exampleEn": "We are a suicide prevention organization.",
-    "exampleTr": "Biz bir intihar önleme organizasyonuyuz.",
+    "exampleEn": "Early detection is key to disease prevention.",
+    "exampleTr": "Erken teşhis, hastalıkları önlemenin anahtarıdır.",
     "source": "builtin",
     "unitId": "u10_imperatives_safety"
   },
@@ -75929,21 +75900,6 @@
     "exampleTr": "Burada sıralama kavramını anlamak çok faydalıdır.",
     "source": "builtin",
     "unitId": "u13_education"
-  },
-  {
-    "id": "w_rape",
-    "type": "word",
-    "level": "C1",
-    "pos": "noun",
-    "en": "rape",
-    "phonetic": "/reɪp/",
-    "acceptedTr": [
-      "tecavüz",
-      "tecavüz etmek"
-    ],
-    "exampleEn": "Her father was accused of statutory rape.",
-    "exampleTr": "Onun babası ırza tecavüzle suçlandı.",
-    "source": "builtin"
   },
   {
     "id": "w_ratio",
@@ -79226,20 +79182,6 @@
     "source": "builtin"
   },
   {
-    "id": "w_suicide",
-    "type": "word",
-    "level": "C1",
-    "pos": "noun",
-    "en": "suicide",
-    "phonetic": "/ˈsuːɪsaɪd/",
-    "acceptedTr": [
-      "intihar"
-    ],
-    "exampleEn": "He committed suicide by hanging himself.",
-    "exampleTr": "Kendini asarak intihar etti.",
-    "source": "builtin"
-  },
-  {
     "id": "w_suite",
     "type": "word",
     "level": "C1",
@@ -81748,8 +81690,8 @@
       "gönüllülük",
       "rızalık"
     ],
-    "exampleEn": "Dick showed a willingness to help us.",
-    "exampleTr": "Dick bize yardımcı olmak için isteklilik gösterdi.",
+    "exampleEn": "Sarah showed a strong willingness to help the new students.",
+    "exampleTr": "Sarah yeni öğrencilere yardım etme konusunda büyük bir isteklilik gösterdi.",
     "source": "builtin"
   },
   {
@@ -86237,21 +86179,6 @@
     "source": "builtin"
   },
   {
-    "id": "s_0294",
-    "type": "sentence",
-    "level": "A2",
-    "pos": "sentence",
-    "en": "I had to shoot my horse.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Atımı vurmak zorunda kaldım.",
-      "Ben atımı vurmak zorunda kaldım."
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
     "id": "s_0295",
     "type": "sentence",
     "level": "A2",
@@ -88474,20 +88401,6 @@
     "source": "builtin"
   },
   {
-    "id": "s_0448",
-    "type": "sentence",
-    "level": "A2",
-    "pos": "sentence",
-    "en": "I'm going to kill them.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Onları öldüreceğim."
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
     "id": "s_0449",
     "type": "sentence",
     "level": "A2",
@@ -88815,21 +88728,6 @@
     "phonetic": "",
     "acceptedTr": [
       "Onu terk edecek misin?"
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
-    "id": "s_0472",
-    "type": "sentence",
-    "level": "A2",
-    "pos": "sentence",
-    "en": "Are they going to kill her?",
-    "phonetic": "",
-    "acceptedTr": [
-      "Onlar onu öldürecek mi?",
-      "Onu öldürecek mi?"
     ],
     "exampleEn": "",
     "exampleTr": "",
@@ -89814,20 +89712,6 @@
     "phonetic": "",
     "acceptedTr": [
       "Saçımı boyamam gerekecek."
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
-    "id": "s_0540",
-    "type": "sentence",
-    "level": "B1",
-    "pos": "sentence",
-    "en": "You are going to have to kill me.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Beni öldürmen gerekecek."
     ],
     "exampleEn": "",
     "exampleTr": "",
@@ -95165,20 +95049,6 @@
     "source": "builtin"
   },
   {
-    "id": "s_0904",
-    "type": "sentence",
-    "level": "B1",
-    "pos": "sentence",
-    "en": "Naked boys were swimming in the river.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Çıplak oğlanlar nehirde yüzüyordu."
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
     "id": "s_0905",
     "type": "sentence",
     "level": "B1",
@@ -95202,20 +95072,6 @@
     "phonetic": "",
     "acceptedTr": [
       "Fakir oğlanlar korkuyla titriyor."
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
-    "id": "s_0907",
-    "type": "sentence",
-    "level": "B1",
-    "pos": "sentence",
-    "en": "The children were swimming in the nude.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Çocuklar çırılçıplak yüzüyorlardı."
     ],
     "exampleEn": "",
     "exampleTr": "",
@@ -98231,21 +98087,6 @@
     "source": "builtin"
   },
   {
-    "id": "s_1115",
-    "type": "sentence",
-    "level": "B2",
-    "pos": "sentence",
-    "en": "I'll kick your ass if I see you around again.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Bir daha buralara gelirsen bacaklarını kırarım.",
-      "Ben bir daha buralara gelirsen bacaklarını kırarım."
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
     "id": "s_1116",
     "type": "sentence",
     "level": "B2",
@@ -100524,21 +100365,6 @@
       "O yorgun olmasına rağmen, çalışmayı durdurmadı.",
       "Yorgun olmasına rağmen, çalışmayı durdurmadı.",
       "O yorgun olmasına rağmen, çalışmayı durdurmamıştır."
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
-    "id": "s_1272",
-    "type": "sentence",
-    "level": "B1",
-    "pos": "sentence",
-    "en": "Although I may be unhappy, I won't commit suicide.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Mutsuz olmama rağmen intihar etmeyeceğim.",
-      "Ben mutsuz olmama rağmen intihar etmeyeceğim."
     ],
     "exampleEn": "",
     "exampleTr": "",
@@ -108569,20 +108395,6 @@
     "source": "builtin"
   },
   {
-    "id": "s_1820",
-    "type": "sentence",
-    "level": "A1",
-    "pos": "sentence",
-    "en": "Fuck, what a pity!",
-    "phonetic": "",
-    "acceptedTr": [
-      "Kahretsin, ne yazık!"
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
     "id": "s_1821",
     "type": "sentence",
     "level": "A1",
@@ -116124,20 +115936,6 @@
     "source": "builtin"
   },
   {
-    "id": "s_2342",
-    "type": "sentence",
-    "level": "A2",
-    "pos": "sentence",
-    "en": "I don't give a fuck.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Benim umurumda değil."
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
     "id": "s_2343",
     "type": "sentence",
     "level": "A2",
@@ -117861,21 +117659,6 @@
     "acceptedTr": [
       "O ev kaç yıllık?",
       "Ev kaç yıllık?"
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
-    "id": "s_2460",
-    "type": "sentence",
-    "level": "A2",
-    "pos": "sentence",
-    "en": "That was a shitty day.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Boktan bir gündü.",
-      "Boktan bir günmüştür."
     ],
     "exampleEn": "",
     "exampleTr": "",
@@ -128322,21 +128105,6 @@
     "source": "builtin"
   },
   {
-    "id": "s_3178",
-    "type": "sentence",
-    "level": "A2",
-    "pos": "sentence",
-    "en": "I didn't try to kill him.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Onu öldürmeyi denemedim.",
-      "Ben onu öldürmeyi denemedim."
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
     "id": "s_3179",
     "type": "sentence",
     "level": "A2",
@@ -129638,23 +129406,6 @@
     "acceptedTr": [
       "Sınava ne zaman girdin?",
       "Sen sınava ne zaman girdin?"
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
-    "id": "s_3269",
-    "type": "sentence",
-    "level": "A2",
-    "pos": "sentence",
-    "en": "He died of a drug overdose.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Aşırı dozda uyuşturucudan öldü.",
-      "Aşırı dozda uyuşturucudan ölmüştür.",
-      "Aşırı dozda uyuşturucudan hayatını kaybetti.",
-      "Aşırı dozda uyuşturucudan vefat etti."
     ],
     "exampleEn": "",
     "exampleTr": "",
@@ -132146,20 +131897,6 @@
     "phonetic": "",
     "acceptedTr": [
       "Şehir, fuara ev sahipliği yapıyor."
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
-    "id": "s_3441",
-    "type": "sentence",
-    "level": "A2",
-    "pos": "sentence",
-    "en": "I don't need no fucking help.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Lanet yardımına ihtiyacım yok."
     ],
     "exampleEn": "",
     "exampleTr": "",
@@ -142752,20 +142489,6 @@
     "source": "builtin"
   },
   {
-    "id": "s_4168",
-    "type": "sentence",
-    "level": "B1",
-    "pos": "sentence",
-    "en": "Get your ass over here, you idiot!",
-    "phonetic": "",
-    "acceptedTr": [
-      "Kıçını kaldırıp buraya gel, seni aptal!"
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
     "id": "s_4169",
     "type": "sentence",
     "level": "B1",
@@ -145468,20 +145191,6 @@
     "acceptedTr": [
       "Motor rölantideyken durdu.",
       "Motor rölantideyken durmuştur."
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
-    "id": "s_4355",
-    "type": "sentence",
-    "level": "B1",
-    "pos": "sentence",
-    "en": "Old people in supermarkets piss me off.",
-    "phonetic": "",
-    "acceptedTr": [
-      "Süpermarketlerdeki yaşlı insanlar beni uyuz ediyorlar."
     ],
     "exampleEn": "",
     "exampleTr": "",
@@ -156088,20 +155797,6 @@
     "source": "builtin"
   },
   {
-    "id": "s_5083",
-    "type": "sentence",
-    "level": "B1",
-    "pos": "sentence",
-    "en": "Do you sometimes get pissed off for no reason?",
-    "phonetic": "",
-    "acceptedTr": [
-      "Bazen nedensiz olarak sinirlenir misin?"
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
     "id": "s_5084",
     "type": "sentence",
     "level": "B1",
@@ -162109,24 +161804,6 @@
       "Pois memurunun sürdüğümü söylediği kadar hızlı sürmüyordum.",
       "Ben pois memurunun sürdüğümü söylediği kadar hızlı sürmüyordum.",
       "Pois memurunun sürdüğümü söylediği kadar çabuk sürmüyordum."
-    ],
-    "exampleEn": "",
-    "exampleTr": "",
-    "source": "builtin"
-  },
-  {
-    "id": "s_5493",
-    "type": "sentence",
-    "level": "B2",
-    "pos": "sentence",
-    "en": "He did get it done but as always, he did it ass-backwards.",
-    "phonetic": "",
-    "acceptedTr": [
-      "O onu yaptırdı ama her zaman olduğu gibi, o onu karmakarışık etti.",
-      "Onu yaptırdı ama her zaman olduğu gibi, o onu karmakarışık etti.",
-      "O onu yaptırdı ama her zaman olduğu gibi, o onu karmakarışık etmiştir.",
-      "O onu yaptırdı fakat her zaman olduğu gibi, o onu karmakarışık etti.",
-      "O onu yaptırdı ama daima olduğu gibi, o onu karmakarışık etti."
     ],
     "exampleEn": "",
     "exampleTr": "",

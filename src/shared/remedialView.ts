@@ -7,6 +7,7 @@ import {
 } from './guideAssistant';
 import { resolveSupportedLanguage } from './i18n';
 import { evaluateEnglishAnswer, evaluateTurkishAnswer } from './matcher';
+import { formatLessonProgressCounter } from './placementTest';
 import { REMEDIAL_SKILL_CATALOG, REMEDIAL_VOICE_TRANSCRIPTS } from './remedialCatalog';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
 import { attachWordBankTileGesture } from './wordBankDrag';
@@ -1133,17 +1134,41 @@ export function startRemedialLessonSession(
 
     const comboEl = document.createElement('span');
     comboEl.className = `duo-combo-pill ${combo >= 2 ? 'visible' : ''}`;
-    comboEl.textContent =
-      combo >= 2
-        ? `${combo}x 🔥`
-        : `${Math.min(currentIdx + 1, queue.length)}/${queue.length}`;
+    comboEl.textContent = combo >= 2 ? `${combo}x 🔥` : '';
 
     if (hasQuestionVoiceover) {
-      topBar.append(exitBtn, progTrack, rulePeekBtn, askRemTopBtn, comboEl);
+      topBar.append(exitBtn, progTrack, rulePeekBtn, askRemTopBtn);
     } else {
-      topBar.append(exitBtn, progTrack, teachRemBtn, rulePeekBtn, askRemTopBtn, comboEl);
+      topBar.append(exitBtn, progTrack, teachRemBtn, rulePeekBtn, askRemTopBtn);
+    }
+    if (combo >= 2) {
+      topBar.appendChild(comboEl);
     }
     sessionEl.appendChild(topBar);
+
+    // Prominent always-visible question counter & remaining badge
+    const remStatusBar = document.createElement('div');
+    remStatusBar.className = 'duo-lesson-status-bar is-crimson';
+    const remStatusLeft = document.createElement('div');
+    remStatusLeft.className = 'duo-status-left';
+    const remQIndexEl = document.createElement('span');
+    remQIndexEl.className = 'duo-q-index';
+    remStatusLeft.appendChild(remQIndexEl);
+    const remQRemEl = document.createElement('span');
+    remQRemEl.className = 'duo-q-remaining';
+    const refreshRemCounter = (checked: boolean): void => {
+      const counter = formatLessonProgressCounter(currentIdx, queue.length, checked, isTr);
+      remQIndexEl.textContent = counter.indexText;
+      remQRemEl.textContent = counter.remainingText;
+      remQRemEl.classList.toggle('is-last', counter.isLast);
+      remQRemEl.classList.toggle('is-done', counter.isDone);
+      if (checked) {
+        progFill.style.width = `${Math.min(100, Math.round(((currentIdx + 1) / Math.max(1, queue.length)) * 100))}%`;
+      }
+    };
+    refreshRemCounter(Boolean(currentCheckedState));
+    remStatusBar.append(remStatusLeft, remQRemEl);
+    sessionEl.appendChild(remStatusBar);
 
     // Inline toggleable cheat-sheet drawer
     const cheatBox = document.createElement('div');
@@ -1825,6 +1850,7 @@ export function startRemedialLessonSession(
       skipBtn.disabled = true;
       checkBtn.disabled = true;
       if (freeInputEl) freeInputEl.disabled = true;
+      refreshRemCounter(true);
 
       const effectiveCorrect = snap.isCorrect || Boolean(snap.overridden);
       const expectedChoiceNorm = (

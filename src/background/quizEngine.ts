@@ -309,9 +309,8 @@ export async function handleSubmitAnswer(
     const aiResult = await evaluateAnswerWithAi(card, userAnswer, aiConfig);
     if (aiResult.ok) {
       const combinedCorrect = evaluation.isCorrect || aiResult.isCorrect;
-      // Do not attach a weakPoint if the local matcher already confirmed high overlap (>= 0.78)
-      const effectiveWeakPoint =
-        evaluation.isCorrect && evaluation.similarity >= 0.78 ? undefined : aiResult.weakPoint;
+      // Never attach a distracting focus weakPoint when the answer was accepted as correct
+      const effectiveWeakPoint = combinedCorrect ? undefined : aiResult.weakPoint;
       evaluation = {
         isCorrect: combinedCorrect,
         matchKind: evaluation.isCorrect ? evaluation.matchKind : aiResult.isCorrect ? 'ai' : 'none',

@@ -13,6 +13,7 @@ import {
 } from '../src/shared/curriculum.ts';
 import {
   buildFallbackRoadmapCoachBanner,
+  computeRoadmapAccuracyStats,
   isValidActiveRoadmapSession,
   summarizeRecentRoadmapLessons,
 } from '../src/shared/roadmapCoach.ts';
@@ -717,4 +718,45 @@ test('computeTrayInsertionIndex allows dropping word-bank tiles into any positio
   assert.equal(computeTrayInsertionIndex(multiRowRects, 30, 230), 4);
   assert.equal(computeTrayInsertionIndex(multiRowRects, 80, 230), 5);
   assert.equal(computeTrayInsertionIndex(multiRowRects, 145, 230), 6);
+});
+
+test('computeRoadmapAccuracyStats excludes neutrally bypassed audio questions without marking right or wrong', () => {
+  assert.deepEqual(computeRoadmapAccuracyStats(4, 8, 4), {
+    gradedTotal: 4,
+    accuracyPct: 100,
+  });
+  assert.deepEqual(computeRoadmapAccuracyStats(3, 8, 4), {
+    gradedTotal: 4,
+    accuracyPct: 75,
+  });
+  assert.deepEqual(computeRoadmapAccuracyStats(0, 4, 4), {
+    gradedTotal: 0,
+    accuracyPct: 100,
+  });
+
+  const sampleExercise = buildUnitLessonExercises('u01_basics', 2, deckCards, {}, 1795000000000, 0)[0]!;
+  const session: RoadmapActiveSession = {
+    version: ACTIVE_ROADMAP_SESSION_VERSION,
+    unitId: 'u01_basics',
+    nodeIndex: 2,
+    stepIndex: 0,
+    queue: [sampleExercise],
+    currentIdx: 0,
+    firstTryCorrectCount: 0,
+    totalInitial: 1,
+    neutralBypassedCount: 1,
+    combo: 2,
+    maxCombo: 2,
+    mistakesMap: {},
+    strongWords: [],
+    byKindStats: {},
+    checkedState: {
+      isCorrect: false,
+      skipped: false,
+      audioBypassed: true,
+      userAnswer: '(audio_unavailable)',
+    },
+    updatedAt: Date.now(),
+  };
+  assert.equal(isValidActiveRoadmapSession(session, Date.now()), true);
 });

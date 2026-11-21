@@ -15,6 +15,10 @@ import {
 } from '../shared/guideAssistant';
 import { resolveSupportedLanguage } from '../shared/i18n';
 import {
+  extractDisplayMeanings,
+  formatDisplayMeaningsInline,
+} from '../shared/meaningFormatter';
+import {
   buildOfflineDictionaryIndex,
   lookupOfflineWord,
   type OfflineDictionaryIndex,
@@ -389,7 +393,7 @@ async function renderAnalyticsTab(): Promise<void> {
       const row = document.createElement('div');
       row.className = 'hard-item';
       const left = document.createElement('span');
-      left.textContent = `${item.card.en} (${item.card.level}) — ${item.card.acceptedTr.slice(0, 2).join(', ')}`;
+      left.textContent = `${item.card.en} (${item.card.level}) — ${formatDisplayMeaningsInline(item.card.acceptedTr, item.card.type)}`;
       const right = document.createElement('span');
       right.className = 'pill retry';
       right.textContent = `${item.progress.totalWrong} ${currentUi.missesLabel}`;
@@ -586,13 +590,13 @@ const FREE_PROVIDER_GUIDES: Record<'groq' | 'nvidia' | 'amd', FreeProviderGuide>
     ctaEn: 'Open Groq Keys ↗',
     stepsTr: [
       'Sağdaki linkten console.groq.com/keys sayfasına git ve Google / e-posta ile ücretsiz giriş yap.',
-      'Sağ üstteki "Create API Key" butonuna bas ve bir isim yaz (ör. EasyLang).',
+      'Sağ üstteki "Create API Key" butonuna bas ve bir isim yaz (ör. LingoEx).',
       'Oluşan "gsk_..." ile başlayan anahtarı kopyala (pencere kapanınca tekrar gösterilmez).',
       'Aşağıdaki ANA API → API Anahtarı kutusuna yapıştırıp "Kaydet" ve "Bağlantıyı Test Et"e bas.',
     ],
     stepsEn: [
       'Open console.groq.com/keys and sign in for free using Google or email.',
-      'Click "Create API Key" and give it any label (e.g. EasyLang).',
+      'Click "Create API Key" and give it any label (e.g. LingoEx).',
       'Copy the generated key starting with "gsk_..." right away (shown once).',
       'Paste it into Primary API → API Key below, then click Save and Test Connection.',
     ],
@@ -1157,12 +1161,12 @@ function triggerDownload(filename: string, content: string, mimeType: string): v
 
 exportUserTsvBtn.addEventListener('click', async () => {
   const cards = await getUserCards();
-  triggerDownload('easylang-user-cards.tsv', exportCardsAsTsv(cards), 'text/tab-separated-values');
+  triggerDownload('lingoex-user-cards.tsv', exportCardsAsTsv(cards), 'text/tab-separated-values');
 });
 
 exportUserJsonBtn.addEventListener('click', async () => {
   const cards = await getUserCards();
-  triggerDownload('easylang-user-cards.json', exportCardsAsJson(cards), 'application/json');
+  triggerDownload('lingoex-user-cards.json', exportCardsAsJson(cards), 'application/json');
 });
 
 function getFilteredCards(): Card[] {
@@ -1227,7 +1231,11 @@ function renderCardsTable(): void {
 
     const tdTr = document.createElement('td');
     tdTr.dataset.wordLang = 'tr';
-    tdTr.textContent = card.acceptedTr.join(', ');
+    const dm = extractDisplayMeanings(card.acceptedTr, card.type);
+    tdTr.textContent = formatDisplayMeaningsInline(card.acceptedTr, card.type);
+    if (card.type === 'sentence' && dm.alternatives.length > 0) {
+      tdTr.title = [dm.primary, ...dm.alternatives].join('\n• ');
+    }
 
     const tdStatus = document.createElement('td');
     if (prog?.retryAt) {
@@ -1856,7 +1864,7 @@ function initNeuralTtsControls(): void {
       if (prep?.ok) {
         await chrome.runtime.sendMessage({
           type: 'SPEAK_NEURAL_TTS',
-          text: 'Hello! EasyLang neural voice is ready on this browser.',
+          text: 'Hello! LingoEx neural voice is ready on this browser.',
           rate: 1.0,
         } satisfies ExtensionMessage);
       }

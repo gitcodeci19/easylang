@@ -595,6 +595,87 @@ mark.etr-rule-glow {
   color: #8e8ea2;
 }
 
+.etr-ans-primary {
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.42;
+}
+
+.etr-meaning-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.etr-meaning-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #d4d4e2;
+}
+
+.etr-bubble-good .etr-meaning-chip {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(52, 211, 153, 0.3);
+  color: #a7f3d0;
+}
+
+.etr-alt-block {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.etr-bubble-good .etr-alt-block {
+  border-top-color: rgba(52, 211, 153, 0.24);
+}
+
+.etr-alt-label {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
+  color: #8e8ea2;
+}
+
+.etr-bubble-good .etr-alt-label {
+  color: rgba(110, 231, 183, 0.78);
+}
+
+.etr-alt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.etr-alt-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11.8px;
+  font-weight: 500;
+  line-height: 1.38;
+  color: #c7d2d9;
+}
+
+.etr-bubble-good .etr-alt-item {
+  color: rgba(236, 253, 245, 0.82);
+}
+
+.etr-alt-dot {
+  flex-shrink: 0;
+  opacity: 0.65;
+}
+
 .etr-bubble-ai {
   background: rgba(14, 165, 233, 0.09);
   border-color: rgba(14, 165, 233, 0.24);

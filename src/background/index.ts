@@ -178,7 +178,7 @@ function registerContextMenu(): void {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: CONTEXT_MENU_ID,
-      title: 'EasyLang: Add "%s" to deck',
+      title: 'LingoEx: Add "%s" to deck',
       contexts: ['selection'],
     });
   });

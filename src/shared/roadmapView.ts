@@ -28,7 +28,15 @@ import {
 import {
   buildFallbackRoadmapCoachBanner,
   chooseActiveSessionToResume,
+  computeRoadmapAccuracyStats,
 } from './roadmapCoach';
+import {
+  formatLessonProgressCounter,
+  getPlacementAvailability,
+  PLACEMENT_RETAKE_COOLDOWN_DAYS,
+  PLACEMENT_TOTAL_QUESTIONS,
+} from './placementTest';
+import { startPlacementTestSession } from './placementTestView';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
 import { evaluateDictationAnswer } from './srs';
 import { attachWordBankTileGesture } from './wordBankDrag';
@@ -124,6 +132,10 @@ interface RoadmapUiLabels {
   overrideAcceptedTitle: string;
   continueBtn: string;
   skipBtn: string;
+  cantListenBtn: string;
+  audioBypassTitle: string;
+  audioBypassNote: string;
+  audioBypassSolutionLabel: string;
   newWordBadge: string;
   retryBadge: string;
   wordBankHint: string;
@@ -182,6 +194,10 @@ function getRoadmapLabels(langMode: FeedbackLanguageMode | undefined): {
         overrideAcceptedTitle: '✓ Doğru kabul edildi',
         continueBtn: 'Devam Et',
         skipBtn: 'Geç',
+        cantListenBtn: '🔇 Şu an sesi dinleyemiyorum',
+        audioBypassTitle: '🔇 Dinlemeden geçildi (Kabul edildi)',
+        audioBypassNote: 'Bu soru doğru veya yanlış olarak işaretlenmedi.',
+        audioBypassSolutionLabel: 'Cümle:',
         newWordBadge: 'YENİ KELİME',
         retryBadge: 'HATA TEKRARI',
         wordBankHint: 'Kelimelere tıklayarak veya sürükleyerek cümleyi kur:',
@@ -241,6 +257,10 @@ function getRoadmapLabels(langMode: FeedbackLanguageMode | undefined): {
       overrideAcceptedTitle: '✓ Marked as correct',
       continueBtn: 'Continue',
       skipBtn: 'Skip',
+      cantListenBtn: "🔇 Can't listen right now",
+      audioBypassTitle: '🔇 Accepted without audio',
+      audioBypassNote: 'Not scored as right or wrong.',
+      audioBypassSolutionLabel: 'Sentence:',
       newWordBadge: 'NEW WORD',
       retryBadge: 'MISTAKE REVIEW',
       wordBankHint: 'Tap or drag word tiles to build the sentence:',
@@ -751,6 +771,100 @@ export class RoadmapController {
     const pathScroll = document.createElement('div');
     pathScroll.className = 'duo-skill-path';
 
+    // Integrated CEFR Placement Exam Gate inside the very top of the Roadmap canvas
+    // Visually distinct (Sky/Cyan diagnostic card) so users never confuse it with a regular lesson
+    const placementRes = this.state.placementResult;
+    const placementAvail = getPlacementAvailability(this.state);
+    const placementCard = document.createElement('div');
+    placementCard.className = `duo-placement-banner${placementRes ? ' is-done' : ''}`;
+
+    const placementInfo = document.createElement('div');
+    placementInfo.className = 'duo-placement-info';
+
+    const placementEyebrow = document.createElement('span');
+    placementEyebrow.className = 'duo-placement-eyebrow';
+    placementEyebrow.textContent = placementRes
+      ? isTr
+        ? `SEVİYE TESPİT SINAVI · SONUÇ ${placementRes.level}`
+        : `PLACEMENT EXAM · RESULT ${placementRes.level}`
+      : isTr
+        ? `SEVİYE TESPİT SINAVI · ${PLACEMENT_TOTAL_QUESTIONS} SORU`
+        : `PLACEMENT EXAM · ${PLACEMENT_TOTAL_QUESTIONS} QUESTIONS`;
+    placementInfo.appendChild(placementEyebrow);
+
+    const placementTitle = document.createElement('div');
+    placementTitle.className = 'duo-placement-title';
+    placementTitle.textContent = placementRes
+      ? isTr
+        ? `Gerçek Seviyen: ${placementRes.level} (${placementRes.score}/${placementRes.total})`
+        : `Your Real Level: ${placementRes.level} (${placementRes.score}/${placementRes.total})`
+      : isTr
+        ? 'Gerçek Seviyemi Belirle (A1 → C1)'
+        : 'Measure Your Real Level (A1 → C1)';
+    placementInfo.appendChild(placementTitle);
+
+    const placementSub = document.createElement('div');
+    placementSub.className = 'duo-placement-sub';
+    if (!placementRes) {
+      placementSub.textContent = isTr
+        ? 'Normal ders değildir — seviyene göre uygun ünitelerin kilidini açar'
+        : 'Not a regular lesson — unlocks roadmap units matching your level';
+    } else if (placementAvail.freeImmediateRemaining > 0) {
+      placementSub.textContent = isTr
+        ? `1 anlık tekrar hakkın kaldı (2. çözümden sonra ${PLACEMENT_RETAKE_COOLDOWN_DAYS} günde bir açılır)`
+        : `1 immediate retake left (then unlocks every ${PLACEMENT_RETAKE_COOLDOWN_DAYS} days)`;
+    } else if (!placementAvail.canTake) {
+      placementSub.textContent = isTr
+        ? `Tekrar ölçüm ${PLACEMENT_RETAKE_COOLDOWN_DAYS} günde bir açılır · Üniteleri atlamak için "BURAYA ATLA"yı kullanabilirsin`
+        : `Retakes unlock every ${PLACEMENT_RETAKE_COOLDOWN_DAYS} days · Use "JUMP HERE" to skip units anytime`;
+    } else {
+      placementSub.textContent = isTr
+        ? 'Yeni 7 günlük ölçüm hakkın açıldı — seviyeni güncelleyebilirsin'
+        : 'Your 7-day retake window is open — re-test your level anytime';
+    }
+    placementInfo.appendChild(placementSub);
+
+    const placementBtn = document.createElement('button');
+    placementBtn.type = 'button';
+    placementBtn.className = `duo-placement-cta${placementRes ? ' is-retake' : ''}`;
+    placementBtn.disabled = !placementAvail.canTake;
+    if (!placementRes) {
+      placementBtn.textContent = isTr ? 'Seviye Testini Başlat →' : 'Start Level Exam →';
+    } else if (!placementAvail.canTake) {
+      placementBtn.textContent = isTr
+        ? `⏳ ${placementAvail.daysRemaining} gün sonra`
+        : `⏳ In ${placementAvail.daysRemaining}d`;
+      placementBtn.title = isTr
+        ? `2. çözümden sonra seviye testi ${PLACEMENT_RETAKE_COOLDOWN_DAYS} günde bir açılır`
+        : `Placement exam retakes unlock every ${PLACEMENT_RETAKE_COOLDOWN_DAYS} days after your 2nd attempt`;
+    } else if (placementAvail.freeImmediateRemaining > 0) {
+      placementBtn.textContent = isTr ? 'Tekrar Ölç (1 hak)' : 'Retake (1 left)';
+    } else {
+      placementBtn.textContent = isTr ? 'Seviyeni Tekrar Ölç' : 'Retake Level Exam';
+    }
+    placementBtn.addEventListener('click', () => {
+      if (!placementAvail.canTake) return;
+      void clearActiveRoadmapSession();
+      void saveOpenGuidebookUnitId(null);
+      startPlacementTestSession({
+        container: this.container,
+        allCards: this.allCards,
+        uiLanguage: this.uiLanguage,
+        attemptSeedSalt: placementAvail.attemptsCount * 9973,
+        onExit: () => {
+          this.renderPathView();
+        },
+        onCompleted: (nextState) => {
+          this.state = nextState;
+          this.onStateUpdated?.(nextState);
+          this.renderPathView('unit_top');
+        },
+      });
+    });
+
+    placementCard.append(placementInfo, placementBtn);
+    pathScroll.appendChild(placementCard);
+
     for (const up of unitsProgress) {
       const secEl = this.buildUnitSectionElement(
         up,
@@ -1142,6 +1256,7 @@ export class RoadmapController {
     let currentIdx = resumedSession ? Math.max(0, resumedSession.currentIdx) : 0;
     let firstTryCorrectCount = resumedSession ? resumedSession.firstTryCorrectCount : 0;
     const totalInitial = resumedSession ? resumedSession.totalInitial : queue.length;
+    let neutralBypassedCount = Math.max(0, resumedSession?.neutralBypassedCount ?? 0);
     let combo = resumedSession ? resumedSession.combo : 0;
     let maxCombo = resumedSession ? resumedSession.maxCombo : 0;
     const mistakesMap: Record<string, RoadmapMistakeItem> = resumedSession
@@ -1179,6 +1294,7 @@ export class RoadmapController {
         currentIdx: idxToSave,
         firstTryCorrectCount,
         totalInitial,
+        neutralBypassedCount,
         combo,
         maxCombo,
         mistakesMap,
@@ -1262,16 +1378,10 @@ export class RoadmapController {
       progFill.style.width = `${pct}%`;
       progTrack.appendChild(progFill);
 
-      const stepPrefix =
-        nodeIndex === 'jump_test'
-          ? ''
-          : isTr
-            ? `Adım ${stepIndex + 1}/${STEPS_PER_NODE} · `
-            : `Step ${stepIndex + 1}/${STEPS_PER_NODE} · `;
       const comboBadge = document.createElement('span');
       comboBadge.className = `duo-combo-pill ${combo >= 2 ? 'visible' : ''}`;
-      comboBadge.textContent =
-        combo >= 2 ? L.comboFmt(combo) : `${stepPrefix}${currentIdx + 1}/${queue.length}`;
+      comboBadge.textContent = combo >= 2 ? L.comboFmt(combo) : '';
+      comboBadge.hidden = combo < 2;
 
       const correctDisplay =
         ex.correctChoice ??
@@ -1372,8 +1482,48 @@ export class RoadmapController {
         : 'Ask the AI tutor any question about this exercise';
       askTopBtn.addEventListener('click', openExerciseTutor);
 
-      topBar.append(exitBtn, progTrack, teachTopBtn, askTopBtn, comboBadge);
+      topBar.append(exitBtn, progTrack, teachTopBtn, askTopBtn);
+      if (combo >= 2) {
+        topBar.appendChild(comboBadge);
+      }
       sessionEl.appendChild(topBar);
+
+      // Always-visible prominent question counter & remaining count strip
+      const statusBar = document.createElement('div');
+      statusBar.className = 'duo-lesson-status-bar';
+      const statusLeft = document.createElement('div');
+      statusLeft.className = 'duo-status-left';
+      const qIndexEl = document.createElement('span');
+      qIndexEl.className = 'duo-q-index';
+      statusLeft.appendChild(qIndexEl);
+      if (nodeIndex !== 'jump_test') {
+        const stepBadge = document.createElement('span');
+        stepBadge.className = 'duo-q-step';
+        stepBadge.textContent = isTr
+          ? `Adım ${stepIndex + 1}/${STEPS_PER_NODE}`
+          : `Step ${stepIndex + 1}/${STEPS_PER_NODE}`;
+        statusLeft.appendChild(stepBadge);
+      } else {
+        const jumpBadge = document.createElement('span');
+        jumpBadge.className = 'duo-q-step';
+        jumpBadge.textContent = isTr ? 'Atlama Sınavı' : 'Jump Test';
+        statusLeft.appendChild(jumpBadge);
+      }
+      const qRemEl = document.createElement('span');
+      qRemEl.className = 'duo-q-remaining';
+      const refreshLessonCounter = (checked: boolean): void => {
+        const counter = formatLessonProgressCounter(currentIdx, queue.length, checked, isTr);
+        qIndexEl.textContent = counter.indexText;
+        qRemEl.textContent = counter.remainingText;
+        qRemEl.classList.toggle('is-last', counter.isLast);
+        qRemEl.classList.toggle('is-done', counter.isDone);
+        if (checked) {
+          progFill.style.width = `${Math.min(100, Math.round(((currentIdx + 1) / Math.max(1, queue.length)) * 100))}%`;
+        }
+      };
+      refreshLessonCounter(Boolean(currentCheckedState));
+      statusBar.append(statusLeft, qRemEl);
+      sessionEl.appendChild(statusBar);
 
       const stage = document.createElement('div');
       stage.className = 'duo-lesson-stage';
@@ -1420,6 +1570,8 @@ export class RoadmapController {
 
       const promptCard = document.createElement('div');
       promptCard.className = 'duo-ex-prompt-card';
+      let disableAudioBypassBtn: (() => void) | null = null;
+      let triggerAudioBypass: (() => void) | null = null;
 
       if (ex.kind === 'audio_dictation') {
         const audioRow = document.createElement('div');
@@ -1444,7 +1596,23 @@ export class RoadmapController {
         });
 
         audioRow.append(playNormal, playSlow);
-        promptCard.appendChild(audioRow);
+
+        const bypassRow = document.createElement('div');
+        bypassRow.className = 'duo-audio-bypass-row';
+        const cantListenBtn = document.createElement('button');
+        cantListenBtn.type = 'button';
+        cantListenBtn.className = 'duo-audio-cant-listen-btn';
+        cantListenBtn.textContent = L.cantListenBtn;
+        cantListenBtn.disabled = Boolean(currentCheckedState);
+        cantListenBtn.addEventListener('click', () => {
+          triggerAudioBypass?.();
+        });
+        disableAudioBypassBtn = () => {
+          cantListenBtn.disabled = true;
+        };
+        bypassRow.appendChild(cantListenBtn);
+
+        promptCard.append(audioRow, bypassRow);
         // Settle 220ms after popup/stage render so Chrome's cloud TTS stream does not clip opening words
         if (!currentCheckedState) {
           autoPlayTimer = setTimeout(() => {
@@ -1766,23 +1934,30 @@ export class RoadmapController {
       const renderCheckedFooter = (snap: CheckedFeedbackSnapshot): void => {
         evaluated = true;
         lockControls();
+        disableAudioBypassBtn?.();
         skipBtn.disabled = true;
         checkBtn.disabled = true;
+        refreshLessonCounter(true);
 
-        const effectiveCorrect = snap.isCorrect || Boolean(snap.overridden);
+        const isAudioBypass = Boolean(snap.audioBypassed);
+        const effectiveCorrect = !isAudioBypass && (snap.isCorrect || Boolean(snap.overridden));
         const expectedChoiceNorm = (ex.correctChoice ?? '').trim().toLowerCase();
         const chosenNorm = (snap.userAnswer ?? '').trim().toLowerCase();
-        for (const btn of stage.querySelectorAll<HTMLButtonElement>('.duo-choice-card')) {
-          btn.classList.remove('is-result-correct', 'is-result-wrong');
-          const valNorm = (btn.dataset.choiceVal ?? '').trim().toLowerCase();
-          if (!valNorm) continue;
-          if (expectedChoiceNorm && valNorm === expectedChoiceNorm) {
-            btn.classList.add('is-result-correct');
-          } else if (!effectiveCorrect && chosenNorm && valNorm === chosenNorm) {
-            btn.classList.add('is-result-wrong');
+        if (!isAudioBypass) {
+          for (const btn of stage.querySelectorAll<HTMLButtonElement>('.duo-choice-card')) {
+            btn.classList.remove('is-result-correct', 'is-result-wrong');
+            const valNorm = (btn.dataset.choiceVal ?? '').trim().toLowerCase();
+            if (!valNorm) continue;
+            if (expectedChoiceNorm && valNorm === expectedChoiceNorm) {
+              btn.classList.add('is-result-correct');
+            } else if (!effectiveCorrect && chosenNorm && valNorm === chosenNorm) {
+              btn.classList.add('is-result-wrong');
+            }
           }
         }
-        footerBar.className = `duo-lesson-footer ${effectiveCorrect ? 'is-correct' : 'is-wrong'}`;
+        footerBar.className = `duo-lesson-footer ${
+          isAudioBypass ? 'is-neutral' : effectiveCorrect ? 'is-correct' : 'is-wrong'
+        }`;
         footerBar.replaceChildren();
 
         const fbText = document.createElement('div');
@@ -1792,11 +1967,13 @@ export class RoadmapController {
         titleRow.className = 'duo-fb-badges';
         const titleEl = document.createElement('span');
         titleEl.className = 'duo-fb-title';
-        titleEl.textContent = snap.overridden
-          ? L.overrideAcceptedTitle
-          : effectiveCorrect
-            ? `✓ ${L.correctHeader}`
-            : `✕ ${L.wrongHeader}`;
+        titleEl.textContent = isAudioBypass
+          ? L.audioBypassTitle
+          : snap.overridden
+            ? L.overrideAcceptedTitle
+            : effectiveCorrect
+              ? `✓ ${L.correctHeader}`
+              : `✕ ${L.wrongHeader}`;
         titleRow.appendChild(titleEl);
 
         if (snap.aiApproved) {
@@ -1813,7 +1990,11 @@ export class RoadmapController {
         if (!effectiveCorrect) {
           solRow = document.createElement('div');
           solRow.className = 'duo-fb-solution';
-          solRow.append(document.createTextNode(`${L.correctAnswerLabel} `));
+          solRow.append(
+            document.createTextNode(
+              `${isAudioBypass ? L.audioBypassSolutionLabel : L.correctAnswerLabel} `
+            )
+          );
           const strongAns = document.createElement('strong');
           strongAns.dataset.wordLang = ex.direction === 'en-to-tr' ? 'tr' : 'en';
           strongAns.textContent = correctDisplay;
@@ -1830,7 +2011,12 @@ export class RoadmapController {
           fbText.appendChild(revealEl);
         }
 
-        if (snap.explanationNote) {
+        if (isAudioBypass) {
+          const bypassNoteEl = document.createElement('div');
+          bypassNoteEl.className = 'duo-fb-note';
+          bypassNoteEl.textContent = L.audioBypassNote;
+          fbText.appendChild(bypassNoteEl);
+        } else if (snap.explanationNote) {
           const noteEl = document.createElement('div');
           noteEl.className = 'duo-fb-note';
           noteEl.textContent = snap.explanationNote;
@@ -1840,7 +2026,7 @@ export class RoadmapController {
         const actionsWrap = document.createElement('div');
         actionsWrap.className = 'duo-fb-actions';
 
-        if (ex.audioText && (ex.direction === 'tr-to-en' || ex.kind === 'cloze_blank')) {
+        if (ex.audioText && (ex.direction === 'tr-to-en' || ex.kind === 'cloze_blank' || isAudioBypass)) {
           const replaySpk = document.createElement('button');
           replaySpk.type = 'button';
           replaySpk.className = 'duo-audio-mini-btn';
@@ -1870,7 +2056,7 @@ export class RoadmapController {
 
         const nextBtn = document.createElement('button');
         nextBtn.type = 'button';
-        nextBtn.className = `duo-btn-continue ${effectiveCorrect ? 'ok' : 'err'}`;
+        nextBtn.className = `duo-btn-continue ${isAudioBypass ? 'neutral' : effectiveCorrect ? 'ok' : 'err'}`;
         nextBtn.textContent = L.continueBtn;
         nextBtn.addEventListener('click', () => {
           currentIdx += 1;
@@ -1900,6 +2086,7 @@ export class RoadmapController {
         const userAns = skipped ? '' : getUserResponse();
 
         lockControls();
+        disableAudioBypassBtn?.();
         skipBtn.disabled = true;
         checkBtn.disabled = true;
 
@@ -2083,6 +2270,30 @@ export class RoadmapController {
         renderCheckedFooter(snap);
       };
 
+      triggerAudioBypass = (): void => {
+        if (evaluated) return;
+        evaluated = true;
+        cancelAutoPlay();
+        cancelEnglishSpeech();
+        lockControls();
+        disableAudioBypassBtn?.();
+        skipBtn.disabled = true;
+        checkBtn.disabled = true;
+
+        if (!ex.isRetryRequeue) {
+          neutralBypassedCount += 1;
+        }
+        const snap: CheckedFeedbackSnapshot = {
+          isCorrect: false,
+          skipped: false,
+          audioBypassed: true,
+          userAnswer: '(audio_unavailable)',
+        };
+        currentCheckedState = snap;
+        persistActiveSession(currentIdx, false);
+        renderCheckedFooter(snap);
+      };
+
       skipBtn.addEventListener('click', () => void evaluateCurrent(true));
       checkBtn.addEventListener('click', () => void evaluateCurrent(false));
 
@@ -2110,7 +2321,11 @@ export class RoadmapController {
       this.state = await saveRoadmapState(stepRes.nextState);
       this.onStateUpdated?.(this.state);
 
-      const accuracyPct = Math.round((firstTryCorrectCount / Math.max(1, totalInitial)) * 100);
+      const { gradedTotal, accuracyPct } = computeRoadmapAccuracyStats(
+        firstTryCorrectCount,
+        totalInitial,
+        neutralBypassedCount
+      );
       const mistakeItems = Object.values(mistakesMap);
       const repeatedMistakeCount = mistakeItems.filter((m) => m.repeatedWrong).length;
       const lessonRecord: RoadmapLessonRecord = {
@@ -2123,7 +2338,7 @@ export class RoadmapController {
         stepIndex,
         accuracyPct,
         xpEarned: stepRes.xpEarned,
-        totalQuestions: totalInitial,
+        totalQuestions: gradedTotal,
         firstTryCorrect: firstTryCorrectCount,
         repeatedMistakeCount,
         strongWords: [...strongWordsSet].slice(0, 8),

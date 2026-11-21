@@ -183,8 +183,8 @@ export interface DashboardStrings {
 }
 
 const EN_DASHBOARD: DashboardStrings = {
-  pageTitle: 'EasyLang · Dashboard',
-  brandTitle: 'EasyLang',
+  pageTitle: 'LingoEx · Dashboard',
+  brandTitle: 'LingoEx',
   askNow: 'Quick Quiz',
   resetProgress: 'Reset Data',
   resetConfirm: 'Reset all learning history, ratings, focus notes, and retry queue?',
@@ -358,8 +358,8 @@ const EN_DASHBOARD: DashboardStrings = {
 };
 
 const TR_DASHBOARD: DashboardStrings = {
-  pageTitle: 'EasyLang · Panel',
-  brandTitle: 'EasyLang',
+  pageTitle: 'LingoEx · Panel',
+  brandTitle: 'LingoEx',
   askNow: 'Hızlı Soru',
   resetProgress: 'Sıfırla',
   resetConfirm: 'Tüm öğrenme geçmişi, Elo puanı, odak notları ve tekrar kuyruğu sıfırlansın mı?',

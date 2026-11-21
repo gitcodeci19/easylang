@@ -1863,6 +1863,110 @@ th {
   font-weight: 500;
 }
 
+/* Placement Exam Gate inside the top of .duo-skill-path (Sky/Cyan diagnostic identity, distinct from violet/gold lessons) */
+.duo-placement-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 12px 15px;
+  border-radius: var(--r-lg);
+  border: 1px dashed rgba(14, 165, 233, 0.42);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.11) 0%, rgba(16, 185, 129, 0.06) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
+}
+
+.duo-placement-banner.is-done {
+  padding: 10px 15px;
+  border-style: solid;
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.07);
+}
+
+.duo-placement-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.duo-placement-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: var(--accent-sky-soft);
+}
+
+.duo-placement-banner.is-done .duo-placement-eyebrow {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(52, 211, 153, 0.35);
+  color: var(--accent-emerald-soft);
+}
+
+.duo-placement-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #f4f4f8;
+}
+
+.duo-placement-sub {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.duo-placement-cta {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(125, 211, 252, 0.4);
+  background: var(--accent-sky-solid);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s ease, transform 0.1s ease;
+}
+
+.duo-placement-cta:hover {
+  background: var(--accent-sky);
+  transform: translateY(-1px);
+}
+
+.duo-placement-cta.is-retake {
+  height: 29px;
+  padding: 0 11px;
+  background: transparent;
+  border-color: rgba(16, 185, 129, 0.4);
+  color: var(--accent-emerald-soft);
+  font-size: 11px;
+}
+
+.duo-placement-cta.is-retake:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.duo-placement-cta:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .duo-unit-bar {
   display: flex;
   align-items: center;
@@ -2421,6 +2525,150 @@ th {
   border-color: rgba(245, 158, 11, 0.34);
 }
 
+/* Always-Visible Prominent Question Counter & Remaining Bar */
+.duo-lesson-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 13px;
+  margin: 0 15px 4px;
+  border-radius: var(--r-md);
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.24);
+  flex-shrink: 0;
+}
+
+.duo-lesson-status-bar.is-crimson {
+  background: rgba(225, 29, 72, 0.09);
+  border-color: rgba(244, 63, 94, 0.26);
+}
+
+.duo-status-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.duo-q-index {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.duo-q-step {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+}
+
+.duo-q-remaining {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  color: #e9d5ff;
+  white-space: nowrap;
+}
+
+.duo-lesson-status-bar.is-crimson .duo-q-remaining {
+  background: rgba(225, 29, 72, 0.2);
+  border-color: rgba(251, 113, 133, 0.45);
+  color: #ffe4e6;
+}
+
+.duo-q-remaining.is-last {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #fde68a;
+}
+
+.duo-q-remaining.is-done {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(52, 211, 153, 0.48);
+  color: #6ee7b7;
+}
+
+.duo-placement-top-tag {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.18);
+  border: 1px solid rgba(167, 139, 250, 0.36);
+  color: #ddd6fe;
+  white-space: nowrap;
+}
+
+.duo-placement-result {
+  gap: 10px;
+}
+
+.duo-placement-lvl-badge {
+  font-size: 20px !important;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.duo-placement-tiers {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  margin: 4px 0;
+}
+
+.duo-placement-tier-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 800;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.duo-placement-tier-chip.is-pass {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.38);
+  color: #6ee7b7;
+}
+
+.duo-placement-tier-chip.is-mid {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.38);
+  color: #fde68a;
+}
+
+.duo-placement-result-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.duo-placement-sync-btn {
+  font-size: 12px;
+}
+
 .duo-lesson-stage {
   flex: 1;
   min-height: 0;
@@ -2524,6 +2772,40 @@ th {
   background: var(--bg-elevated);
   border-color: var(--border-subtle);
   color: var(--text-primary);
+}
+
+.duo-audio-slow-btn:hover {
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+.duo-audio-bypass-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.duo-audio-cant-listen-btn {
+  height: 28px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.14s ease, color 0.14s ease, background 0.14s ease;
+}
+
+.duo-audio-cant-listen-btn:hover:not(:disabled) {
+  border-color: rgba(148, 163, 184, 0.5);
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-primary);
+}
+
+.duo-audio-cant-listen-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .duo-choices-grid {
@@ -2889,6 +3171,11 @@ th {
   border-top-color: rgba(225, 29, 72, 0.34);
 }
 
+.duo-lesson-footer.is-neutral {
+  background: rgba(148, 163, 184, 0.1);
+  border-top-color: rgba(148, 163, 184, 0.34);
+}
+
 .duo-fb-text {
   flex: 1;
   min-width: 0;
@@ -2905,6 +3192,10 @@ th {
 
 .duo-lesson-footer.is-wrong .duo-fb-title {
   color: var(--accent-crimson-soft);
+}
+
+.duo-lesson-footer.is-neutral .duo-fb-title {
+  color: #cbd5e1;
 }
 
 .duo-fb-solution,
@@ -3009,6 +3300,16 @@ th {
   background: var(--accent-crimson);
   border-color: transparent;
   color: #ffffff;
+}
+
+.duo-btn-continue.neutral {
+  background: #475569;
+  border-color: rgba(203, 213, 225, 0.25);
+  color: #ffffff;
+}
+
+.duo-btn-continue.neutral:hover:not(:disabled) {
+  background: #64748b;
 }
 
 .duo-lesson-complete {

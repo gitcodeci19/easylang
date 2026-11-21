@@ -73,7 +73,7 @@ async function initContentScript(): Promise<void> {
         const settings = await getSettings();
         if (isUrlBlocked(window.location.href, settings.blockedDomains)) {
           removePageHighlightQuiz();
-          renderToast('EasyLang is blocked on this site.');
+          renderToast('LingoEx is blocked on this site.');
           sendResponse({ ok: false, blocked: true });
           return;
         }
@@ -88,7 +88,7 @@ async function initContentScript(): Promise<void> {
         const settings = await getSettings();
         if (isUrlBlocked(window.location.href, settings.blockedDomains)) {
           removeListeningQuiz();
-          renderToast('EasyLang is blocked on this site.');
+          renderToast('LingoEx is blocked on this site.');
           sendResponse({ ok: false, blocked: true });
           return;
         }

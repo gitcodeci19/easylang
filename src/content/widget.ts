@@ -2,6 +2,7 @@ import { sanitizeConceptExplanationForCard } from '../shared/concepts';
 import { createGuideHelpButton, stopGuideAssistant } from '../shared/guideAssistant';
 import { renderHighlightedPhrase, renderHighlightedSentence } from '../shared/grammarHighlighter';
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
+import { extractDisplayMeanings } from '../shared/meaningFormatter';
 import type { OfflineWordEntry } from '../shared/offlineDictionary';
 import { speakEnglishText as speakEnglish } from '../shared/speech';
 import { isAiApiConfigured } from '../shared/storage';
@@ -448,6 +449,7 @@ export function renderRecallWidget(
       feedbackBox.appendChild(userBubble);
     }
 
+    const displayMeanings = extractDisplayMeanings(card.acceptedTr, card.type);
     const ansBubble = createEl(
       'div',
       isCorrect ? 'etr-bubble etr-bubble-ref' : 'etr-bubble etr-bubble-good'
@@ -458,16 +460,59 @@ export function renderRecallWidget(
         'etr-bubble-label',
         isCorrect
           ? isTr
-            ? 'Kabul Edilen Anlamlar'
-            : 'Accepted Meanings'
+            ? displayMeanings.alternatives.length > 0
+              ? 'Kabul Edilen Anlamlar'
+              : 'Kabul Edilen Anlam'
+            : displayMeanings.alternatives.length > 0
+              ? 'Accepted Meanings'
+              : 'Accepted Meaning'
           : isTr
             ? '✓ Doğru Anlam'
             : '✓ Correct Meaning'
       )
     );
-    const acceptedTextEl = createEl('div', undefined, card.acceptedTr.join(', '));
-    acceptedTextEl.dataset.wordLang = 'tr';
-    ansBubble.appendChild(acceptedTextEl);
+
+    const primaryMeaningEl = createEl('div', 'etr-ans-primary', displayMeanings.primary);
+    primaryMeaningEl.dataset.wordLang = 'tr';
+    ansBubble.appendChild(primaryMeaningEl);
+
+    if (displayMeanings.alternatives.length > 0) {
+      if (card.type === 'word') {
+        const chipsWrap = createEl('div', 'etr-meaning-chips');
+        chipsWrap.dataset.wordLang = 'tr';
+        for (const alt of displayMeanings.alternatives) {
+          const chip = createEl('span', 'etr-meaning-chip', alt);
+          chip.dataset.wordLang = 'tr';
+          chipsWrap.appendChild(chip);
+        }
+        ansBubble.appendChild(chipsWrap);
+      } else {
+        const altBlock = createEl('div', 'etr-alt-block');
+        altBlock.dataset.wordLang = 'tr';
+        const altLabel = createEl(
+          'span',
+          'etr-alt-label',
+          isTr
+            ? displayMeanings.alternatives.length > 1
+              ? 'Alternatif çeviriler'
+              : 'Alternatif çeviri'
+            : displayMeanings.alternatives.length > 1
+              ? 'Alternative translations'
+              : 'Alternative translation'
+        );
+        const altList = createEl('div', 'etr-alt-list');
+        for (const alt of displayMeanings.alternatives) {
+          const row = createEl('div', 'etr-alt-item');
+          const dot = createEl('span', 'etr-alt-dot', '•');
+          const txt = createEl('span', undefined, alt);
+          txt.dataset.wordLang = 'tr';
+          row.append(dot, txt);
+          altList.appendChild(row);
+        }
+        altBlock.append(altLabel, altList);
+        ansBubble.appendChild(altBlock);
+      }
+    }
     feedbackBox.appendChild(ansBubble);
 
     const lowerDetails = createEl('div', 'etr-lower-details');

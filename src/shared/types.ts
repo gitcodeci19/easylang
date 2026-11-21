@@ -312,6 +312,8 @@ export interface ExerciseDraftState {
 export interface CheckedFeedbackSnapshot {
   isCorrect: boolean;
   skipped: boolean;
+  /** Neutral acceptance when audio listening is unavailable; excluded from both correct and wrong stats. */
+  audioBypassed?: boolean;
   userAnswer: string;
   explanationNote?: string;
   aiApproved?: boolean;
@@ -329,6 +331,8 @@ export interface RoadmapActiveSession {
   currentIdx: number;
   firstTryCorrectCount: number;
   totalInitial: number;
+  /** Count of initial questions accepted neutrally when audio could not be played. */
+  neutralBypassedCount?: number;
   combo: number;
   maxCombo: number;
   mistakesMap: Record<string, RoadmapMistakeItem>;

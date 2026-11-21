@@ -49,6 +49,27 @@ export const LESSON_KIND_LABELS: Record<
 };
 
 /**
+ * Compute graded question count and accuracy percentage excluding neutrally bypassed
+ * audio questions so "can't listen right now" acts as neither correct nor wrong.
+ */
+export function computeRoadmapAccuracyStats(
+  firstTryCorrectCount: number,
+  totalInitial: number,
+  neutralBypassedCount: number = 0
+): { gradedTotal: number; accuracyPct: number } {
+  const safeBypass = Math.max(0, neutralBypassedCount);
+  const gradedTotal = Math.max(0, totalInitial - safeBypass);
+  if (gradedTotal === 0) {
+    return { gradedTotal: 0, accuracyPct: 100 };
+  }
+  const clampedCorrect = Math.max(0, Math.min(gradedTotal, firstTryCorrectCount));
+  return {
+    gradedTotal,
+    accuracyPct: Math.round((clampedCorrect / gradedTotal) * 100),
+  };
+}
+
+/**
  * Aggregate the latest up to 5 completed Roadmap lessons into recurring mistake words,
  * repeated retry misses, weak/strong exercise types, and accuracy trend.
  */

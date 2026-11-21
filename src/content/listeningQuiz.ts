@@ -242,6 +242,32 @@ const LISTENING_CSS = `
     color: #ffffff;
   }
 
+  .etr-lq-cant-listen-btn {
+    margin-left: auto;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    background: rgba(148, 163, 184, 0.08);
+    color: #cbd5e1;
+    border-radius: 6px;
+    height: 26px;
+    padding: 0 9px;
+    font: inherit;
+    font-size: 10.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  }
+
+  .etr-lq-cant-listen-btn:hover:not(:disabled) {
+    background: rgba(148, 163, 184, 0.16);
+    border-color: rgba(148, 163, 184, 0.42);
+    color: #f8fafc;
+  }
+
+  .etr-lq-cant-listen-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
   .etr-lq-prompt {
     color: #9e9eb0;
     font-size: 11.5px;
@@ -463,7 +489,14 @@ export async function launchListeningQuiz(): Promise<void> {
     speakSentence(sentenceEn, 0.72);
   });
 
-  audioBar.append(playNormalBtn, playSlowBtn);
+  const cantListenBtn = createEl(
+    'button',
+    'etr-lq-cant-listen-btn',
+    isTr ? '🔇 Şu an sesi dinleyemiyorum' : "🔇 Can't listen right now"
+  );
+  cantListenBtn.type = 'button';
+
+  audioBar.append(playNormalBtn, playSlowBtn, cantListenBtn);
 
   const promptEl = createEl('div', 'etr-lq-prompt', ui.listeningPrompt);
   const textarea = createEl('textarea', 'etr-lq-textarea');
@@ -513,6 +546,57 @@ export async function launchListeningQuiz(): Promise<void> {
   }
   requestAnimationFrame(() => textarea.focus({ preventScroll: true }));
 
+  const appendMeaningIfPresent = (): void => {
+    if (!meaningTr) return;
+    const meaningEl = createEl(
+      'div',
+      'etr-lq-meaning',
+      isTr ? `Anlam: ${meaningTr}` : `Meaning: ${meaningTr}`
+    );
+    meaningEl.dataset.wordLang = 'tr';
+    bodyWrap.appendChild(meaningEl);
+  };
+
+  const handleNeutralAudioBypass = (): void => {
+    cancelEnglishSpeech();
+    restoreBlurredYouTubeCaptions();
+    cantListenBtn.disabled = true;
+    bodyWrap.replaceChildren();
+
+    const statusLine = createEl(
+      'div',
+      'etr-lq-prompt',
+      isTr
+        ? '🔇 Dinlemeden kabul edildi · Doğru veya yanlış işlenmedi'
+        : '🔇 Accepted without audio · Not scored as right or wrong'
+    );
+    statusLine.style.fontWeight = '700';
+    statusLine.style.color = '#cbd5e1';
+
+    const compareBox = createEl('div', 'etr-lq-compare');
+    const refRow = createEl('div', 'etr-lq-compare-row');
+    const refValEl = createEl('div', 'etr-lq-compare-ref', sentenceEn);
+    refValEl.dataset.wordLang = 'en';
+    refRow.append(
+      createEl('span', 'etr-lq-compare-lbl', isTr ? 'Cümle' : 'Sentence'),
+      refValEl
+    );
+    compareBox.appendChild(refRow);
+
+    bodyWrap.append(statusLine, compareBox);
+    appendMeaningIfPresent();
+
+    const nextRow = createEl('div', 'etr-lq-actions');
+    const doneBtn = createEl('button', 'etr-lq-btn etr-lq-btn-ghost', ui.closeBtn);
+    doneBtn.type = 'button';
+    doneBtn.addEventListener('click', () => removeListeningQuiz());
+    nextRow.appendChild(doneBtn);
+    bodyWrap.appendChild(nextRow);
+    doneBtn.focus({ preventScroll: true });
+  };
+
+  cantListenBtn.addEventListener('click', handleNeutralAudioBypass);
+
   const handleSubmit = () => {
     const attempt = textarea.value.trim();
     if (!attempt) {
@@ -520,6 +604,7 @@ export async function launchListeningQuiz(): Promise<void> {
       return;
     }
 
+    cantListenBtn.disabled = true;
     restoreBlurredYouTubeCaptions();
     const evaluation = evaluateDictationAnswer(sentenceEn, attempt);
     void sendBgMessage({
@@ -569,16 +654,7 @@ export async function launchListeningQuiz(): Promise<void> {
     }
 
     bodyWrap.append(scoreLine, compareBox, diffBox);
-
-    if (meaningTr) {
-      const meaningEl = createEl(
-        'div',
-        'etr-lq-meaning',
-        isTr ? `Anlam: ${meaningTr}` : `Meaning: ${meaningTr}`
-      );
-      meaningEl.dataset.wordLang = 'tr';
-      bodyWrap.appendChild(meaningEl);
-    }
+    appendMeaningIfPresent();
 
     const nextRow = createEl('div', 'etr-lq-actions');
     const doneBtn = createEl('button', 'etr-lq-btn etr-lq-btn-ghost', ui.closeBtn);

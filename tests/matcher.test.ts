@@ -90,3 +90,113 @@ test('offline evaluator accepts rich Turkish and English paraphrases, synonyms, 
   assert.equal(evaluateTurkishAnswer('Ben yorgunum', ['Ben yorgun değilim.'], 'sentence').isCorrect, false);
   assert.equal(evaluateEnglishAnswer('I am ready', ['I am not ready.'], 'sentence').isCorrect, false);
 });
+
+test('offline Turkish matcher blocks verb negation flips, past/future swaps, 4-char prefix traps, and repeated-word gaming', () => {
+  // 1. Verb negation polarity (even when Levenshtein distance is 1 char like geliyorum vs gelmiyorum!)
+  assert.equal(evaluateTurkishAnswer('Dün sinemaya gitmedim.', ['Dün sinemaya gittim.'], 'sentence').isCorrect, false);
+  assert.equal(evaluateTurkishAnswer('Yarın okula gelmiyorum.', ['Yarın okula geliyorum.'], 'sentence').isCorrect, false);
+  assert.equal(evaluateTurkishAnswer('Bunu asla yapmaz.', ['Bunu yapar.'], 'sentence').isCorrect, false);
+  assert.equal(evaluateTurkishAnswer('Anahtarı almayı unutmayın.', ['Anahtarı almayı unutun.'], 'sentence').isCorrect, false);
+
+  // Positive verbal noun ("alışmam") must NOT falsely trigger negation
+  assert.equal(
+    evaluateTurkishAnswer('Yeni klavye düzenine alışmam birkaç haftamı aldı.', ['Yeni klavye düzenine alışmam birkaç haftamı almıştır.'], 'sentence').isCorrect,
+    true
+  );
+
+  // 2. Past vs future tense contradiction
+  assert.equal(
+    evaluateTurkishAnswer('Dün sabah toplantıya katıldım.', ['Yarın sabah toplantıya katılacağım.'], 'sentence').isCorrect,
+    false
+  );
+  assert.equal(
+    evaluateTurkishAnswer('Toplantıya katıldım.', ['Toplantıya katılacağım.'], 'sentence').isCorrect,
+    false
+  );
+
+  // 3. No false 4-char prefix collisions & core noun swaps caught offline
+  assert.equal(
+    evaluateTurkishAnswer('Yeni arabam parka yakın.', ['Yeni evim parka yakın.'], 'sentence').isCorrect,
+    false
+  );
+  assert.equal(
+    evaluateTurkishAnswer("Kardeşim yarın Ankara'ya trenle gidecek.", ["Kardeşim yarın İstanbul'a trenle gidecek."], 'sentence').isCorrect,
+    false
+  );
+  assert.equal(
+    evaluateTurkishAnswer('wi-fi sinyalı arka oturma odasında süper zayıf çekiyor.', ['Arka yatak odasında Wi-Fi sinyali çok zayıf.'], 'sentence').isCorrect,
+    false
+  );
+
+  // 4. Number mismatch caught offline (5 saat != iki saat, 2015 != 2009)
+  assert.equal(
+    evaluateTurkishAnswer(
+      'Oğlum ve eşim yeni IKEA kitaplığını 5 saatte kurdu.',
+      ['Oğlum ve eşim yeni IKEA kitaplığını iki saatte kurdu.'],
+      'sentence'
+    ).isCorrect,
+    false
+  );
+  assert.equal(
+    evaluateTurkishAnswer(
+      "Michael Jackson 2015'te öldü.",
+      ["Michael Jackson 2009'da öldü."],
+      'sentence'
+    ).isCorrect,
+    false
+  );
+
+  // 5. Repeated-word gaming must fail 1-to-1 matching
+  assert.equal(
+    evaluateTurkishAnswer('kedi kedi kedi', ['Kedi bahçede uyuyor.'], 'sentence').isCorrect,
+    false
+  );
+});
+
+test('offline Turkish matcher accepts natural numbers, apostrophes, colloquial phrasing, and synonyms without AI', () => {
+  // Number word <-> digit equivalence ("2 saatte" vs "iki saatte", "40 dakika" vs "kırk dakika")
+  assert.equal(
+    evaluateTurkishAnswer(
+      'Oğlum ve eşim yeni IKEA kitaplığını 2 saatte monte etti.',
+      ['Oğlum ve eşim yeni IKEA kitaplığını iki saatte kurdu.'],
+      'sentence'
+    ).isCorrect,
+    true
+  );
+  assert.equal(
+    evaluateTurkishAnswer(
+      'Tren 40 dakika sonra kalkıyor.',
+      ['Tren kırk dakika sonra kalkıyor.'],
+      'sentence'
+    ).isCorrect,
+    true
+  );
+
+  // Natural colloquial Turkish for Wi-Fi card when room is right ("yatak odasında" + "süper zayıf çekiyor")
+  assert.equal(
+    evaluateTurkishAnswer(
+      'wi-fi sinyalı arka yatak odasında süper zayıf çekiyor.',
+      ['Arka yatak odasında Wi-Fi sinyali çok zayıf.'],
+      'sentence'
+    ).isCorrect,
+    true
+  );
+
+  // Apostrophe proper nouns + natural conjunction/synonym swaps
+  assert.equal(
+    evaluateTurkishAnswer(
+      'Kardeşim yarın İstanbula trenle gidecek',
+      ["Kardeşim yarın İstanbul'a trenle gidecek."],
+      'sentence'
+    ).isCorrect,
+    true
+  );
+  assert.equal(
+    evaluateTurkishAnswer(
+      'Dün akşam yeni kafede sıcak kahve yudumladık.',
+      ['Dün akşam yeni kafede sıcak kahve içtik.'],
+      'sentence'
+    ).isCorrect,
+    true
+  );
+});

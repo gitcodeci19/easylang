@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "EasyLang",
+  "name": "LingoEx - Yapay Zekâ ile İngilizce Öğren",
   "version": "2.0.0",
-  "description": "Learn English naturally while browsing — active-recall flashcards, page challenges, listening practice, and spaced repetition.",
+  "description": "İnternette gezinirken yapay zekâ asistanın ile İngilizce öğren! Anında sözlük, sesli anlatım ve akıllı pratik kartları.",
   "permissions": [
     "alarms",
     "storage",
@@ -28,7 +28,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "EasyLang",
+    "default_title": "LingoEx",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

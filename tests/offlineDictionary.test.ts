@@ -300,3 +300,20 @@ test('offline dictionary achieves >=97% token coverage across cards.json and >=9
   assert.ok(fullPct >= 97.0, `Expected full corpus offline coverage >= 97%, got ${fullPct.toFixed(2)}%`);
   assert.ok(remPct >= 99.5, `Expected Remedial catalog offline coverage >= 99.5%, got ${remPct.toFixed(2)}%`);
 });
+
+test('offline dictionary resolves compound words, prefixed derivations, and rainforest cleanly', () => {
+  const rainforest = lookupOfflineWord(DICT_INDEX, 'rainforest');
+  assert.ok(rainforest, 'expected rainforest lookup hit');
+  assert.ok(rainforest.meaningsTr.includes('yağmur ormanı'));
+
+  for (const word of ['bookstore', 'sunlight', 'gently', 'reuse', 'redesign', 'unreadable', 'datasets']) {
+    const hit = lookupOfflineWord(DICT_INDEX, word);
+    assert.ok(hit && hit.meaningsTr.length >= 1, `expected offline hit for "${word}"`);
+  }
+
+  // Unlisted compound word falls back to automatic left + right decomposition
+  const starlight = lookupOfflineWord(DICT_INDEX, 'starlight');
+  assert.ok(starlight, 'expected automatic compound decomposition for "starlight"');
+  assert.equal(starlight.inflectionNoteTr, 'bileşik kelime');
+  assert.ok(starlight.lemma.includes('+'));
+});
