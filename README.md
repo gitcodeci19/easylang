@@ -32,8 +32,6 @@
   <img src="docs/gifs/02-mistake-focus-loop.gif" alt="YouTube izlerken hatayı yakalayıp AI açıklaması sunan ve odak listesine alan EasyLang kartı" width="820" />
 </p>
 
-https://github.com/user-attachments/assets/8c34cede-0d40-493f-ba9c-981a12020011
-
 ---
 
 ## 🤖 NASIL OLUYOR DA YAPAY ZEKÂ OLMASINA RAĞMEN BEDAVA?
