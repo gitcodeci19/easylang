@@ -1,5 +1,5 @@
 
-# EasyLang – Yapay Zekâ Destekli Dil Öğrenme Tarayıcı Eklentisi
+# Yapay Zekâ Destekli Dil Öğrenme Tarayıcı Eklentisi
 
 <p align="left">
   <a href="https://github.com/gitcodeci19/easylang/releases">
