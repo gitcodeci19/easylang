@@ -7568,3 +7568,892 @@ body.remedial-crimson-active {
   line-height: 1.5;
   color: #cbd5e1;
 }
+
+/* ==========================================================================
+   ULTRA-CLEAN OPTIONS DASHBOARD SYSTEM (LINEAR / APPLE SETTINGS GRADE)
+   Zero nested box clutter, single Soft Indigo accent, custom crisp controls
+   ========================================================================== */
+body {
+  background-color: #0e1015;
+}
+
+.layout {
+  max-width: 940px;
+  padding: 20px 24px 56px;
+}
+
+/* 1. Top Header */
+.topbar {
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 12px;
+}
+
+.brand-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+
+h1 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.summary-line {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.topbar-actions {
+  gap: 8px;
+}
+
+.lang-select {
+  height: 32px;
+  padding: 0 26px 0 10px;
+  border-radius: 9px;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.topbar-actions .btn {
+  height: 32px;
+  border-radius: 9px;
+  padding: 0 13px;
+}
+
+.btn-danger-outline {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.btn-danger-outline:hover:not(:disabled) {
+  background: rgba(224, 82, 99, 0.12);
+  border-color: rgba(224, 82, 99, 0.36);
+  color: #fda4af;
+}
+
+/* 2. Quiet Utility Backup Strip & Harmonized Banners (Zero shouting yellow/green) */
+.backup-bar,
+.backup-bar.needs-backup,
+.backup-bar:has(.backup-bar-dot.is-ok) {
+  margin-bottom: 14px;
+  padding: 9px 14px;
+  border-radius: 11px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-left: 1px solid var(--border-subtle);
+  gap: 12px;
+}
+
+.backup-bar-info {
+  align-items: center;
+  gap: 10px;
+}
+
+.backup-bar-dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 0;
+  background: var(--accent-gold);
+}
+
+.backup-bar-dot.is-ok {
+  background: var(--accent-emerald);
+}
+
+.backup-bar-headline strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.backup-bar-key-note {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.backup-bar-copy p {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.backup-bar-actions {
+  gap: 6px;
+}
+
+.backup-bar .btn-primary,
+.backup-bar .btn-ghost {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.backup-bar .btn-primary:hover,
+.backup-bar .btn-ghost:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: #ffffff;
+}
+
+.backup-bar.needs-backup .btn-primary {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: rgba(129, 140, 248, 0.38);
+  color: #e0e7ff;
+}
+
+.backup-bar.needs-backup .btn-primary:hover {
+  background: rgba(99, 102, 241, 0.24);
+  border-color: rgba(129, 140, 248, 0.54);
+}
+
+.no-api-bar,
+.dash-banner {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  background: var(--bg-panel);
+  border: 1px solid rgba(129, 140, 248, 0.24);
+  border-left: 2px solid var(--accent-purple);
+}
+
+.no-api-bar .btn-primary,
+.dash-banner .btn-primary {
+  background: var(--accent-purple);
+  border-color: transparent;
+  color: #ffffff;
+  border-radius: 8px;
+}
+
+.no-api-bar .btn-primary:hover,
+.dash-banner .btn-primary:hover {
+  background: #7376f7;
+}
+
+/* 3. Standalone Clean Navigation Tabs (Zero outer pill box, unified Soft Indigo active) */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 12px;
+  margin-bottom: 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0;
+}
+
+.tab {
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  gap: 7px;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.tab.active,
+.tab[data-tab='roadmap'].active,
+.tab[data-tab='analytics'].active,
+.tab[data-tab='ai'].active,
+.tab[data-tab='cards'].active,
+.tab[data-tab='settings'].active {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(129, 140, 248, 0.42);
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.tab.active .ui-ico {
+  color: #a5b4fc;
+  opacity: 1;
+}
+
+/* 4. Borderless Panels & Crisp Page Header Row */
+.panel {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+.tab-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tab-page-title {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+
+/* 5. Linear / Apple-Style Settings Cards */
+.settings-stack {
+  gap: 14px;
+}
+
+.settings-section-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 13px;
+  overflow: hidden;
+}
+
+.settings-card-head {
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.settings-card-eyebrow {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.settings-two-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-cell {
+  padding: 16px 18px;
+  gap: 7px;
+}
+
+.settings-two-split > .settings-cell:first-child {
+  border-right: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.settings-inline-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.settings-row-copy {
+  min-width: 0;
+}
+
+.settings-row-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-block-row {
+  padding: 15px 18px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+/* 6. Crisp Unified Inputs, Custom Selects, Presets, Quiet Range & TTS Inline Strip */
+.field {
+  gap: 6px;
+}
+
+.field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c8d0df;
+}
+
+.field small {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+input[type='text'],
+input[type='url'],
+input[type='password'],
+input[type='number'],
+input[type='search'],
+select,
+textarea {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9px;
+  padding: 7px 11px;
+  font-size: 12.5px;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease, background-color 0.14s ease;
+}
+
+input[type='text'],
+input[type='url'],
+input[type='password'],
+input[type='number'],
+input[type='search'],
+select {
+  height: 34px;
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%238c95a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+}
+
+.duo-map-hud .duo-unit-picker {
+  background-image: none;
+}
+
+.select-compact {
+  width: 100%;
+  max-width: none;
+}
+
+textarea {
+  line-height: 1.5;
+  resize: vertical;
+}
+
+#blockedDomains {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  padding: 10px 12px;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+#tab-ai input:focus,
+#tab-ai select:focus,
+#tab-ai textarea:focus,
+#tab-cards input:focus,
+#tab-cards select:focus {
+  outline: none;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.num-preset-row {
+  gap: 8px;
+}
+
+input[type='number'].num-compact {
+  width: 62px;
+  flex: 0 0 62px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+input[type='number'].num-compact::-webkit-inner-spin-button,
+input[type='number'].num-compact::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.preset-pills {
+  padding: 2px;
+  gap: 2px;
+  border-radius: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+}
+
+.preset-pill {
+  height: 26px;
+  min-width: 34px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.preset-pill:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: transparent;
+  color: var(--text-primary);
+}
+
+.preset-pill.is-active {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(129, 140, 248, 0.44);
+  color: #eef2ff;
+}
+
+.quiet-range-row {
+  gap: 8px;
+}
+
+.quiet-part {
+  height: 34px;
+  padding: 0 4px 0 11px;
+  border-radius: 9px;
+  background: var(--bg-input);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  gap: 6px;
+}
+
+.quiet-part:focus-within {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.quiet-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.quiet-part input[type='number'].num-compact {
+  width: 44px;
+  flex: 0 0 44px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  padding: 0 4px;
+  box-shadow: none;
+}
+
+.quiet-part input[type='number'].num-compact:focus {
+  box-shadow: none;
+  border: none;
+}
+
+/* Flush inline TTS status row (no nested bordered card!) */
+.neural-tts-bar {
+  margin-top: 8px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  gap: 10px;
+}
+
+.neural-tts-status {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.btn-xs {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+/* 7. Tactile CEFR Level Pill Toggles (Zero ugly native browser checkboxes) */
+.checkbox-row {
+  gap: 6px;
+  padding-top: 0;
+}
+
+.chip-check {
+  position: relative;
+  height: 32px;
+  min-width: 54px;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+  user-select: none;
+}
+
+.chip-check input[type='checkbox'] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.chip-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  transition: background-color 0.14s ease;
+}
+
+.chip-check:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.chip-check:has(input:checked) {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: rgba(129, 140, 248, 0.48);
+  color: #eef2ff;
+}
+
+.chip-check:has(input:checked) .chip-dot {
+  background: #818cf8;
+}
+
+.chip-check:has(input:focus-visible) {
+  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.5);
+}
+
+/* 8. Unified Behavior Toggle List & Soft Indigo Switches (Zero neon green boxes!) */
+.pref-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+
+.pref-grid.is-single-col {
+  grid-template-columns: 1fr;
+}
+
+.pref-card {
+  padding: 13px 18px;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  gap: 14px;
+}
+
+.pref-grid:not(.is-single-col) .pref-card:nth-child(odd) {
+  border-right: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.pref-grid:not(.is-single-col) .pref-card:nth-last-child(-n + 2),
+.pref-grid.is-single-col .pref-card:last-child {
+  border-bottom: none;
+}
+
+.pref-card:hover {
+  background: rgba(255, 255, 255, 0.024);
+  border-color: rgba(255, 255, 255, 0.055);
+}
+
+.pref-card:has(input:checked) {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.055);
+}
+
+.pref-card:has(input:checked):hover {
+  background: rgba(255, 255, 255, 0.024);
+}
+
+.pref-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #dde2ec;
+  line-height: 1.4;
+}
+
+.mini-switch {
+  width: 36px;
+  height: 20px;
+  flex: 0 0 36px;
+}
+
+.mini-slider {
+  background: #272c38;
+}
+
+.mini-slider::before {
+  width: 14px;
+  height: 14px;
+  left: 3px;
+  bottom: 3px;
+  background: #8e96aa;
+}
+
+.mini-switch input:checked + .mini-slider {
+  background: var(--accent-purple);
+}
+
+.mini-switch input:checked + .mini-slider::before {
+  transform: translateX(16px);
+  background: #ffffff;
+}
+
+/* Anchored Save Strip */
+.settings-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 18px;
+  border-radius: 13px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+}
+
+.settings-save-btn {
+  height: 34px;
+  padding: 0 18px;
+  border-radius: 9px;
+  font-size: 12.5px;
+}
+
+.settings-divider {
+  margin: 24px 0 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-section-title {
+  margin: 0 0 12px;
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* 9. Unified Primary/Secondary Buttons Across All Tabs */
+.btn,
+.btn-primary,
+.btn-ghost {
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 9px;
+}
+
+.btn-primary,
+#tab-ai .btn-primary,
+#ai-coach-btn {
+  background: var(--accent-purple);
+  border-color: transparent;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled),
+#tab-ai .btn-primary:hover:not(:disabled),
+#ai-coach-btn:hover:not(:disabled) {
+  background: #7376f7;
+}
+
+.btn-secondary,
+.btn-ghost {
+  background: var(--bg-elevated);
+  border-color: var(--border-subtle);
+  color: #d6dce9;
+}
+
+.btn-secondary:hover:not(:disabled),
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: #ffffff;
+}
+
+.btn-sm {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 8px;
+  font-size: 11.5px;
+}
+
+.btn-xs,
+.btn-mini {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+/* 10. Unified Cards Across Analytics, AI Settings & Custom Cards */
+.subcard,
+.provider-card,
+.accordion-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 13px;
+  padding: 16px 18px;
+}
+
+.provider-card {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ai-guide-card {
+  border-color: var(--border-subtle);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.free-api-item {
+  border-radius: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+}
+
+.free-api-item.is-recommended {
+  border-color: rgba(129, 140, 248, 0.34);
+}
+
+.tag-best {
+  background: rgba(99, 102, 241, 0.14);
+  color: #c7d2fe;
+  border-color: rgba(129, 140, 248, 0.32);
+}
+
+.tag-smart {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+
+.free-steps-title,
+.free-steps-link,
+.free-step-num {
+  color: #c7d2fe;
+}
+
+.free-steps-link,
+.free-step-num {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(129, 140, 248, 0.32);
+}
+
+.free-steps-link:hover {
+  background: var(--accent-purple);
+  border-color: var(--accent-purple);
+  color: #ffffff;
+}
+
+.free-model-chip:hover {
+  border-color: rgba(129, 140, 248, 0.42);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.free-model-chip.is-selected {
+  border-color: #818cf8;
+  background: rgba(99, 102, 241, 0.16);
+}
+
+.accordion-summary::before {
+  color: var(--text-muted);
+}
+
+/* Analytics Hero Cards: calm, balanced, tabular numerals */
+.analytics-hero {
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.metric-card,
+.metric-card.accent,
+.analytics-hero .metric-card:nth-child(2),
+.analytics-hero .metric-card:nth-child(3) {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 13px;
+  padding: 15px 18px;
+  gap: 5px;
+}
+
+.metric-value {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.coach-output {
+  border-color: rgba(129, 140, 248, 0.24);
+  border-left: 2px solid var(--accent-purple);
+}
+
+.concept-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--accent-purple-bright);
+  border-radius: 10px;
+  padding: 11px 14px;
+}
+
+.concept-card.mastered {
+  border-left-color: var(--accent-emerald);
+}
+
+/* Cards Table */
+.toolbar {
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.table-wrap {
+  border-radius: 13px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+}
+
+th {
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 14px;
+}
+
+td {
+  padding: 10px 14px;
+}
+
+@media (max-width: 720px) {
+  .settings-two-split,
+  .pref-grid,
+  .split-cards,
+  .analytics-hero,
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-two-split > .settings-cell:first-child {
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  }
+
+  .pref-grid:not(.is-single-col) .pref-card:nth-child(odd) {
+    border-right: none;
+  }
+
+  .pref-grid:not(.is-single-col) .pref-card:nth-last-child(-n + 2) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  }
+
+  .pref-grid:not(.is-single-col) .pref-card:last-child {
+    border-bottom: none;
+  }
+}

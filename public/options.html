@@ -201,20 +201,24 @@
       </div>
 
       <nav class="tabs" role="tablist">
-        <button class="tab" data-tab="roadmap" type="button" data-i18n="tabRoadmap">
-          Öğrenme Yolu
+        <button class="tab" data-tab="roadmap" type="button">
+          <svg class="ui-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+          <span data-i18n="tabRoadmap">Öğrenme Yolu</span>
         </button>
-        <button class="tab" data-tab="analytics" type="button" data-i18n="tabAnalytics">
-          Gelişimim
+        <button class="tab" data-tab="analytics" type="button">
+          <svg class="ui-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span data-i18n="tabAnalytics">Gelişimim</span>
         </button>
-        <button class="tab" data-tab="ai" type="button" data-i18n="tabAi">
-          AI - API Ayarları
+        <button class="tab" data-tab="ai" type="button">
+          <svg class="ui-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/><path d="M19 3v3"/><path d="M17.5 4.5h3"/></svg>
+          <span data-i18n="tabAi">AI - API Ayarları</span>
         </button>
-        <button class="tab" data-tab="cards" type="button" data-i18n="tabCards">
-          Kelimelerim
+        <button class="tab" data-tab="cards" type="button">
+          <svg class="ui-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span data-i18n="tabCards">Kelimelerim</span>
         </button>
         <button class="tab tab-settings-right active" data-tab="settings" type="button">
-          <span class="tab-gear" aria-hidden="true">⚙</span>
+          <svg class="ui-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
           <span data-i18n="tabSettings">Ayarlar</span>
         </button>
       </nav>
@@ -226,7 +230,8 @@
 
       <!-- SETTINGS TAB -->
       <section id="tab-settings" class="panel">
-        <div class="tab-guide-row">
+        <div class="tab-header-row">
+          <h2 class="tab-page-title" data-i18n="tabSettings">Ayarlar</h2>
           <button
             type="button"
             class="el-help-trigger is-pill"
@@ -238,10 +243,16 @@
             <span class="el-help-label">Bu ne işe yarıyor?</span>
           </button>
         </div>
+
         <form id="settings-form" class="settings-stack">
-          <div class="subcard settings-card-block">
-            <div class="settings-compact-grid">
-              <div class="field">
+          <!-- Section 1: Schedule & Quiet Hours -->
+          <div class="settings-section-card">
+            <div class="settings-card-head">
+              <span class="settings-card-eyebrow" data-i18n="secTiming">Zamanlama ve Sessiz Saatler</span>
+            </div>
+
+            <div class="settings-two-split">
+              <div class="field settings-cell">
                 <label for="intervalMinutes" data-i18n="lblInterval">Soru Sıklığı (dakika)</label>
                 <div class="num-preset-row">
                   <input id="intervalMinutes" class="num-compact" type="number" min="1" max="240" required />
@@ -256,7 +267,7 @@
                 <small data-i18n="hintInterval">Varsayılan: 20 dakika</small>
               </div>
 
-              <div class="field">
+              <div class="field settings-cell">
                 <label for="retryDelayMinutes" data-i18n="lblRetryDelay"
                   >Yanlışları Tekrarla (dakika)</label
                 >
@@ -273,45 +284,52 @@
                   >Yanlış kartların tekrar sorulma süresi (varsayılan: 20 dk)</small
                 >
               </div>
+            </div>
 
-              <div class="field full-span">
-                <label data-i18n="lblQuietHours"
+            <div class="settings-inline-row">
+              <div class="settings-row-copy">
+                <label class="settings-row-title" data-i18n="lblQuietHours"
                   >Sessiz Saatler (0–23 saat aralığı, boş = kapalı)</label
                 >
-                <div class="quiet-range-row">
-                  <label class="quiet-part" for="quietHoursStart">
-                    <span class="quiet-sub" data-i18n="lblQuietStart">Başlangıç</span>
-                    <input
-                      id="quietHoursStart"
-                      class="num-compact"
-                      type="number"
-                      min="0"
-                      max="23"
-                      placeholder="23"
-                      data-i18n-ph="phQuietStart"
-                    />
-                  </label>
-                  <span class="quiet-sep">—</span>
-                  <label class="quiet-part" for="quietHoursEnd">
-                    <span class="quiet-sub" data-i18n="lblQuietEnd">Bitiş</span>
-                    <input
-                      id="quietHoursEnd"
-                      class="num-compact"
-                      type="number"
-                      min="0"
-                      max="23"
-                      placeholder="08"
-                      data-i18n-ph="phQuietEnd"
-                    />
-                  </label>
-                </div>
+              </div>
+              <div class="quiet-range-row">
+                <label class="quiet-part" for="quietHoursStart">
+                  <span class="quiet-sub" data-i18n="lblQuietStart">Başlangıç</span>
+                  <input
+                    id="quietHoursStart"
+                    class="num-compact"
+                    type="number"
+                    min="0"
+                    max="23"
+                    placeholder="23"
+                    data-i18n-ph="phQuietStart"
+                  />
+                </label>
+                <span class="quiet-sep">—</span>
+                <label class="quiet-part" for="quietHoursEnd">
+                  <span class="quiet-sub" data-i18n="lblQuietEnd">Bitiş</span>
+                  <input
+                    id="quietHoursEnd"
+                    class="num-compact"
+                    type="number"
+                    min="0"
+                    max="23"
+                    placeholder="08"
+                    data-i18n-ph="phQuietEnd"
+                  />
+                </label>
               </div>
             </div>
           </div>
 
-          <div class="subcard settings-card-block">
-            <div class="settings-compact-grid">
-              <div class="field">
+          <!-- Section 2: Content, Levels & Voice -->
+          <div class="settings-section-card">
+            <div class="settings-card-head">
+              <span class="settings-card-eyebrow" data-i18n="secContent">İçerik, Seviye ve Seslendirme</span>
+            </div>
+
+            <div class="settings-two-split">
+              <div class="field settings-cell">
                 <label for="contentMode" data-i18n="lblContentMode">Soru Türü</label>
                 <select id="contentMode" class="select-compact">
                   <option value="mixed" data-i18n="optMixed">Karışık (Kelime + Cümle)</option>
@@ -320,7 +338,7 @@
                 </select>
               </div>
 
-              <div class="field">
+              <div class="field settings-cell">
                 <label for="ttsVoiceMode">Seslendirme Kalitesi (TTS)</label>
                 <select id="ttsVoiceMode" class="select-compact">
                   <option value="neural" selected>Yapay Zeka Sesi (Piper · HFC Female)</option>
@@ -330,19 +348,23 @@
                   <button type="button" class="btn btn-secondary btn-xs" id="neural-tts-test-btn">▶ Sesi Dinle</button>
                 </div>
               </div>
+            </div>
 
-              <div class="field full-span">
-                <label data-i18n="lblCefrLevels">Aktif Seviyeler</label>
-                <div class="checkbox-row" id="levels-group">
-                  <label class="chip-check"><input type="checkbox" value="A1" /><span>A1</span></label>
-                  <label class="chip-check"><input type="checkbox" value="A2" /><span>A2</span></label>
-                  <label class="chip-check"><input type="checkbox" value="B1" /><span>B1</span></label>
-                  <label class="chip-check"><input type="checkbox" value="B2" /><span>B2</span></label>
-                  <label class="chip-check"><input type="checkbox" value="C1" /><span>C1</span></label>
-                </div>
+            <div class="settings-inline-row">
+              <div class="settings-row-copy">
+                <label class="settings-row-title" data-i18n="lblCefrLevels">Aktif Seviyeler</label>
               </div>
+              <div class="checkbox-row" id="levels-group">
+                <label class="chip-check"><input type="checkbox" value="A1" /><span class="chip-dot" aria-hidden="true"></span><span>A1</span></label>
+                <label class="chip-check"><input type="checkbox" value="A2" /><span class="chip-dot" aria-hidden="true"></span><span>A2</span></label>
+                <label class="chip-check"><input type="checkbox" value="B1" /><span class="chip-dot" aria-hidden="true"></span><span>B1</span></label>
+                <label class="chip-check"><input type="checkbox" value="B2" /><span class="chip-dot" aria-hidden="true"></span><span>B2</span></label>
+                <label class="chip-check"><input type="checkbox" value="C1" /><span class="chip-dot" aria-hidden="true"></span><span>C1</span></label>
+              </div>
+            </div>
 
-              <div class="field full-span">
+            <div class="settings-block-row">
+              <div class="field">
                 <label for="blockedDomains" data-i18n="lblBlockedDomains"
                   >Hariç Tutulan Siteler</label
                 >
@@ -359,7 +381,12 @@
             </div>
           </div>
 
-          <div class="subcard settings-card-block">
+          <!-- Section 3: Behavior & Automation -->
+          <div class="settings-section-card">
+            <div class="settings-card-head">
+              <span class="settings-card-eyebrow" data-i18n="secBehavior">Davranış ve Otomasyon</span>
+            </div>
+
             <div class="pref-grid">
               <label class="pref-card" for="enabled">
                 <span class="pref-label" data-i18n="togEnabled">Zamanlayıcıyla otomatik soru sor</span>
@@ -421,13 +448,13 @@
             </div>
           </div>
 
-          <div class="form-footer">
-            <button class="btn btn-primary" type="submit" data-i18n="btnSaveSettings">
-              Değişiklikleri Kaydet
-            </button>
+          <div class="settings-save-bar">
             <span id="settings-saved-msg" class="saved-msg" hidden data-i18n="msgSaved"
               >Kaydedildi ✓</span
             >
+            <button class="btn btn-primary settings-save-btn" type="submit" data-i18n="btnSaveSettings">
+              Değişiklikleri Kaydet
+            </button>
           </div>
         </form>
 
@@ -553,7 +580,8 @@
 
       <!-- ANALYTICS TAB -->
       <section id="tab-analytics" class="panel" hidden>
-        <div class="tab-guide-row">
+        <div class="tab-header-row">
+          <h2 class="tab-page-title" data-i18n="tabAnalytics">Gelişimim</h2>
           <button
             type="button"
             class="el-help-trigger is-pill"
@@ -638,7 +666,8 @@
 
       <!-- AI SETTINGS TAB -->
       <section id="tab-ai" class="panel" hidden>
-        <div class="tab-guide-row">
+        <div class="tab-header-row">
+          <h2 class="tab-page-title" data-i18n="tabAi">AI - API Ayarları</h2>
           <button
             type="button"
             class="el-help-trigger is-pill"
@@ -651,19 +680,25 @@
           </button>
         </div>
         <form id="ai-form" class="ai-layout">
-          <div class="subcard">
-            <div class="toggles-list" style="padding-top: 0">
-              <label class="toggle-item">
-                <input id="ai-enabled" type="checkbox" />
-                <span data-i18n="aiEnableLabel"
+          <div class="settings-section-card ai-toggles-card">
+            <div class="pref-grid is-single-col">
+              <label class="pref-card" for="ai-enabled">
+                <span class="pref-label" data-i18n="aiEnableLabel"
                   >AI Anlamsal Değerlendirmeyi ve Sağ Tık Çevirisini Etkinleştir</span
                 >
+                <span class="mini-switch">
+                  <input id="ai-enabled" type="checkbox" />
+                  <span class="mini-slider"></span>
+                </span>
               </label>
-              <label class="toggle-item">
-                <input id="ai-always-evaluate" type="checkbox" />
-                <span data-i18n="aiAlwaysLabel"
+              <label class="pref-card" for="ai-always-evaluate">
+                <span class="pref-label" data-i18n="aiAlwaysLabel"
                   >Her cevabı AI ile değerlendir (kapalı = sadece yerel eşleştirici reddettiğinde AI kullan)</span
                 >
+                <span class="mini-switch">
+                  <input id="ai-always-evaluate" type="checkbox" />
+                  <span class="mini-slider"></span>
+                </span>
               </label>
             </div>
           </div>
@@ -1065,7 +1100,8 @@
 
       <!-- CARDS & QUEUE TAB -->
       <section id="tab-cards" class="panel" hidden>
-        <div class="tab-guide-row">
+        <div class="tab-header-row">
+          <h2 class="tab-page-title" data-i18n="tabCards">Kelimelerim</h2>
           <button
             type="button"
             class="el-help-trigger is-pill"

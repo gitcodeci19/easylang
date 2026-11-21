@@ -15,6 +15,9 @@ export interface DashboardStrings {
   tabCards: string;
 
   // Settings tab
+  secTiming: string;
+  secContent: string;
+  secBehavior: string;
   lblInterval: string;
   hintInterval: string;
   lblRetryDelay: string;
@@ -220,6 +223,9 @@ const EN_DASHBOARD: DashboardStrings = {
   togAutoTranslate: 'Suggest translations on right-click selection',
   btnSaveSettings: 'Save Changes',
   msgSaved: 'Saved ✓',
+  secTiming: 'Schedule & Quiet Hours',
+  secContent: 'Content, Levels & Voice',
+  secBehavior: 'Behavior & Automation',
 
   metricLevel: 'My Level (Elo)',
   metricAccuracy: 'Accuracy',
@@ -395,6 +401,9 @@ const TR_DASHBOARD: DashboardStrings = {
   togAutoTranslate: 'Sağ tıkla kelime eklerken anlam önerisi getir',
   btnSaveSettings: 'Değişiklikleri Kaydet',
   msgSaved: 'Kaydedildi ✓',
+  secTiming: 'Zamanlama ve Sessiz Saatler',
+  secContent: 'İçerik, Seviye ve Seslendirme',
+  secBehavior: 'Davranış ve Otomasyon',
 
   metricLevel: 'Seviyem (Elo)',
   metricAccuracy: 'Doğruluk Oranı',
