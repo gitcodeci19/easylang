@@ -1,7 +1,6 @@
 import { openAiTutorDrawer } from './aiTutorDrawer';
 import { advanceConceptAfterAnswer } from './concepts';
 import {
-  createGuideHelpButton,
   getActiveGuideAssistantId,
   stopGuideAssistant,
 } from './guideAssistant';
@@ -114,12 +113,7 @@ export function createModeTabBar(params: {
     if (params.activeMode !== 'path') params.onSelectMode('path');
   });
 
-  const pathHelpBtn = createGuideHelpButton('tour_home_roadmap', {
-    isTr: params.isTr,
-    variant: 'dot',
-    extraClass: 'duo-tab-help-btn',
-  });
-  pathWrap.append(pathTab, pathHelpBtn);
+  pathWrap.append(pathTab);
 
   const remWrap = document.createElement('div');
   remWrap.className = 'duo-mode-tab-wrap';
@@ -143,12 +137,7 @@ export function createModeTabBar(params: {
     if (params.activeMode !== 'remedial') params.onSelectMode('remedial');
   });
 
-  const remHelpBtn = createGuideHelpButton('tour_remedial_hub', {
-    isTr: params.isTr,
-    variant: 'dot',
-    extraClass: 'duo-tab-help-btn',
-  });
-  remWrap.append(remTab, remHelpBtn);
+  remWrap.append(remTab);
 
   bar.append(pathWrap, remWrap);
   return bar;
@@ -579,11 +568,6 @@ export function renderRemedialBriefing(
   const briefTopActions = document.createElement('div');
   briefTopActions.className = 'rem-brief-top-actions';
 
-  const briefHelpBtn = createGuideHelpButton('tour_remedial_briefing', {
-    isTr,
-    variant: 'dot',
-  });
-
   const askBriefBtn = document.createElement('button');
   askBriefBtn.type = 'button';
   askBriefBtn.className = 'duo-ask-ai-btn is-crimson';
@@ -593,7 +577,7 @@ export function renderRemedialBriefing(
     : 'Ask the AI tutor any question about this rule';
   askBriefBtn.addEventListener('click', openBriefTutor);
 
-  briefTopActions.append(briefHelpBtn, askBriefBtn);
+  briefTopActions.append(askBriefBtn);
   topBar.append(backBtn, titleEl, briefTopActions);
   root.appendChild(topBar);
 

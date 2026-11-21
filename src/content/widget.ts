@@ -1,5 +1,5 @@
 import { sanitizeConceptExplanationForCard } from '../shared/concepts';
-import { createGuideHelpButton, stopGuideAssistant } from '../shared/guideAssistant';
+import { stopGuideAssistant } from '../shared/guideAssistant';
 import { renderHighlightedPhrase, renderHighlightedSentence } from '../shared/grammarHighlighter';
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
 import { extractDisplayMeanings } from '../shared/meaningFormatter';
@@ -686,12 +686,7 @@ export function renderRecallWidget(
       'etr-label',
       isTr ? 'AI Öğretmene Sor:' : 'Ask AI Tutor:'
     );
-    const askAiHelpBtn = createGuideHelpButton('tour_ask_ai', {
-      isTr,
-      variant: 'dot',
-      host: wrap,
-    });
-    askAiHead.append(askAiLabel, askAiHelpBtn);
+    askAiHead.append(askAiLabel);
 
     const askAiHistory: Array<{ role: 'user' | 'assistant'; text: string }> = [];
     const askAiOutput = createEl('div', 'etr-ask-output');

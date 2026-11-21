@@ -9039,6 +9039,7 @@ tbody tr:hover {
 .duo-mode-tab,
 .duo-mode-tab.is-remedial {
   height: 40px;
+  padding: 0 14px;
   border-radius: 13px;
   background: #ffffff;
   border: 2px solid #e2e8f0;

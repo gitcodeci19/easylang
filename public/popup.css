@@ -7289,6 +7289,7 @@ body.remedial-crimson-active .rank-chip {
 .duo-mode-tab,
 .duo-mode-tab.is-remedial {
   height: 38px;
+  padding: 0 12px;
   border-radius: 13px;
   background: #ffffff;
   border: 2px solid #e2e8f0;
@@ -7753,6 +7754,7 @@ body.remedial-crimson-active .rank-chip {
 
 .act-btn {
   height: 38px;
+  padding: 0 12px;
   border-radius: 13px;
   background: #ffffff;
   border: 2px solid #e2e8f0;

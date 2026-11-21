@@ -113,15 +113,11 @@ function getOrCreateFloatingPill(host?: HTMLElement | ShadowRoot): HTMLButtonEle
     waves.appendChild(document.createElement('i'));
   }
 
-  const label = document.createElement('span');
-  label.className = 'el-guide-pill-label';
-  label.textContent = 'Asistan Konuşuyor';
-
   const stopChip = document.createElement('span');
   stopChip.className = 'el-guide-pill-stop';
   stopChip.textContent = '■ Durdur';
 
-  pill.append(waves, label, stopChip);
+  pill.append(waves, stopChip);
   pill.addEventListener('click', (e) => {
     e.stopPropagation();
     if (pendingAutoplayGuide && !activeGuideId) {
@@ -154,20 +150,17 @@ function showFloatingPill(
   if (!pill) return;
   activePillEl = pill;
 
-  const labelEl = pill.querySelector<HTMLElement>('.el-guide-pill-label');
   const stopEl = pill.querySelector<HTMLElement>('.el-guide-pill-stop');
 
   if (mode === 'speaking') {
     pill.classList.add('is-speaking');
     pill.classList.remove('is-ready');
     pill.title = isTr ? 'Durdurmak için tıkla' : 'Click to stop';
-    if (labelEl) labelEl.textContent = isTr ? 'Asistan Konuşuyor' : 'Assistant Speaking';
     if (stopEl) stopEl.textContent = isTr ? '■ Durdur' : '■ Stop';
   } else {
     pill.classList.remove('is-speaking');
     pill.classList.add('is-ready');
     pill.title = isTr ? 'Sesli tanıtımı başlat' : 'Play voice guide';
-    if (labelEl) labelEl.textContent = isTr ? 'Asistan Hazır' : 'Guide Ready';
     if (stopEl) stopEl.textContent = isTr ? '▶ Dinle' : '▶ Play';
   }
   pill.hidden = false;

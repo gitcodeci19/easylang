@@ -5,7 +5,6 @@ import {
 } from './aiGrammarCoachView';
 import { renderHighlightedPhrase, renderHighlightedSentence } from './grammarHighlighter';
 import {
-  createGuideHelpButton,
   getActiveGuideAssistantId,
   registerBeforeGuidePlayHook,
   stopGuideAssistant,
@@ -639,7 +638,7 @@ export function createQuestionVoiceCard(options: {
 
   const subEl = document.createElement('span');
   subEl.className = 'ai-voice-sub';
-  subEl.textContent = isTr ? 'Dinlemek için tıkla' : 'Tap to listen';
+  subEl.hidden = true;
 
   copyWrap.append(titleEl, subEl);
 
@@ -765,25 +764,24 @@ export function createQuestionVoiceCard(options: {
 
   const refreshCopy = (playing: boolean, ended = false): void => {
     if (playing) {
-      subEl.textContent = isAutoTriggered
-        ? isTr
-          ? 'Yanlış cevap · asistan otomatik anlatıyor'
-          : 'Wrong answer · explaining automatically'
-        : isTr
-          ? 'Asistan anlatıyor · duraklatmak için tıkla'
-          : 'Assistant speaking · tap to pause';
+      subEl.textContent = '';
+      subEl.hidden = true;
       chipEl.textContent = isTr ? '⏸ Duraklat' : '⏸ Pause';
       return;
     }
 
-    const durSuffix = knownDurationSec > 0 ? ` · ${formatAudioSeconds(knownDurationSec)}` : '';
     if (!hasStartedOnce || ended) {
-      subEl.textContent = isTr
-        ? `Dinlemek için tıkla${durSuffix}`
-        : `Tap to listen${durSuffix}`;
+      if (knownDurationSec > 0) {
+        subEl.textContent = formatAudioSeconds(knownDurationSec);
+        subEl.hidden = false;
+      } else {
+        subEl.textContent = '';
+        subEl.hidden = true;
+      }
       chipEl.textContent = ended ? (isTr ? '↺ Tekrar' : '↺ Replay') : isTr ? '✦ Dinle' : '✦ Listen';
     } else {
-      subEl.textContent = isTr ? 'Duraklatıldı · devam etmek için tıkla' : 'Paused · tap to resume';
+      subEl.textContent = '';
+      subEl.hidden = true;
       chipEl.textContent = isTr ? '▶ Devam' : '▶ Resume';
     }
   };
@@ -1328,20 +1326,13 @@ export function openTeachMeDrawer(options: OpenTeachMeDrawerOptions): void {
   const headerActions = document.createElement('div');
   headerActions.className = 'tm-header-actions';
 
-  const helpBtn = createGuideHelpButton('tour_teach_me', {
-    isTr,
-    variant: 'pill',
-    labelTr: 'Bu ne işe yarıyor?',
-    labelEn: 'How it works?',
-  });
-
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'tm-close-btn';
   closeBtn.textContent = '✕';
   closeBtn.title = isTr ? 'Kapat (Esc)' : 'Close (Esc)';
   closeBtn.addEventListener('click', closeDrawer);
-  headerActions.append(helpBtn, closeBtn);
+  headerActions.append(closeBtn);
   header.append(title, headerActions);
   panel.appendChild(header);
 
@@ -1580,14 +1571,6 @@ export function buildInlineTeachMePanel(options: {
 
   const headActions = document.createElement('div');
   headActions.className = 'etr-teach-head-actions';
-
-  const helpBtn = createGuideHelpButton('tour_teach_me', {
-    isTr,
-    variant: 'dot',
-    extraClass: 'etr-teach-help-btn',
-    host: options.guideHost,
-  });
-  headActions.appendChild(helpBtn);
 
   if (options.onClose) {
     const closeBtn = document.createElement('button');

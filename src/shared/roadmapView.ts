@@ -780,72 +780,12 @@ export class RoadmapController {
     miniTrack.appendChild(miniFill);
 
     progressWrap.append(subMeta, miniTrack);
-
-    const insight =
-      this.coachInsight ?? buildFallbackRoadmapCoachBanner(this.historyRecords, resolvedLang);
-
-    const coachTrigger = document.createElement('button');
-    coachTrigger.type = 'button';
-    coachTrigger.className = `duo-coach-trigger status-${insight.status}`;
-    coachTrigger.setAttribute('aria-expanded', 'false');
-
-    const coachDot = document.createElement('span');
-    coachDot.className = 'duo-coach-dot';
-    coachDot.setAttribute('aria-hidden', 'true');
-
-    const coachTag = document.createElement('span');
-    coachTag.className = 'duo-coach-tag';
-    coachTag.textContent =
-      insight.lessonCountAnalyzed > 0
-        ? isTr
-          ? insight.source === 'ai'
-            ? `AI Koç · Son ${insight.lessonCountAnalyzed} Ders`
-            : `Son ${insight.lessonCountAnalyzed} Ders`
-          : insight.source === 'ai'
-            ? `AI Coach · Last ${insight.lessonCountAnalyzed}`
-            : `Last ${insight.lessonCountAnalyzed}`
-        : isTr
-          ? 'AI Koç'
-          : 'AI Coach';
-
-    const coachChevron = document.createElement('span');
-    coachChevron.className = 'duo-coach-chevron';
-    coachChevron.textContent = '▾';
-
-    coachTrigger.append(coachDot, coachTag, coachChevron);
-    hudMeta.append(progressWrap, coachTrigger);
-
-    // Collapsible AI Coach drawer integrated smoothly inside the bottom of the HUD
-    const coachDrawer = document.createElement('div');
-    coachDrawer.className = `duo-coach-drawer status-${insight.status}`;
-    coachDrawer.hidden = true;
-
-    const coachMsg = document.createElement('div');
-    coachMsg.className = 'duo-coach-msg';
-    coachMsg.textContent = insight.message;
-    coachDrawer.appendChild(coachMsg);
-
-    const setCoachOpen = (open: boolean): void => {
-      coachDrawer.hidden = !open;
-      coachTrigger.classList.toggle('is-open', open);
-      mapHud.classList.toggle('is-coach-open', open);
-      coachTrigger.setAttribute('aria-expanded', String(open));
-      coachChevron.textContent = open ? '▴' : '▾';
-    };
-
-    coachTrigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      setCoachOpen(coachDrawer.hidden);
-    });
-
-    mapHud.append(hudTop, hudMeta, coachDrawer);
+    hudMeta.append(progressWrap);
+    mapHud.append(hudTop, hudMeta);
 
     // 2. Full-bleed Scrollable S-Curve Roadmap Canvas gliding smoothly underneath the HUD
     const pathScroll = document.createElement('div');
     pathScroll.className = 'duo-skill-path';
-    pathScroll.addEventListener('click', () => {
-      if (!coachDrawer.hidden) setCoachOpen(false);
-    });
 
     // Integrated CEFR Placement Exam Gate inside the very top of the Roadmap canvas
     // Visually distinct (Sky/Cyan diagnostic card) so users never confuse it with a regular lesson
@@ -942,14 +882,7 @@ export class RoadmapController {
     pathScroll.appendChild(placementCard);
 
     for (const up of unitsProgress) {
-      const secEl = this.buildUnitSectionElement(
-        up,
-        isTr,
-        L,
-        activeUnit.id,
-        courseRank,
-        this.state.xp
-      );
+      const secEl = this.buildUnitSectionElement(up, isTr, L, activeUnit.id);
       pathScroll.appendChild(secEl);
     }
 
@@ -1010,9 +943,7 @@ export class RoadmapController {
     up: ComputedUnitProgress,
     isTr: boolean,
     L: RoadmapUiLabels,
-    activeUnitId: string,
-    courseRank: ReturnType<typeof getRoadmapCourseRank>,
-    totalXp: number
+    activeUnitId: string
   ): HTMLElement {
     const { unit } = up;
     const sec = document.createElement('section');
@@ -1142,26 +1073,6 @@ export class RoadmapController {
       });
 
       ringWrap.appendChild(btn);
-
-      if (nodeState.status === 'active') {
-        const xpSidePill = document.createElement('div');
-        xpSidePill.className = `duo-active-xp-pill ${i === 2 ? 'is-left' : 'is-right'}`;
-        xpSidePill.title = isTr
-          ? `Yol Haritası Kurs Seviyesi: ${courseRank.courseLevel} (${courseRank.completedNodesCount}/${courseRank.totalNodesCount} ders tamamlandı · ${totalXp} XP)`
-          : `Roadmap Course Rank: ${courseRank.courseLevel} (${courseRank.completedNodesCount}/${courseRank.totalNodesCount} lessons · ${totalXp} XP)`;
-
-        const lvlSpan = document.createElement('span');
-        lvlSpan.className = 'duo-axp-lvl';
-        lvlSpan.textContent = courseRank.courseLevel;
-
-        const xpSpan = document.createElement('span');
-        xpSpan.className = 'duo-axp-val';
-        xpSpan.textContent = `${totalXp} XP`;
-
-        xpSidePill.append(lvlSpan, xpSpan);
-        ringWrap.appendChild(xpSidePill);
-      }
-
       row.appendChild(ringWrap);
 
       const cap = document.createElement('div');
@@ -1171,18 +1082,6 @@ export class RoadmapController {
           ? `${L.nodeLabels[nodeState.node.kind]} (${nodeState.completedSteps}/${nodeState.totalSteps})`
           : L.nodeLabels[nodeState.node.kind];
       row.appendChild(cap);
-
-      // Compact inline chest badge next to Node 3 (index 2)
-      if (i === 2) {
-        const chestBadge = document.createElement('div');
-        chestBadge.className = `duo-inline-chest ${
-          up.chestClaimed ? 'claimed' : up.chestUnlocked ? 'unlocked' : 'locked'
-        }`;
-        chestBadge.innerHTML = `${getNodeIconSvg('chest', up.chestClaimed)} <span>${
-          up.chestClaimed ? L.chestOpened : L.chestLabel
-        }</span>`;
-        row.appendChild(chestBadge);
-      }
 
       nodesTrack.appendChild(row);
     }

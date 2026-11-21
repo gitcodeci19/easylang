@@ -1,5 +1,4 @@
 import {
-  createGuideHelpButton,
   getActiveGuideAssistantId,
   stopGuideAssistant,
 } from './guideAssistant';
@@ -92,13 +91,6 @@ export function openAiTutorDrawer(options: OpenAiTutorDrawerOptions): void {
   const headerActions = document.createElement('div');
   headerActions.className = 'ait-header-actions';
 
-  const helpBtn = createGuideHelpButton('tour_ask_ai', {
-    isTr,
-    variant: 'pill',
-    labelTr: 'Bu ne işe yarıyor?',
-    labelEn: 'How it works?',
-  });
-
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'ait-close-btn';
@@ -106,7 +98,7 @@ export function openAiTutorDrawer(options: OpenAiTutorDrawerOptions): void {
   closeBtn.title = isTr ? 'Kapat (Esc)' : 'Close (Esc)';
   closeBtn.addEventListener('click', closeDrawer);
 
-  headerActions.append(helpBtn, closeBtn);
+  headerActions.append(closeBtn);
   header.append(titleWrap, headerActions);
   panel.appendChild(header);
 
