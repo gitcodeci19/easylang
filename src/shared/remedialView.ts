@@ -9,6 +9,7 @@ import { resolveSupportedLanguage } from './i18n';
 import { evaluateEnglishAnswer, evaluateTurkishAnswer } from './matcher';
 import { formatLessonProgressCounter } from './placementTest';
 import { REMEDIAL_SKILL_CATALOG, REMEDIAL_VOICE_TRANSCRIPTS } from './remedialCatalog';
+import { playCorrectSfx, playLessonCompleteSfx, playTapSfx, playWrongSfx } from './sfx';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
 import {
   getRemedialSkillIconName,
@@ -936,6 +937,7 @@ export function startRemedialLessonSession(
     ? resumedSession.queue.map((item) => ({ ...item }))
     : plan.exercises.map((item) => ({ ...item }));
   const totalInitial = resumedSession ? resumedSession.totalInitial : queue.length;
+  const lessonStartMs = Date.now();
   let currentIdx = resumedSession ? Math.max(0, resumedSession.currentIdx) : 0;
   let firstTryCorrect = resumedSession ? resumedSession.firstTryCorrect : 0;
   let combo = resumedSession ? resumedSession.combo : 0;
@@ -1043,11 +1045,20 @@ export function startRemedialLessonSession(
       });
     });
 
+    const progressTrack = document.createElement('div');
+    progressTrack.className = 'duo-progress-track';
+    const progressFill = document.createElement('div');
+    progressFill.className = 'duo-progress-fill';
+    progressTrack.appendChild(progressFill);
+
     const counterEl = document.createElement('span');
     counterEl.className = 'duo-q-counter-pill is-crimson';
     const refreshRemCounter = (checked: boolean): void => {
       const counter = formatLessonProgressCounter(currentIdx, queue.length, checked, isTr);
       counterEl.textContent = counter.indexText;
+      const doneCount = checked ? currentIdx + 1 : currentIdx;
+      const pct = Math.max(6, Math.min(100, Math.round((doneCount / Math.max(1, queue.length)) * 100)));
+      progressFill.style.width = `${pct}%`;
     };
     refreshRemCounter(Boolean(currentCheckedState));
 
@@ -1154,7 +1165,7 @@ export function startRemedialLessonSession(
     if (combo >= 2) {
       topActions.appendChild(comboEl);
     }
-    topBar.append(exitBtn, counterEl, topActions);
+    topBar.append(exitBtn, progressTrack, counterEl, topActions);
     sessionEl.appendChild(topBar);
 
     // Inline toggleable cheat-sheet drawer
@@ -1294,6 +1305,7 @@ export function startRemedialLessonSession(
           if (locked) return;
           selectedChoice = ch;
           currentDraft.selectedChoice = ch;
+          playTapSfx();
           btns.forEach((b) => b.classList.toggle('selected', b === btn));
           const blankEl = promptCard.querySelector('.rem-duel-blank');
           if (blankEl) blankEl.textContent = ch;
@@ -1458,6 +1470,7 @@ export function startRemedialLessonSession(
         tBtn.addEventListener('click', () => {
           if (locked || spotBugFound) return;
           if (i === ex.buggyTokenIndex) {
+            playTapSfx();
             spotBugFound = true;
             currentDraft.spotBugFound = true;
             tBtn.classList.remove('is-nudge-hint');
@@ -1571,6 +1584,7 @@ export function startRemedialLessonSession(
           if (locked) return;
           selectedChoice = ch;
           currentDraft.selectedChoice = ch;
+          playTapSfx();
           btns.forEach((b) => b.classList.toggle('selected', b === btn));
           speakEnglish(ch, 1.0);
           updateCheckEnabled();
@@ -1643,6 +1657,7 @@ export function startRemedialLessonSession(
           if (locked) return;
           selectedChoice = ch;
           currentDraft.selectedChoice = ch;
+          playTapSfx();
           btns.forEach((b) => b.classList.toggle('selected', b === btn));
           if (ex.kind === 'cloze_blank' || ex.direction === 'tr-to-en') {
             speakEnglish(ch, 1.0, { isQuickTile: ch.trim().split(/\s+/).length <= 3 });
@@ -1722,6 +1737,7 @@ export function startRemedialLessonSession(
             bankTray,
             isLocked: () => locked,
             onTap: () => {
+              playTapSfx();
               placedTiles.splice(i, 1);
               commitPlacedTilesChange();
             },
@@ -1870,6 +1886,10 @@ export function startRemedialLessonSession(
         } else if (!effectiveCorrect && chosenNorm && valNorm === chosenNorm) {
           btn.classList.add('is-result-wrong');
         }
+      }
+      for (const tile of stage.querySelectorAll<HTMLButtonElement>('.duo-wb-tile.placed')) {
+        tile.classList.remove('is-result-correct', 'is-result-wrong');
+        tile.classList.add(effectiveCorrect ? 'is-result-correct' : 'is-result-wrong');
       }
 
       footerBar.className = `duo-lesson-footer ${effectiveCorrect ? 'is-correct' : 'is-wrong'}`;
@@ -2063,6 +2083,11 @@ export function startRemedialLessonSession(
         overridden: false,
       };
       currentCheckedState = snap;
+      if (isCorrect) {
+        playCorrectSfx();
+      } else {
+        playWrongSfx();
+      }
       persistLesson(false);
       renderCheckedFooter(snap);
 
@@ -2160,16 +2185,24 @@ export function startRemedialLessonSession(
       ? `"${plan.titleTr}" konusundaki eksiğini güçlendirdin.${graduationNote}${conceptsAdvanced > 0 ? ` (${conceptsAdvanced} AI kavram notu da ilerledi!)` : ''}`
       : `You sharpened "${plan.titleEn}".${graduationNote}${conceptsAdvanced > 0 ? ` (${conceptsAdvanced} tracked AI concepts advanced!)` : ''}`;
 
+    const elapsedSec = Math.max(1, Math.round((Date.now() - lessonStartMs) / 1000));
+    const elapsedFmt = `${Math.floor(elapsedSec / 60)}:${String(elapsedSec % 60).padStart(2, '0')}`;
+    playLessonCompleteSfx();
+
     const metrics = document.createElement('div');
     metrics.className = 'duo-complete-metrics';
     metrics.innerHTML = `
-      <div class="duo-complete-stat">
+      <div class="duo-complete-stat is-gold">
         <span class="duo-cs-label">${isTr ? 'Kazanılan XP' : 'XP Earned'}</span>
         <span class="duo-cs-val rem-accent">+${xpEarned} XP</span>
       </div>
-      <div class="duo-complete-stat">
+      <div class="duo-complete-stat is-green">
         <span class="duo-cs-label">${isTr ? 'Doğruluk' : 'Accuracy'}</span>
         <span class="duo-cs-val ok">${accuracyPct}%</span>
+      </div>
+      <div class="duo-complete-stat is-cobalt">
+        <span class="duo-cs-label">${isTr ? 'Süre' : 'Time'}</span>
+        <span class="duo-cs-val cobalt">${elapsedFmt}</span>
       </div>
     `;
 

@@ -1,4 +1,5 @@
 import { resolveSupportedLanguage } from '../shared/i18n';
+import { playCorrectSfx, playWrongSfx } from '../shared/sfx';
 import {
   normalizePageSentenceKey,
   selectPageSentenceCandidates,
@@ -787,14 +788,125 @@ const PAGE_QUIZ_CSS = `
     top: 14px;
     right: 14px;
     z-index: 2147483647;
-    background: #111117;
-    color: #fcd34d;
-    border: 1px solid rgba(245, 158, 11, 0.36);
-    border-radius: 8px;
-    padding: 7px 12px;
-    font-size: 11.5px;
-    font-weight: 600;
-    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.65);
+    background: #ffffff;
+    color: #1d4ed8;
+    border: 2px solid #93c5fd;
+    border-bottom: 3px solid #2563eb;
+    border-radius: 12px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 800;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+  }
+
+  /* Ice White & Modern Cobalt Tactile 3D Override */
+  .etr-pq-card {
+    background-color: #f9fbfe;
+    background-image:
+      radial-gradient(circle at 82% 14%, rgba(37, 99, 235, 0.04), transparent 56%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='440' height='300' viewBox='0 0 440 300' fill='none'%3E%3Cpath d='M0 74 C 73 32, 147 32, 220 74 C 293 116, 367 116, 440 74' stroke='%233b82f6' stroke-opacity='0.075' stroke-width='1.2'/%3E%3Cpath d='M0 96 C 73 58, 147 58, 220 96 C 293 134, 367 134, 440 96' stroke='%2364748b' stroke-opacity='0.055' stroke-width='1'/%3E%3Cpath d='M0 224 C 73 262, 147 262, 220 224 C 293 186, 367 186, 440 224' stroke='%2364748b' stroke-opacity='0.07' stroke-width='1.2'/%3E%3Cpath d='M0 244 C 73 278, 147 278, 220 244 C 293 210, 367 210, 440 244' stroke='%233b82f6' stroke-opacity='0.05' stroke-width='1'/%3E%3C/svg%3E");
+    background-size: 100% 100%, 440px 300px;
+    color: #0f172a;
+    border: 2px solid #e2e8f0;
+    border-bottom: 4px solid #cbd5e1;
+    border-radius: 18px;
+    box-shadow: 0 20px 48px rgba(15, 23, 42, 0.18);
+  }
+  .etr-pq-head {
+    background: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .etr-pq-badge {
+    background: #eff6ff;
+    border: 1.5px solid #bfdbfe;
+    color: #1d4ed8;
+  }
+  .etr-pq-close {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    color: #475569;
+  }
+  .etr-pq-quote {
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-left: 4px solid #2563eb;
+    color: #0f172a;
+  }
+  .etr-pq-textarea {
+    background: #f8fafc;
+    color: #0f172a;
+    border: 2px solid #cbd5e1;
+    border-radius: 12px;
+  }
+  .etr-pq-textarea:focus {
+    background: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+  }
+  .etr-pq-btn {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-bottom: 3px solid #cbd5e1;
+    color: #334155;
+    border-radius: 10px;
+    font-weight: 800;
+  }
+  .etr-pq-btn-primary {
+    background: #2563eb;
+    border-color: #2563eb;
+    border-bottom-color: #1d4ed8;
+    color: #ffffff;
+  }
+  .etr-pq-result.ok .etr-pq-verdict {
+    color: #15803d;
+  }
+  .etr-pq-result.bad .etr-pq-verdict {
+    color: #be123c;
+  }
+  .etr-pq-bubble-good {
+    background: #dcfce7;
+    border-color: #86efac;
+    border-left-color: #16a34a;
+    color: #14532d;
+  }
+  .etr-pq-bubble-good .etr-pq-bubble-label {
+    color: #15803d;
+  }
+  .etr-pq-bubble-bad {
+    background: #ffe4e6;
+    border-color: #fda4af;
+    border-left-color: #e11d48;
+    color: #881337;
+  }
+  .etr-pq-bubble-bad .etr-pq-bubble-label {
+    color: #be123c;
+  }
+  .etr-pq-bubble-ref {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    border-left-color: #94a3b8;
+    color: #0f172a;
+  }
+  .etr-pq-bubble-ref .etr-pq-bubble-label {
+    color: #475569;
+  }
+  .etr-pq-bubble-ai {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    border-left-color: #2563eb;
+    color: #1e3a8a;
+  }
+  .etr-pq-bubble-ai .etr-pq-bubble-label {
+    color: #1d4ed8;
+  }
+  .etr-pq-bubble-note {
+    background: #fef3c7;
+    border-color: #fcd34d;
+    border-left-color: #f59e0b;
+    color: #78350f;
+  }
+  .etr-pq-bubble-note .etr-pq-bubble-label {
+    color: #b45309;
   }
 `;
 
@@ -1100,6 +1212,11 @@ function renderAnchoredQuizBox(
       }
 
       const evaluation = response.result;
+      if (evaluation.isCorrect) {
+        playCorrectSfx();
+      } else {
+        playWrongSfx();
+      }
       void sendBgMessage({
         type: 'RECORD_PAGE_QUIZ_RESULT',
         isCorrect: evaluation.isCorrect,

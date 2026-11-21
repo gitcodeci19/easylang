@@ -1,4 +1,5 @@
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
+import { playCorrectSfx, playWrongSfx } from '../shared/sfx';
 import { cancelEnglishSpeech, speakEnglishText as speakSentence } from '../shared/speech';
 import { evaluateDictationAnswer } from '../shared/srs';
 import type {
@@ -412,6 +413,125 @@ const LISTENING_CSS = `
     font-weight: 600;
     word-break: break-word;
   }
+
+  /* Ice White & Modern Cobalt Tactile 3D Override */
+  .etr-lq-card {
+    background-color: #f9fbfe;
+    background-image:
+      radial-gradient(circle at 82% 14%, rgba(37, 99, 235, 0.04), transparent 56%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='440' height='300' viewBox='0 0 440 300' fill='none'%3E%3Cpath d='M0 74 C 73 32, 147 32, 220 74 C 293 116, 367 116, 440 74' stroke='%233b82f6' stroke-opacity='0.075' stroke-width='1.2'/%3E%3Cpath d='M0 96 C 73 58, 147 58, 220 96 C 293 134, 367 134, 440 96' stroke='%2364748b' stroke-opacity='0.055' stroke-width='1'/%3E%3Cpath d='M0 224 C 73 262, 147 262, 220 224 C 293 186, 367 186, 440 224' stroke='%2364748b' stroke-opacity='0.07' stroke-width='1.2'/%3E%3Cpath d='M0 244 C 73 278, 147 278, 220 244 C 293 210, 367 210, 440 244' stroke='%233b82f6' stroke-opacity='0.05' stroke-width='1'/%3E%3C/svg%3E");
+    background-size: 100% 100%, 440px 300px;
+    color: #0f172a;
+    border: 2px solid #e2e8f0;
+    border-bottom: 4px solid #cbd5e1;
+    border-radius: 18px;
+    box-shadow: 0 20px 48px rgba(15, 23, 42, 0.16);
+  }
+  .etr-lq-head {
+    background: #ffffff;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .etr-lq-badge {
+    background: #eff6ff;
+    border: 1.5px solid #bfdbfe;
+    color: #1d4ed8;
+  }
+  .etr-lq-meta {
+    background: #f1f5f9;
+    border: 1.5px solid #e2e8f0;
+    color: #475569;
+  }
+  .etr-lq-close {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    color: #475569;
+  }
+  .etr-lq-close:hover {
+    background: #ffe4e6;
+    border-color: #fda4af;
+    color: #be123c;
+  }
+  .etr-lq-audio-bar {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+  }
+  .etr-lq-audio-btn,
+  .etr-lq-cant-listen-btn,
+  .etr-lq-btn,
+  .etr-lq-btn-ghost {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-bottom: 3px solid #cbd5e1;
+    color: #334155;
+    border-radius: 10px;
+    font-weight: 700;
+  }
+  .etr-lq-audio-btn:hover,
+  .etr-lq-cant-listen-btn:hover:not(:disabled),
+  .etr-lq-btn-ghost:hover {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    border-bottom-color: #3b82f6;
+    color: #1d4ed8;
+  }
+  .etr-lq-audio-btn:first-child,
+  .etr-lq-btn-primary {
+    background: #2563eb;
+    border-color: #2563eb;
+    border-bottom-color: #1d4ed8;
+    color: #ffffff;
+  }
+  .etr-lq-audio-btn:first-child:hover,
+  .etr-lq-btn-primary:hover {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    border-bottom-color: #1d4ed8;
+    color: #ffffff;
+  }
+  .etr-lq-prompt,
+  .etr-lq-compare-lbl {
+    color: #475569;
+  }
+  .etr-lq-meaning {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    color: #334155;
+  }
+  .etr-lq-textarea {
+    background: #ffffff;
+    color: #0f172a;
+    border: 2px solid #cbd5e1;
+    border-radius: 12px;
+  }
+  .etr-lq-textarea:focus {
+    background: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+  }
+  .etr-lq-compare,
+  .etr-lq-diff {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+  }
+  .etr-lq-compare-user {
+    color: #b45309;
+    font-weight: 600;
+  }
+  .etr-lq-compare-ref,
+  .etr-lq-word-ok {
+    color: #15803d;
+  }
+  .etr-lq-word-ok {
+    background: #dcfce7;
+    border-color: #86efac;
+  }
+  .etr-lq-word-miss {
+    background: #ffe4e6;
+    border-color: #fda4af;
+    color: #be123c;
+  }
 `;
 
 export async function launchListeningQuiz(): Promise<void> {
@@ -571,7 +691,7 @@ export async function launchListeningQuiz(): Promise<void> {
         : 'Accepted without audio · Not scored as right or wrong'
     );
     statusLine.style.fontWeight = '700';
-    statusLine.style.color = '#cbd5e1';
+    statusLine.style.color = '#475569';
 
     const compareBox = createEl('div', 'etr-lq-compare');
     const refRow = createEl('div', 'etr-lq-compare-row');
@@ -607,6 +727,11 @@ export async function launchListeningQuiz(): Promise<void> {
     cantListenBtn.disabled = true;
     restoreBlurredYouTubeCaptions();
     const evaluation = evaluateDictationAnswer(sentenceEn, attempt);
+    if (evaluation.isCorrect) {
+      playCorrectSfx();
+    } else {
+      playWrongSfx();
+    }
     void sendBgMessage({
       type: 'RECORD_LISTENING_RESULT',
       cardId: liveYt ? undefined : fallbackChallenge?.cardId,
@@ -623,7 +748,7 @@ export async function launchListeningQuiz(): Promise<void> {
         : `${evaluation.isCorrect ? '✓' : '✕'} Accuracy: ${evaluation.accuracyPercent}%${evaluation.isCorrect ? ' · +5 XP' : ''}`
     );
     scoreLine.style.fontWeight = '700';
-    scoreLine.style.color = evaluation.isCorrect ? '#34d399' : '#fbbf24';
+    scoreLine.style.color = evaluation.isCorrect ? '#15803d' : '#be123c';
 
     const compareBox = createEl('div', 'etr-lq-compare');
     const userRow = createEl('div', 'etr-lq-compare-row');

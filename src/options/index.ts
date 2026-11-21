@@ -328,17 +328,17 @@ function renderRatingSvgChart(
   const dotsSvg = coords
     .map(
       (c) =>
-        `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="3.2" fill="${
-          c.isCorrect ? '#10b981' : '#f43f5e'
+        `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="3.4" fill="${
+          c.isCorrect ? '#16a34a' : '#e11d48'
         }"><title>${c.rating} ELO</title></circle>`
     )
     .join('');
 
   container.innerHTML = `
     <svg viewBox="0 0 ${width} ${height}" width="100%" height="140" role="img" aria-label="Rating Trajectory Chart">
-      <text x="${pad}" y="12" fill="#7a7a8c" font-size="10">${Math.round(maxR)}</text>
-      <text x="${pad}" y="${height - 4}" fill="#7a7a8c" font-size="10">${Math.round(minR)}</text>
-      <polyline fill="none" stroke="#8b5cf6" stroke-width="2.2" points="${pointsAttr}" />
+      <text x="${pad}" y="12" fill="#64748b" font-size="10">${Math.round(maxR)}</text>
+      <text x="${pad}" y="${height - 4}" fill="#64748b" font-size="10">${Math.round(minR)}</text>
+      <polyline fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" points="${pointsAttr}" />
       ${dotsSvg}
     </svg>
   `;

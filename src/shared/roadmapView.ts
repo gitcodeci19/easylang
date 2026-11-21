@@ -37,6 +37,7 @@ import {
   PLACEMENT_TOTAL_QUESTIONS,
 } from './placementTest';
 import { startPlacementTestSession } from './placementTestView';
+import { playCorrectSfx, playLessonCompleteSfx, playTapSfx, playWrongSfx } from './sfx';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
 import { evaluateDictationAnswer } from './srs';
 import { setIconLabel, setIconOnly, uiIconSvg } from './uiIcons';
@@ -1080,8 +1081,8 @@ export class RoadmapController {
         const isDone = nodeState.status === 'completed';
         connSvg.innerHTML = `
           <line x1="0" y1="0" x2="${dx}" y2="44"
-            stroke="${isDone ? 'rgba(245, 158, 11, 0.45)' : 'rgba(255, 255, 255, 0.09)'}"
-            stroke-width="2.5" stroke-dasharray="${isDone ? 'none' : '4 4'}" />
+            stroke="${isDone ? '#F59E0B' : '#CBD5E1'}"
+            stroke-width="3" stroke-linecap="round" stroke-dasharray="${isDone ? 'none' : '5 5'}" />
         `;
         row.appendChild(connSvg);
       }
@@ -1112,8 +1113,8 @@ export class RoadmapController {
         ringSvg.setAttribute('class', 'duo-progress-ring');
         ringSvg.setAttribute('viewBox', '0 0 84 84');
         ringSvg.innerHTML = `
-          <circle cx="42" cy="42" r="36" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4.5"/>
-          <circle cx="42" cy="42" r="36" fill="none" stroke="#8b5cf6" stroke-width="4.5"
+          <circle cx="42" cy="42" r="36" fill="none" stroke="#DBEAFE" stroke-width="5"/>
+          <circle cx="42" cy="42" r="36" fill="none" stroke="#2563EB" stroke-width="5"
             stroke-linecap="round" stroke-dasharray="226" stroke-dashoffset="${dashOffset}"
             transform="rotate(-90 42 42)"/>
         `;
@@ -1352,6 +1353,7 @@ export class RoadmapController {
         );
 
     let currentIdx = resumedSession ? Math.max(0, resumedSession.currentIdx) : 0;
+    const lessonStartMs = Date.now();
     let firstTryCorrectCount = resumedSession ? resumedSession.firstTryCorrectCount : 0;
     const totalInitial = resumedSession ? resumedSession.totalInitial : queue.length;
     let neutralBypassedCount = Math.max(0, resumedSession?.neutralBypassedCount ?? 0);
@@ -1468,11 +1470,20 @@ export class RoadmapController {
         })();
       });
 
+      const progressTrack = document.createElement('div');
+      progressTrack.className = 'duo-progress-track';
+      const progressFill = document.createElement('div');
+      progressFill.className = 'duo-progress-fill';
+      progressTrack.appendChild(progressFill);
+
       const counterEl = document.createElement('span');
       counterEl.className = 'duo-q-counter-pill';
       const refreshLessonCounter = (checked: boolean): void => {
         const counter = formatLessonProgressCounter(currentIdx, queue.length, checked, isTr);
         counterEl.textContent = counter.indexText;
+        const doneCount = checked ? currentIdx + 1 : currentIdx;
+        const pct = Math.max(6, Math.min(100, Math.round((doneCount / Math.max(1, queue.length)) * 100)));
+        progressFill.style.width = `${pct}%`;
       };
       refreshLessonCounter(Boolean(currentCheckedState));
 
@@ -1586,7 +1597,7 @@ export class RoadmapController {
       if (combo >= 2) {
         topActions.appendChild(comboBadge);
       }
-      topBar.append(exitBtn, counterEl, topActions);
+      topBar.append(exitBtn, progressTrack, counterEl, topActions);
       sessionEl.appendChild(topBar);
 
       const stage = document.createElement('div');
@@ -1779,6 +1790,7 @@ export class RoadmapController {
           cBtn.className = `duo-choice-card ${selectedOption === choiceText ? 'selected' : ''}`;
           cBtn.innerHTML = `<span class="duo-choice-key">${i + 1}</span> <span class="duo-choice-label">${choiceText}</span>`;
           cBtn.addEventListener('click', () => {
+            playTapSfx();
             selectedOption = choiceText;
             currentDraft.selectedChoice = choiceText;
             for (const b of optionBtns) b.classList.remove('selected');
@@ -1858,6 +1870,7 @@ export class RoadmapController {
               bankTray,
               isLocked: () => wbLocked,
               onTap: () => {
+                playTapSfx();
                 usedIndices.splice(pos, 1);
                 commitUsedIndicesChange();
               },
@@ -1916,6 +1929,7 @@ export class RoadmapController {
                 bankTray,
                 isLocked: () => wbLocked,
                 onTap: () => {
+                  playTapSfx();
                   usedIndices.push(idx);
                   if (ex.direction !== 'en-to-tr') {
                     speakEnglish(word, 1.0, { isQuickTile: true });
@@ -2017,6 +2031,10 @@ export class RoadmapController {
             } else if (!effectiveCorrect && chosenNorm && valNorm === chosenNorm) {
               btn.classList.add('is-result-wrong');
             }
+          }
+          for (const tile of stage.querySelectorAll<HTMLButtonElement>('.duo-wb-tile.placed')) {
+            tile.classList.remove('is-result-correct', 'is-result-wrong');
+            tile.classList.add(effectiveCorrect ? 'is-result-correct' : 'is-result-wrong');
           }
         }
         footerBar.className = `duo-lesson-footer ${
@@ -2312,6 +2330,11 @@ export class RoadmapController {
           overridden: false,
         };
         currentCheckedState = snap;
+        if (isCorrect) {
+          playCorrectSfx();
+        } else {
+          playWrongSfx();
+        }
         persistActiveSession(currentIdx, false);
         renderCheckedFooter(snap);
       };
@@ -2409,6 +2432,10 @@ export class RoadmapController {
           ? `Bu düğümü tamamlamak için ${stepRes.totalSteps - stepRes.completedSteps} adım daha kaldı.`
           : `${stepRes.totalSteps - stepRes.completedSteps} more step(s) to complete this node.`;
 
+      const elapsedSec = Math.max(1, Math.round((Date.now() - lessonStartMs) / 1000));
+      const elapsedFmt = `${Math.floor(elapsedSec / 60)}:${String(elapsedSec % 60).padStart(2, '0')}`;
+      playLessonCompleteSfx();
+
       sessionEl.replaceChildren();
       const summary = document.createElement('div');
       summary.className = 'duo-lesson-complete';
@@ -2417,13 +2444,17 @@ export class RoadmapController {
         <h2 class="duo-complete-title">${completeHeading}</h2>
         <p class="duo-complete-sub">${completeSub}</p>
         <div class="duo-complete-metrics">
-          <div class="duo-complete-stat">
+          <div class="duo-complete-stat is-gold">
             <span class="duo-cs-label">${L.xpEarnedLabel}</span>
             <span class="duo-cs-val accent">+${stepRes.xpEarned} XP</span>
           </div>
-          <div class="duo-complete-stat">
+          <div class="duo-complete-stat is-green">
             <span class="duo-cs-label">${L.accuracyLabel}</span>
             <span class="duo-cs-val ok">${accuracyPct}%</span>
+          </div>
+          <div class="duo-complete-stat is-cobalt">
+            <span class="duo-cs-label">${isTr ? 'Süre' : 'Time'}</span>
+            <span class="duo-cs-val cobalt">${elapsedFmt}</span>
           </div>
         </div>
       `;

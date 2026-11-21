@@ -4,6 +4,7 @@ import { renderHighlightedPhrase, renderHighlightedSentence } from '../shared/gr
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
 import { extractDisplayMeanings } from '../shared/meaningFormatter';
 import type { OfflineWordEntry } from '../shared/offlineDictionary';
+import { playCorrectSfx, playWrongSfx } from '../shared/sfx';
 import { speakEnglishText as speakEnglish } from '../shared/speech';
 import { isAiApiConfigured } from '../shared/storage';
 import { buildInlineTeachMePanel, stopActiveRuleAudio } from '../shared/teachMeDrawer';
@@ -387,6 +388,11 @@ export function renderRecallWidget(
     stopActiveRuleAudio();
     stopGuideAssistant();
     const isCorrect = outcome.evaluation.isCorrect;
+    if (isCorrect) {
+      playCorrectSfx();
+    } else {
+      playWrongSfx();
+    }
     cardEl.className = `etr-card ${isCorrect ? 'state-correct' : 'state-wrong'}`;
     cardEl.replaceChildren();
 

@@ -11,6 +11,7 @@ import {
   type PlacementEvaluationResult,
   type PlacementTierLevel,
 } from './placementTest.ts';
+import { playCorrectSfx, playLessonCompleteSfx, playTapSfx, playWrongSfx } from './sfx.ts';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech.ts';
 import {
   getRoadmapState,
@@ -211,6 +212,7 @@ export function startPlacementTestSession(options: PlacementTestViewOptions): vo
 
     wrap.append(badge, title, sub, metrics, tiersGrid, actions);
     sessionEl.appendChild(wrap);
+    playLessonCompleteSfx();
     goBtn.focus({ preventScroll: true });
   };
 
@@ -245,11 +247,20 @@ export function startPlacementTestSession(options: PlacementTestViewOptions): vo
       onExit();
     });
 
+    const progressTrack = document.createElement('div');
+    progressTrack.className = 'duo-progress-track';
+    const progressFill = document.createElement('div');
+    progressFill.className = 'duo-progress-fill';
+    progressTrack.appendChild(progressFill);
+
     const counterEl = document.createElement('span');
     counterEl.className = 'duo-q-counter-pill';
     const refreshCounter = (checked: boolean): void => {
       const counter = formatLessonProgressCounter(currentIdx, questions.length, checked, isTr);
       counterEl.textContent = counter.indexText;
+      const doneCount = checked ? currentIdx + 1 : currentIdx;
+      const pct = Math.max(6, Math.min(100, Math.round((doneCount / Math.max(1, questions.length)) * 100)));
+      progressFill.style.width = `${pct}%`;
     };
     refreshCounter(false);
 
@@ -265,7 +276,7 @@ export function startPlacementTestSession(options: PlacementTestViewOptions): vo
     topActions.className = 'duo-topbar-actions';
     topActions.append(tierBadge, modeTag);
 
-    topBar.append(exitBtn, counterEl, topActions);
+    topBar.append(exitBtn, progressTrack, counterEl, topActions);
     sessionEl.appendChild(topBar);
 
     // 2. Stage
@@ -357,6 +368,7 @@ export function startPlacementTestSession(options: PlacementTestViewOptions): vo
       cBtn.querySelector('.duo-choice-label')!.textContent = choiceText;
       cBtn.addEventListener('click', () => {
         if (evaluated) return;
+        playTapSfx();
         selectedOption = choiceText;
         for (const b of optionBtns) b.classList.remove('selected');
         cBtn.classList.add('selected');
@@ -380,6 +392,11 @@ export function startPlacementTestSession(options: PlacementTestViewOptions): vo
       const isCorrect = !skipped && Boolean(expectedNorm) && chosenNorm === expectedNorm;
 
       answers.push({ tier: item.tier, isCorrect });
+      if (isCorrect) {
+        playCorrectSfx();
+      } else {
+        playWrongSfx();
+      }
       refreshCounter(true);
 
       for (const btn of optionBtns) {
