@@ -1038,12 +1038,13 @@ export function startRemedialLessonSession(
       });
     });
 
-    const progTrack = document.createElement('div');
-    progTrack.className = 'duo-lesson-prog-track';
-    const progFill = document.createElement('div');
-    progFill.className = 'duo-lesson-prog-fill';
-    progFill.style.width = `${Math.min(100, Math.round((currentIdx / Math.max(1, queue.length)) * 100))}%`;
-    progTrack.appendChild(progFill);
+    const counterEl = document.createElement('span');
+    counterEl.className = 'duo-q-counter-pill is-crimson';
+    const refreshRemCounter = (checked: boolean): void => {
+      const counter = formatLessonProgressCounter(currentIdx, queue.length, checked, isTr);
+      counterEl.textContent = counter.indexText;
+    };
+    refreshRemCounter(Boolean(currentCheckedState));
 
     const rulePeekBtn = document.createElement('button');
     rulePeekBtn.type = 'button';
@@ -1136,39 +1137,18 @@ export function startRemedialLessonSession(
     comboEl.className = `duo-combo-pill ${combo >= 2 ? 'visible' : ''}`;
     comboEl.textContent = combo >= 2 ? `${combo}x 🔥` : '';
 
+    const topActions = document.createElement('div');
+    topActions.className = 'duo-topbar-actions';
     if (hasQuestionVoiceover) {
-      topBar.append(exitBtn, progTrack, rulePeekBtn, askRemTopBtn);
+      topActions.append(rulePeekBtn, askRemTopBtn);
     } else {
-      topBar.append(exitBtn, progTrack, teachRemBtn, rulePeekBtn, askRemTopBtn);
+      topActions.append(teachRemBtn, rulePeekBtn, askRemTopBtn);
     }
     if (combo >= 2) {
-      topBar.appendChild(comboEl);
+      topActions.appendChild(comboEl);
     }
+    topBar.append(exitBtn, counterEl, topActions);
     sessionEl.appendChild(topBar);
-
-    // Prominent always-visible question counter & remaining badge
-    const remStatusBar = document.createElement('div');
-    remStatusBar.className = 'duo-lesson-status-bar is-crimson';
-    const remStatusLeft = document.createElement('div');
-    remStatusLeft.className = 'duo-status-left';
-    const remQIndexEl = document.createElement('span');
-    remQIndexEl.className = 'duo-q-index';
-    remStatusLeft.appendChild(remQIndexEl);
-    const remQRemEl = document.createElement('span');
-    remQRemEl.className = 'duo-q-remaining';
-    const refreshRemCounter = (checked: boolean): void => {
-      const counter = formatLessonProgressCounter(currentIdx, queue.length, checked, isTr);
-      remQIndexEl.textContent = counter.indexText;
-      remQRemEl.textContent = counter.remainingText;
-      remQRemEl.classList.toggle('is-last', counter.isLast);
-      remQRemEl.classList.toggle('is-done', counter.isDone);
-      if (checked) {
-        progFill.style.width = `${Math.min(100, Math.round(((currentIdx + 1) / Math.max(1, queue.length)) * 100))}%`;
-      }
-    };
-    refreshRemCounter(Boolean(currentCheckedState));
-    remStatusBar.append(remStatusLeft, remQRemEl);
-    sessionEl.appendChild(remStatusBar);
 
     // Inline toggleable cheat-sheet drawer
     const cheatBox = document.createElement('div');
@@ -1187,12 +1167,17 @@ export function startRemedialLessonSession(
     const stage = document.createElement('div');
     stage.className = 'duo-lesson-stage';
 
-    const badgeEl = document.createElement('div');
-    badgeEl.className = 'duo-ex-badge rem-ex-badge';
-    badgeEl.textContent = ex.isRetryRequeue
-      ? `${isTr ? '🔁 HATA TEKRARI' : '🔁 RETRY'} · ${badge}`
-      : badge;
-    stage.appendChild(badgeEl);
+    // Skip redundant exercise type pill on spot_fix since its prominent step header is self-explanatory
+    if (ex.kind !== 'spot_fix' || ex.isRetryRequeue) {
+      const badgeEl = document.createElement('div');
+      badgeEl.className = 'duo-ex-badge rem-ex-badge';
+      badgeEl.textContent = ex.isRetryRequeue
+        ? ex.kind === 'spot_fix'
+          ? (isTr ? '🔁 HATA TEKRARI' : '🔁 RETRY')
+          : `${isTr ? '🔁 HATA TEKRARI' : '🔁 RETRY'} · ${badge}`
+        : badge;
+      stage.appendChild(badgeEl);
+    }
 
     // spot_fix already displays its interactive 2-step guide inside the proofreader card
     if (ex.kind !== 'spot_fix') {
@@ -1353,14 +1338,14 @@ export function startRemedialLessonSession(
 
       const syncStepper = (): void => {
         if (!spotBugFound) {
-          step1Pill.className = 'rem-spot-step is-active';
-          step1Pill.textContent = isTr ? '1. Hatalı kelimeyi işaretle' : '1. Mark wrong word';
+          step1Pill.className = 'rem-spot-step is-active is-step1-hero';
+          step1Pill.textContent = isTr ? '⚡ 1. Hatalı kelimeyi işaretle' : '⚡ 1. Tap the wrong word';
           step2Pill.className = 'rem-spot-step';
           step2Pill.textContent = isTr ? '2. Doğrusunu seç' : '2. Choose fix';
         } else if (!spotSelectedFix) {
           step1Pill.className = 'rem-spot-step is-done';
           step1Pill.textContent = `✓ "${buggyTok}"`;
-          step2Pill.className = 'rem-spot-step is-active';
+          step2Pill.className = 'rem-spot-step is-active is-step2-hero';
           step2Pill.textContent = isTr ? '2. Doğrusunu seç' : '2. Choose fix';
         } else {
           step1Pill.className = 'rem-spot-step is-done';
@@ -1428,7 +1413,10 @@ export function startRemedialLessonSession(
           btn.append(oldSpan, newSpan);
           btn.classList.add('is-patched');
         } else {
-          btn.textContent = original;
+          const lbl = document.createElement('span');
+          lbl.className = 'rem-bug-token-label';
+          lbl.textContent = original;
+          btn.appendChild(lbl);
           btn.classList.remove('is-patched');
         }
       };
@@ -1439,7 +1427,11 @@ export function startRemedialLessonSession(
         const tBtn = document.createElement('button');
         tBtn.type = 'button';
         tBtn.className = 'rem-bug-token';
-        tBtn.textContent = tok;
+        tBtn.style.setProperty('--tok-i', String(i));
+        const tokLabel = document.createElement('span');
+        tokLabel.className = 'rem-bug-token-label';
+        tokLabel.textContent = tok;
+        tBtn.appendChild(tokLabel);
         if (spotSafeSet.has(i)) {
           tBtn.classList.add('is-safe-word');
         }

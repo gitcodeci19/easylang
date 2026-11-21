@@ -22,6 +22,7 @@ import {
   diagnoseUserWeaknesses,
   findRemedialQuestionAudioForSentence,
   getResolvedRemedialSkillIds,
+  tokenizeSentenceForBank,
 } from '../src/shared/weaknessDetector.ts';
 
 function makeWord(id: string, en: string, tr: string, level: Card['level'] = 'B1'): Card {
@@ -715,4 +716,35 @@ test('all 92 pre-authored remedial questions have exact 1-to-1 ElevenLabs script
   const hitDog = findRemedialQuestionAudioForSentence('my dog has been missing for three days');
   assert.equal(hitDog?.questionAudioId, 'listening_gap__duel_2');
   assert.equal(findRemedialQuestionAudioForSentence('A completely unrelated sentence here.'), null);
+});
+
+test('tokenizeSentenceForBank preserves times, decimals, currency, percentages, thousands, and ordinals', () => {
+  assert.deepEqual(
+    tokenizeSentenceForBank("The bus didn't arrive until 9:00 AM."),
+    ['The', 'bus', "didn't", 'arrive', 'until', '9:00', 'AM']
+  );
+  assert.deepEqual(
+    tokenizeSentenceForBank('The train departs at 7:30 p.m.!'),
+    ['The', 'train', 'departs', 'at', '7:30', 'p.m.']
+  );
+  assert.deepEqual(
+    tokenizeSentenceForBank('Watching tutorials at 1.5x speed costs $19.99 (50% off for 1,000 users).'),
+    ['Watching', 'tutorials', 'at', '1.5x', 'speed', 'costs', '$19.99', '50%', 'off', 'for', '1,000', 'users']
+  );
+  assert.deepEqual(
+    tokenizeSentenceForBank('The match ended 2-2 in 2022.'),
+    ['The', 'match', 'ended', '2-2', 'in', '2022']
+  );
+  assert.deepEqual(
+    tokenizeSentenceForBank("Otobüs saat 9:00'a kadar gelmedi."),
+    ['Otobüs', 'saat', "9:00'a", 'kadar', 'gelmedi']
+  );
+  assert.deepEqual(
+    tokenizeSentenceForBank('Isaac Newton 17. yüzyılda yaşadı.'),
+    ['Isaac', 'Newton', '17.', 'yüzyılda', 'yaşadı']
+  );
+  assert.deepEqual(
+    tokenizeSentenceForBank("I can't wait to play GTA 6."),
+    ['I', "can't", 'wait', 'to', 'play', 'GTA', '6']
+  );
 });

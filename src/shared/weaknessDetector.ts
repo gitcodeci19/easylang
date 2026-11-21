@@ -766,12 +766,39 @@ function makeSyntheticCard(id: string, en: string, tr: string): Card {
   };
 }
 
-function tokenizeSentenceForBank(sentence: string): string[] {
-  return sentence
-    .replace(/[.,!?;:"()]/g, '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+/**
+ * Strip only outer sentence punctuation from a whitespace-delimited token
+ * so internal punctuation inside times (9:00, 7:30), decimals (1.5x, $19.99),
+ * thousands separators (1,000), scores/fractions (2-2, 3/4), percentages (50%),
+ * contractions (didn't), dotted abbreviations (a.m., p.m., U.S.), and
+ * mid-sentence Turkish ordinals (17. yüzyılda) stays intact.
+ */
+function cleanBankToken(rawToken: string, nextRawToken?: string): string {
+  let token = rawToken.trim();
+  if (!token) return '';
+  token = token.replace(/^[.,!?;:"'“”‘’()[\]{}]+/, '');
+  if (/^(?:[a-zA-Z]\.){2,}[,!?;:"'“”‘’()[\]{}]*$/.test(token)) {
+    token = token.replace(/[,!?;:"'“”‘’()[\]{}]+$/, '');
+  } else if (
+    /^\d+\.$/.test(token) &&
+    nextRawToken &&
+    /^[a-zçğıöşü]/.test(nextRawToken.trim())
+  ) {
+    // Preserve mid-sentence Turkish ordinal dot (e.g. "17. yüzyılda")
+  } else {
+    token = token.replace(/[.,!?;:"'“”‘’()[\]{}]+$/, '');
+  }
+  return token.trim();
+}
+
+export function tokenizeSentenceForBank(sentence: string): string[] {
+  const rawTokens = sentence.trim().split(/\s+/).filter(Boolean);
+  const out: string[] = [];
+  for (let i = 0; i < rawTokens.length; i += 1) {
+    const cleaned = cleanBankToken(rawTokens[i]!, rawTokens[i + 1]);
+    if (cleaned) out.push(cleaned);
+  }
+  return out;
 }
 
 function pickSkillSentenceCards(

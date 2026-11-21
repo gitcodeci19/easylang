@@ -1501,8 +1501,27 @@ function hashString(str: string): number {
   return h || 1;
 }
 
-function cleanToken(w: string): string {
-  return w.replace(/^[.,!?;:"'()[\]]+|[.,!?;:"'()[\]]+$/g, '').trim();
+/**
+ * Strip only outer sentence punctuation from a token while preserving
+ * internal numeric punctuation (9:00, 1.5x, 1,000, $19.99, 50%, 2-2),
+ * dotted abbreviations (a.m., p.m., U.S.), and mid-sentence Turkish ordinals (17. yüzyılda).
+ */
+function cleanToken(w: string, nextRawToken?: string): string {
+  let token = w.trim();
+  if (!token) return '';
+  token = token.replace(/^[.,!?;:"'“”‘’()[\]{}]+/, '');
+  if (/^(?:[a-zA-Z]\.){2,}[,!?;:"'“”‘’()[\]{}]*$/.test(token)) {
+    token = token.replace(/[,!?;:"'“”‘’()[\]{}]+$/, '');
+  } else if (
+    /^\d+\.$/.test(token) &&
+    nextRawToken &&
+    /^[a-zçğıöşü]/.test(nextRawToken.trim())
+  ) {
+    // Keep mid-sentence Turkish ordinal dot (e.g. "17. yüzyılda")
+  } else {
+    token = token.replace(/[.,!?;:"'“”‘’()[\]{}]+$/, '');
+  }
+  return token.trim();
 }
 
 /**
@@ -1943,7 +1962,7 @@ export function buildUnitLessonExercises(
 
     const trTokens = sentenceTr
       .split(/\s+/)
-      .map((t) => cleanToken(t))
+      .map((t, i, arr) => cleanToken(t, arr[i + 1]))
       .filter(Boolean);
 
     if (enToTr && trTokens.length >= 3) {

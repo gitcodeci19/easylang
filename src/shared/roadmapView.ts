@@ -1370,13 +1370,13 @@ export class RoadmapController {
         })();
       });
 
-      const progTrack = document.createElement('div');
-      progTrack.className = 'duo-lesson-prog-track';
-      const progFill = document.createElement('div');
-      progFill.className = 'duo-lesson-prog-fill';
-      const pct = Math.min(100, Math.round((currentIdx / queue.length) * 100));
-      progFill.style.width = `${pct}%`;
-      progTrack.appendChild(progFill);
+      const counterEl = document.createElement('span');
+      counterEl.className = 'duo-q-counter-pill';
+      const refreshLessonCounter = (checked: boolean): void => {
+        const counter = formatLessonProgressCounter(currentIdx, queue.length, checked, isTr);
+        counterEl.textContent = counter.indexText;
+      };
+      refreshLessonCounter(Boolean(currentCheckedState));
 
       const comboBadge = document.createElement('span');
       comboBadge.className = `duo-combo-pill ${combo >= 2 ? 'visible' : ''}`;
@@ -1482,48 +1482,14 @@ export class RoadmapController {
         : 'Ask the AI tutor any question about this exercise';
       askTopBtn.addEventListener('click', openExerciseTutor);
 
-      topBar.append(exitBtn, progTrack, teachTopBtn, askTopBtn);
+      const topActions = document.createElement('div');
+      topActions.className = 'duo-topbar-actions';
+      topActions.append(teachTopBtn, askTopBtn);
       if (combo >= 2) {
-        topBar.appendChild(comboBadge);
+        topActions.appendChild(comboBadge);
       }
+      topBar.append(exitBtn, counterEl, topActions);
       sessionEl.appendChild(topBar);
-
-      // Always-visible prominent question counter & remaining count strip
-      const statusBar = document.createElement('div');
-      statusBar.className = 'duo-lesson-status-bar';
-      const statusLeft = document.createElement('div');
-      statusLeft.className = 'duo-status-left';
-      const qIndexEl = document.createElement('span');
-      qIndexEl.className = 'duo-q-index';
-      statusLeft.appendChild(qIndexEl);
-      if (nodeIndex !== 'jump_test') {
-        const stepBadge = document.createElement('span');
-        stepBadge.className = 'duo-q-step';
-        stepBadge.textContent = isTr
-          ? `Adım ${stepIndex + 1}/${STEPS_PER_NODE}`
-          : `Step ${stepIndex + 1}/${STEPS_PER_NODE}`;
-        statusLeft.appendChild(stepBadge);
-      } else {
-        const jumpBadge = document.createElement('span');
-        jumpBadge.className = 'duo-q-step';
-        jumpBadge.textContent = isTr ? 'Atlama Sınavı' : 'Jump Test';
-        statusLeft.appendChild(jumpBadge);
-      }
-      const qRemEl = document.createElement('span');
-      qRemEl.className = 'duo-q-remaining';
-      const refreshLessonCounter = (checked: boolean): void => {
-        const counter = formatLessonProgressCounter(currentIdx, queue.length, checked, isTr);
-        qIndexEl.textContent = counter.indexText;
-        qRemEl.textContent = counter.remainingText;
-        qRemEl.classList.toggle('is-last', counter.isLast);
-        qRemEl.classList.toggle('is-done', counter.isDone);
-        if (checked) {
-          progFill.style.width = `${Math.min(100, Math.round(((currentIdx + 1) / Math.max(1, queue.length)) * 100))}%`;
-        }
-      };
-      refreshLessonCounter(Boolean(currentCheckedState));
-      statusBar.append(statusLeft, qRemEl);
-      sessionEl.appendChild(statusBar);
 
       const stage = document.createElement('div');
       stage.className = 'duo-lesson-stage';

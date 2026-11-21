@@ -228,7 +228,7 @@ export function startPlacementTestSession(options: PlacementTestViewOptions): vo
     const ex = item.exercise;
     sessionEl.replaceChildren();
 
-    // 1. Top bar: Exit + Progress bar + Placement title pill
+    // 1. Minimal single-row top bar: Exit + Question Counter + Tier badge
     const topBar = document.createElement('div');
     topBar.className = 'duo-lesson-topbar';
 
@@ -244,49 +244,30 @@ export function startPlacementTestSession(options: PlacementTestViewOptions): vo
       onExit();
     });
 
-    const progTrack = document.createElement('div');
-    progTrack.className = 'duo-lesson-prog-track';
-    const progFill = document.createElement('div');
-    progFill.className = 'duo-lesson-prog-fill';
-    progFill.style.width = `${Math.min(100, Math.round((currentIdx / questions.length) * 100))}%`;
-    progTrack.appendChild(progFill);
+    const counterEl = document.createElement('span');
+    counterEl.className = 'duo-q-counter-pill';
+    const refreshCounter = (checked: boolean): void => {
+      const counter = formatLessonProgressCounter(currentIdx, questions.length, checked, isTr);
+      counterEl.textContent = counter.indexText;
+    };
+    refreshCounter(false);
+
+    const tierBadge = document.createElement('span');
+    tierBadge.className = 'duo-q-step';
+    tierBadge.textContent = isTr ? `Seviye ${item.tier}` : `Level ${item.tier}`;
 
     const modeTag = document.createElement('span');
     modeTag.className = 'duo-placement-top-tag';
     modeTag.textContent = isTr ? '🎯 Seviye Testi' : '🎯 Placement';
 
-    topBar.append(exitBtn, progTrack, modeTag);
+    const topActions = document.createElement('div');
+    topActions.className = 'duo-topbar-actions';
+    topActions.append(tierBadge, modeTag);
+
+    topBar.append(exitBtn, counterEl, topActions);
     sessionEl.appendChild(topBar);
 
-    // 2. Prominent Question Counter & Remaining Strip
-    const statusBar = document.createElement('div');
-    statusBar.className = 'duo-lesson-status-bar';
-
-    const statusLeft = document.createElement('div');
-    statusLeft.className = 'duo-status-left';
-    const qIndexEl = document.createElement('span');
-    qIndexEl.className = 'duo-q-index';
-    const tierBadge = document.createElement('span');
-    tierBadge.className = 'duo-q-step';
-    tierBadge.textContent = isTr ? `Seviye ${item.tier}` : `Level ${item.tier}`;
-    statusLeft.append(qIndexEl, tierBadge);
-
-    const qRemEl = document.createElement('span');
-    qRemEl.className = 'duo-q-remaining';
-
-    const refreshCounter = (checked: boolean): void => {
-      const counter = formatLessonProgressCounter(currentIdx, questions.length, checked, isTr);
-      qIndexEl.textContent = counter.indexText;
-      qRemEl.textContent = counter.remainingText;
-      qRemEl.classList.toggle('is-last', counter.isLast);
-      qRemEl.classList.toggle('is-done', counter.isDone);
-    };
-    refreshCounter(false);
-
-    statusBar.append(statusLeft, qRemEl);
-    sessionEl.appendChild(statusBar);
-
-    // 3. Stage
+    // 2. Stage
     const stage = document.createElement('div');
     stage.className = 'duo-lesson-stage';
 
@@ -398,7 +379,6 @@ export function startPlacementTestSession(options: PlacementTestViewOptions): vo
       const isCorrect = !skipped && Boolean(expectedNorm) && chosenNorm === expectedNorm;
 
       answers.push({ tier: item.tier, isCorrect });
-      progFill.style.width = `${Math.min(100, Math.round(((currentIdx + 1) / questions.length) * 100))}%`;
       refreshCounter(true);
 
       for (const btn of optionBtns) {

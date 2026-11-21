@@ -292,6 +292,7 @@ export function normalizeTurkish(input: string): string {
   return input
     .toLocaleLowerCase('tr-TR')
     .replace(/\([^)]*\)/g, ' ')
+    .replace(/\b0([1-9])([:.]\d{2})\b/g, '$1$2')
     .replace(
       /(\d+)['’](?:da|de|ta|te|dan|den|tan|ten|a|e|i|ı|u|ü|ya|ye|yi|yı|yu|yü|nin|nın|nun|nün|in|ın|un|ün)\b/g,
       '$1'
@@ -1017,6 +1018,7 @@ export function normalizeEnglish(input: string): string {
   }
   return s
     .replace(/\([^)]*\)/g, ' ')
+    .replace(/\b0([1-9])([:.]\d{2})\b/g, '$1$2')
     .replace(/[.,!?;:"'()\[\]{}\-_/\\]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

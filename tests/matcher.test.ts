@@ -199,4 +199,22 @@ test('offline Turkish matcher accepts natural numbers, apostrophes, colloquial p
     ).isCorrect,
     true
   );
+
+  // Clock time normalization (09:00 <-> 9:00 <-> 9.00) in both Turkish and English
+  assert.equal(
+    evaluateTurkishAnswer(
+      "Otobüs saat 09.00'a kadar gelmedi.",
+      ["Otobüs saat 9:00'a kadar gelmedi."],
+      'sentence'
+    ).isCorrect,
+    true
+  );
+  assert.equal(
+    evaluateEnglishAnswer(
+      "The bus didn't arrive until 09:00 AM",
+      ["The bus didn't arrive until 9:00 AM."],
+      'sentence'
+    ).isCorrect,
+    true
+  );
 });
