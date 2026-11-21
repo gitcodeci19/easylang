@@ -93,7 +93,9 @@
 
         <div id="backup-nudge-banner" class="banner-card backup-nudge" hidden>
           <div class="banner-body">
-            <span class="banner-icon" aria-hidden="true">💾</span>
+            <span class="banner-icon" aria-hidden="true">
+              <svg class="ui-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </span>
             <div class="banner-copy">
               <strong id="backup-nudge-title">İlerleme yedeğini almayı unutma</strong>
               <p id="backup-nudge-sub">Tarayıcı verileri silinirse emeğin kaybolabilir. Tek tıkla JSON yedeği indir.</p>
@@ -107,7 +109,9 @@
 
         <div id="no-api-popup-banner" class="banner-card no-api-nudge" hidden>
           <div class="banner-body">
-            <span class="banner-icon" aria-hidden="true">🔑</span>
+            <span class="banner-icon" aria-hidden="true">
+              <svg class="ui-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg>
+            </span>
             <div class="banner-copy">
               <strong id="no-api-popup-title">Ücretsiz AI Değerlendirmesi Kapalı</strong>
               <p id="no-api-popup-sub">1 dakikada ücretsiz Groq API anahtarı al — adım adım kurulum rehberi burada.</p>
@@ -178,7 +182,9 @@
       <div id="popup-onboarding" class="onboarding-overlay" hidden>
         <div class="onboarding-card">
           <div class="ob-brand">
-            <span class="ob-logo">⚡</span>
+            <span class="ob-logo" aria-hidden="true">
+              <svg class="ui-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </span>
             <span class="ob-title-brand">LingoEx</span>
             <button
               id="ob-guide-replay-btn"
@@ -250,7 +256,7 @@
 
             <label class="ob-file-drop" for="ob-backup-file">
               <input id="ob-backup-file" type="file" accept=".json,application/json,.txt,.tsv" />
-              <span id="ob-file-label">📁 Yedek JSON Dosyası Seç</span>
+              <span id="ob-file-label">Yedek JSON Dosyası Seç</span>
             </label>
 
             <textarea id="ob-backup-text" class="ob-textarea" rows="4" placeholder="{ ... }"></textarea>

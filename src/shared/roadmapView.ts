@@ -39,6 +39,7 @@ import {
 import { startPlacementTestSession } from './placementTestView';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
 import { evaluateDictationAnswer } from './srs';
+import { setIconLabel, setIconOnly, uiIconSvg } from './uiIcons';
 import { attachWordBankTileGesture } from './wordBankDrag';
 import {
   appendRoadmapLessonRecord,
@@ -186,16 +187,16 @@ function getRoadmapLabels(langMode: FeedbackLanguageMode | undefined): {
         guideWordsHeader: 'Ünite Kelime ve Cümleleri',
         closeBtn: 'Kapat',
         checkBtn: 'Kontrol Et',
-        aiCheckingBtn: '✨ AI Kontrol Ediyor...',
-        aiActiveBadge: '✨ AI',
-        aiApprovedTag: '✨ AI Onayı',
-        aiDisabledTip: '💡 Eş anlam ve küçük yazım hataları için AI - API Ayarları bölümünden ücretsiz anahtar ekleyebilirsin.',
+        aiCheckingBtn: 'AI Kontrol Ediyor...',
+        aiActiveBadge: 'AI',
+        aiApprovedTag: 'AI Onayı',
+        aiDisabledTip: 'Eş anlam ve küçük yazım hataları için AI - API Ayarları bölümünden ücretsiz anahtar ekleyebilirsin.',
         overrideBtn: '✓ Doğru Say',
         overrideAcceptedTitle: '✓ Doğru kabul edildi',
         continueBtn: 'Devam Et',
         skipBtn: 'Geç',
-        cantListenBtn: '🔇 Şu an sesi dinleyemiyorum',
-        audioBypassTitle: '🔇 Dinlemeden geçildi (Kabul edildi)',
+        cantListenBtn: 'Şu an sesi dinleyemiyorum',
+        audioBypassTitle: 'Dinlemeden geçildi (Kabul edildi)',
         audioBypassNote: 'Bu soru doğru veya yanlış olarak işaretlenmedi.',
         audioBypassSolutionLabel: 'Cümle:',
         newWordBadge: 'YENİ KELİME',
@@ -249,16 +250,16 @@ function getRoadmapLabels(langMode: FeedbackLanguageMode | undefined): {
       guideWordsHeader: 'Unit Vocabulary & Sentences',
       closeBtn: 'Close',
       checkBtn: 'Check',
-      aiCheckingBtn: '✨ AI Checking...',
-      aiActiveBadge: '✨ AI',
-      aiApprovedTag: '✨ AI Approved',
-      aiDisabledTip: '💡 Add a free AI key under AI - API Keys so synonyms & minor typos are accepted.',
+      aiCheckingBtn: 'AI Checking...',
+      aiActiveBadge: 'AI',
+      aiApprovedTag: 'AI Approved',
+      aiDisabledTip: 'Add a free AI key under AI - API Keys so synonyms & minor typos are accepted.',
       overrideBtn: '✓ Accept Answer',
       overrideAcceptedTitle: '✓ Marked as correct',
       continueBtn: 'Continue',
       skipBtn: 'Skip',
-      cantListenBtn: "🔇 Can't listen right now",
-      audioBypassTitle: '🔇 Accepted without audio',
+      cantListenBtn: "Can't listen right now",
+      audioBypassTitle: 'Accepted without audio',
       audioBypassNote: 'Not scored as right or wrong.',
       audioBypassSolutionLabel: 'Sentence:',
       newWordBadge: 'NEW WORD',
@@ -654,12 +655,19 @@ export class RoadmapController {
       })
     );
 
-    // 1. Minimal, Calm Unit Header Bar (Unit Picker + Concise 1-Line Progress + Quiet Actions)
-    const unitBar = document.createElement('div');
-    unitBar.className = 'duo-unit-bar';
+    // 1. Unified Full-Height Map Surface with Integrated Frosted-Glass HUD
+    const mapSurface = document.createElement('div');
+    mapSurface.className = 'duo-map-surface';
 
-    const unitBarLeft = document.createElement('div');
-    unitBarLeft.className = 'duo-unit-bar-left';
+    const mapHud = document.createElement('div');
+    mapHud.className = 'duo-map-hud';
+
+    // HUD Row 1: Unit selector (left) + compact actions (right)
+    const hudTop = document.createElement('div');
+    hudTop.className = 'duo-map-hud-top';
+
+    const pickerWrap = document.createElement('div');
+    pickerWrap.className = 'duo-unit-picker-wrap';
 
     const unitSelect = document.createElement('select');
     unitSelect.className = 'duo-unit-picker';
@@ -674,16 +682,12 @@ export class RoadmapController {
       unitSelect.appendChild(opt);
     }
 
-    const subMeta = document.createElement('div');
-    subMeta.className = 'duo-unit-submeta';
-    subMeta.textContent = isTr
-      ? `${activeUnit.level} · ${activeUnitProg.masteredUnitCards}/${activeUnitProg.totalUnitCards} kelime`
-      : `${activeUnit.level} · ${activeUnitProg.masteredUnitCards}/${activeUnitProg.totalUnitCards} words`;
-    subMeta.title = isTr
-      ? `Harita: ${courseRank.courseLevel} (${courseRank.completedNodesCount}/${courseRank.totalNodesCount} ders) · ${L.dailyXpFmt(this.state.dailyXp, this.state.dailyXpGoal)}`
-      : `Course: ${courseRank.courseLevel} (${courseRank.completedNodesCount}/${courseRank.totalNodesCount} lessons) · ${L.dailyXpFmt(this.state.dailyXp, this.state.dailyXpGoal)}`;
+    const pickerChevron = document.createElement('span');
+    pickerChevron.className = 'duo-unit-picker-chevron';
+    pickerChevron.setAttribute('aria-hidden', 'true');
+    setIconOnly(pickerChevron, 'chevronDown', 13);
 
-    unitBarLeft.append(unitSelect, subMeta);
+    pickerWrap.append(unitSelect, pickerChevron);
 
     const unitBarRight = document.createElement('div');
     unitBarRight.className = 'duo-unit-bar-actions';
@@ -714,8 +718,12 @@ export class RoadmapController {
 
     const resetMapBtn = document.createElement('button');
     resetMapBtn.type = 'button';
-    resetMapBtn.className = 'duo-bar-btn';
-    resetMapBtn.textContent = '↺';
+    resetMapBtn.className = 'duo-bar-btn duo-bar-icon-btn';
+    setIconOnly(resetMapBtn, 'rotateCcw', 12);
+    resetMapBtn.setAttribute(
+      'aria-label',
+      isTr ? 'Yol haritasını sıfırla' : 'Reset roadmap progress'
+    );
     resetMapBtn.title = isTr
       ? 'Sadece Yol Haritası ilerlemesini Ünite 1 başına sıfırla (20dk Recall ELO puanınız korunur)'
       : 'Reset Roadmap progress back to Unit 1 (keeps your 20m Recall Elo intact)';
@@ -733,23 +741,52 @@ export class RoadmapController {
     });
 
     unitBarRight.append(guideBtn, focusBtn, resetMapBtn);
-    unitBar.append(unitBarLeft, unitBarRight);
-    root.appendChild(unitBar);
+    hudTop.append(pickerWrap, unitBarRight);
 
-    // 2. Scrollable S-Curve Roadmap Canvas
-    const pathScroll = document.createElement('div');
-    pathScroll.className = 'duo-skill-path';
+    // HUD Row 2: Slim unit mastery meter (left) + integrated collapsible AI Coach trigger (right)
+    const hudMeta = document.createElement('div');
+    hudMeta.className = 'duo-map-hud-meta';
 
-    // Smart collapsible floating AI Coach pill tucked cleanly INSIDE the Roadmap canvas (0px chrome bloat)
+    const progressWrap = document.createElement('div');
+    progressWrap.className = 'duo-unit-progress-wrap';
+
+    const subMeta = document.createElement('span');
+    subMeta.className = 'duo-unit-submeta';
+    subMeta.textContent = isTr
+      ? `${activeUnit.level} · ${activeUnitProg.masteredUnitCards}/${activeUnitProg.totalUnitCards} kelime`
+      : `${activeUnit.level} · ${activeUnitProg.masteredUnitCards}/${activeUnitProg.totalUnitCards} words`;
+    subMeta.title = isTr
+      ? `Harita: ${courseRank.courseLevel} (${courseRank.completedNodesCount}/${courseRank.totalNodesCount} ders) · ${L.dailyXpFmt(this.state.dailyXp, this.state.dailyXpGoal)}`
+      : `Course: ${courseRank.courseLevel} (${courseRank.completedNodesCount}/${courseRank.totalNodesCount} lessons) · ${L.dailyXpFmt(this.state.dailyXp, this.state.dailyXpGoal)}`;
+
+    const unitMasteryPct =
+      activeUnitProg.totalUnitCards > 0
+        ? Math.max(
+            0,
+            Math.min(
+              100,
+              Math.round((activeUnitProg.masteredUnitCards / activeUnitProg.totalUnitCards) * 100)
+            )
+          )
+        : 0;
+
+    const miniTrack = document.createElement('span');
+    miniTrack.className = 'duo-unit-mini-bar';
+    miniTrack.setAttribute('aria-hidden', 'true');
+    const miniFill = document.createElement('span');
+    miniFill.className = 'duo-unit-mini-bar-fill';
+    miniFill.style.width = `${unitMasteryPct}%`;
+    miniTrack.appendChild(miniFill);
+
+    progressWrap.append(subMeta, miniTrack);
+
     const insight =
       this.coachInsight ?? buildFallbackRoadmapCoachBanner(this.historyRecords, resolvedLang);
-    const coachStrip = document.createElement('button');
-    coachStrip.type = 'button';
-    coachStrip.className = `duo-coach-strip status-${insight.status}`;
-    coachStrip.setAttribute('aria-expanded', 'false');
 
-    const coachHead = document.createElement('div');
-    coachHead.className = 'duo-coach-head';
+    const coachTrigger = document.createElement('button');
+    coachTrigger.type = 'button';
+    coachTrigger.className = `duo-coach-trigger status-${insight.status}`;
+    coachTrigger.setAttribute('aria-expanded', 'false');
 
     const coachDot = document.createElement('span');
     coachDot.className = 'duo-coach-dot';
@@ -762,10 +799,10 @@ export class RoadmapController {
         ? isTr
           ? insight.source === 'ai'
             ? `AI Koç · Son ${insight.lessonCountAnalyzed} Ders`
-            : `Son ${insight.lessonCountAnalyzed} Ders Özeti`
+            : `Son ${insight.lessonCountAnalyzed} Ders`
           : insight.source === 'ai'
             ? `AI Coach · Last ${insight.lessonCountAnalyzed}`
-            : `Last ${insight.lessonCountAnalyzed} Summary`
+            : `Last ${insight.lessonCountAnalyzed}`
         : isTr
           ? 'AI Koç'
           : 'AI Coach';
@@ -774,22 +811,40 @@ export class RoadmapController {
     coachChevron.className = 'duo-coach-chevron';
     coachChevron.textContent = '▾';
 
-    coachHead.append(coachDot, coachTag, coachChevron);
+    coachTrigger.append(coachDot, coachTag, coachChevron);
+    hudMeta.append(progressWrap, coachTrigger);
+
+    // Collapsible AI Coach drawer integrated smoothly inside the bottom of the HUD
+    const coachDrawer = document.createElement('div');
+    coachDrawer.className = `duo-coach-drawer status-${insight.status}`;
+    coachDrawer.hidden = true;
 
     const coachMsg = document.createElement('div');
     coachMsg.className = 'duo-coach-msg';
     coachMsg.textContent = insight.message;
-    coachMsg.hidden = true;
+    coachDrawer.appendChild(coachMsg);
 
-    coachStrip.append(coachHead, coachMsg);
-    coachStrip.addEventListener('click', () => {
-      const nextOpen = coachMsg.hidden;
-      coachMsg.hidden = !nextOpen;
-      coachStrip.classList.toggle('is-expanded', nextOpen);
-      coachStrip.setAttribute('aria-expanded', String(nextOpen));
-      coachChevron.textContent = nextOpen ? '▴' : '▾';
+    const setCoachOpen = (open: boolean): void => {
+      coachDrawer.hidden = !open;
+      coachTrigger.classList.toggle('is-open', open);
+      mapHud.classList.toggle('is-coach-open', open);
+      coachTrigger.setAttribute('aria-expanded', String(open));
+      coachChevron.textContent = open ? '▴' : '▾';
+    };
+
+    coachTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setCoachOpen(coachDrawer.hidden);
     });
-    pathScroll.appendChild(coachStrip);
+
+    mapHud.append(hudTop, hudMeta, coachDrawer);
+
+    // 2. Full-bleed Scrollable S-Curve Roadmap Canvas gliding smoothly underneath the HUD
+    const pathScroll = document.createElement('div');
+    pathScroll.className = 'duo-skill-path';
+    pathScroll.addEventListener('click', () => {
+      if (!coachDrawer.hidden) setCoachOpen(false);
+    });
 
     // Integrated CEFR Placement Exam Gate inside the very top of the Roadmap canvas
     // Visually distinct (Sky/Cyan diagnostic card) so users never confuse it with a regular lesson
@@ -852,8 +907,8 @@ export class RoadmapController {
       placementBtn.textContent = isTr ? 'Seviye Testini Başlat →' : 'Start Level Exam →';
     } else if (!placementAvail.canTake) {
       placementBtn.textContent = isTr
-        ? `⏳ ${placementAvail.daysRemaining} gün sonra`
-        : `⏳ In ${placementAvail.daysRemaining}d`;
+        ? `${placementAvail.daysRemaining} gün sonra`
+        : `In ${placementAvail.daysRemaining}d`;
       placementBtn.title = isTr
         ? `2. çözümden sonra seviye testi ${PLACEMENT_RETAKE_COOLDOWN_DAYS} günde bir açılır`
         : `Placement exam retakes unlock every ${PLACEMENT_RETAKE_COOLDOWN_DAYS} days after your 2nd attempt`;
@@ -904,26 +959,49 @@ export class RoadmapController {
       this.renderPathView('unit_top');
     });
 
-    root.appendChild(pathScroll);
+    const syncHudScrollState = (): void => {
+      mapHud.classList.toggle('is-scrolled', pathScroll.scrollTop > 8);
+    };
+    pathScroll.addEventListener('scroll', syncHudScrollState, { passive: true });
+
+    mapSurface.append(mapHud, pathScroll);
+    root.appendChild(mapSurface);
     this.container.appendChild(root);
 
     requestAnimationFrame(() => {
+      const hudH = mapHud.offsetHeight || 62;
       if (scrollMode === 'unit_top') {
-        const targetEl = pathScroll.querySelector(`[data-unit-section="${activeUnit.id}"]`);
-        targetEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const targetEl = pathScroll.querySelector<HTMLElement>(
+          `[data-unit-section="${activeUnit.id}"]`
+        );
+        if (targetEl) {
+          const scrollRect = pathScroll.getBoundingClientRect();
+          const elRect = targetEl.getBoundingClientRect();
+          const topPos = elRect.top - scrollRect.top + pathScroll.scrollTop - hudH - 12;
+          pathScroll.scrollTo({ top: Math.max(0, topPos), behavior: 'smooth' });
+        }
+        syncHudScrollState();
         return;
       }
 
-      const activeSec = pathScroll.querySelector(`[data-unit-section="${activeUnit.id}"]`);
+      const activeSec = pathScroll.querySelector<HTMLElement>(
+        `[data-unit-section="${activeUnit.id}"]`
+      );
       const targetRow =
         activeSec?.querySelector<HTMLElement>('.duo-node-row.is-active') ??
         pathScroll.querySelector<HTMLElement>('.duo-node-row.is-active') ??
         activeSec;
       if (targetRow) {
-        targetRow.scrollIntoView({ behavior: 'auto', block: 'center' });
+        const scrollRect = pathScroll.getBoundingClientRect();
+        const rowRect = targetRow.getBoundingClientRect();
+        const rowOffsetInScroll = rowRect.top - scrollRect.top + pathScroll.scrollTop;
+        const visibleHeight = Math.max(120, pathScroll.clientHeight - hudH);
+        const idealTopInView = hudH + visibleHeight * 0.5 - rowRect.height * 0.5;
+        pathScroll.scrollTop = Math.max(0, rowOffsetInScroll - idealTopInView);
         const focusBtnTarget = targetRow.querySelector<HTMLButtonElement>('.duo-node-btn');
         focusBtnTarget?.focus({ preventScroll: true });
       }
+      syncHudScrollState();
     });
   }
 
@@ -1188,7 +1266,7 @@ export class RoadmapController {
       const spk = document.createElement('button');
       spk.type = 'button';
       spk.className = 'duo-audio-mini-btn';
-      spk.textContent = '🔊';
+      setIconOnly(spk, 'volume', 14);
       spk.addEventListener('click', () => speakEnglish(kp.en, 1.0));
 
       const txt = document.createElement('div');
@@ -1216,7 +1294,7 @@ export class RoadmapController {
       const spk = document.createElement('button');
       spk.type = 'button';
       spk.className = 'duo-audio-mini-btn';
-      spk.textContent = '🔊';
+      setIconOnly(spk, 'volume', 14);
       spk.addEventListener('click', () => speakEnglish(card.en, 1.0));
 
       const content = document.createElement('div');
@@ -1487,7 +1565,7 @@ export class RoadmapController {
       const teachTopBtn = document.createElement('button');
       teachTopBtn.type = 'button';
       teachTopBtn.className = `duo-teach-btn${shouldGlowTeach ? ' is-glow' : ''}`;
-      teachTopBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Teach';
+      setIconLabel(teachTopBtn, 'headphones', isTr ? 'Öğret' : 'Teach', 13);
       teachTopBtn.title = isTr
         ? 'Bu sorudaki kuralları sesli ve yazılı dinle (API bağlıysa canlı AI + EMA)'
         : 'Listen & read rules in this question';
@@ -1496,7 +1574,7 @@ export class RoadmapController {
       const askTopBtn = document.createElement('button');
       askTopBtn.type = 'button';
       askTopBtn.className = 'duo-ask-ai-btn';
-      askTopBtn.textContent = isTr ? '💬 AI’a Sor' : '💬 Ask AI';
+      setIconLabel(askTopBtn, 'message', isTr ? 'AI’a Sor' : 'Ask AI', 13);
       askTopBtn.title = isTr
         ? 'Bu soru hakkında yapay zekâya istediğini sor (örn. neden bu kelime kullanıldı?)'
         : 'Ask the AI tutor any question about this exercise';
@@ -1566,7 +1644,7 @@ export class RoadmapController {
         const playNormal = document.createElement('button');
         playNormal.type = 'button';
         playNormal.className = 'duo-audio-big-btn';
-        playNormal.innerHTML = '🔊 <span>1.0x</span>';
+        playNormal.innerHTML = `${uiIconSvg('volume', 16)} <span>1.0x</span>`;
         playNormal.addEventListener('click', () => {
           cancelAutoPlay();
           speakEnglish(ex.audioText, 1.0);
@@ -1588,7 +1666,7 @@ export class RoadmapController {
         const cantListenBtn = document.createElement('button');
         cantListenBtn.type = 'button';
         cantListenBtn.className = 'duo-audio-cant-listen-btn';
-        cantListenBtn.textContent = L.cantListenBtn;
+        setIconLabel(cantListenBtn, 'volumeOff', L.cantListenBtn, 13);
         cantListenBtn.disabled = Boolean(currentCheckedState);
         cantListenBtn.addEventListener('click', () => {
           triggerAudioBypass?.();
@@ -1619,7 +1697,7 @@ export class RoadmapController {
           const spk = document.createElement('button');
           spk.type = 'button';
           spk.className = 'duo-audio-mini-btn';
-          spk.textContent = '🔊';
+          setIconOnly(spk, 'volume', 14);
           spk.addEventListener('click', () => {
             cancelAutoPlay();
             speakEnglish(ex.audioText, 1.0);
@@ -2016,7 +2094,7 @@ export class RoadmapController {
           const replaySpk = document.createElement('button');
           replaySpk.type = 'button';
           replaySpk.className = 'duo-audio-mini-btn';
-          replaySpk.textContent = '🔊';
+          setIconOnly(replaySpk, 'volume', 14);
           replaySpk.title = isTr ? 'İngilizce telaffuzu dinle' : 'Listen to pronunciation';
           replaySpk.addEventListener('click', () => speakEnglish(ex.audioText, 1.0));
           actionsWrap.appendChild(replaySpk);
@@ -2355,8 +2433,8 @@ export class RoadmapController {
       const coachLabel = document.createElement('div');
       coachLabel.className = 'duo-complete-coach-lbl';
       coachLabel.textContent = isTr
-        ? `✨ Son ${instantInsight.lessonCountAnalyzed} Ders Analizi`
-        : `✨ Last ${instantInsight.lessonCountAnalyzed}-Lesson Analysis`;
+        ? `Son ${instantInsight.lessonCountAnalyzed} Ders Analizi`
+        : `Last ${instantInsight.lessonCountAnalyzed}-Lesson Analysis`;
       const coachBody = document.createElement('p');
       coachBody.className = 'duo-complete-coach-msg';
       coachBody.textContent = instantInsight.message;
@@ -2375,8 +2453,8 @@ export class RoadmapController {
               this.coachInsight = payload.insight;
               coachBox.className = `duo-complete-coach status-${payload.insight.status}`;
               coachLabel.textContent = isTr
-                ? `✨ AI · Son ${payload.insight.lessonCountAnalyzed} Ders`
-                : `✨ AI · Last ${payload.insight.lessonCountAnalyzed}`;
+                ? `AI · Son ${payload.insight.lessonCountAnalyzed} Ders`
+                : `AI · Last ${payload.insight.lessonCountAnalyzed}`;
               coachBody.textContent = payload.insight.message;
             }
           })

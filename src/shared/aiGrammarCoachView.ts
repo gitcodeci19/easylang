@@ -11,6 +11,7 @@ import type {
   NeuralTtsStatus,
   VoiceCoachRuleId,
 } from './types';
+import { setIconLabel, setIconOnly } from './uiIcons';
 import { getVoiceCoachRuleSpec } from './voiceCoachCatalog';
 
 const coachResultCache = new Map<string, AiGrammarCoachResult>();
@@ -223,7 +224,7 @@ export function createAiGrammarCoachView(
     activeWordTimings = [];
     updateKaraokeWord(-1, false);
     if (statusBadgeRef) {
-      statusBadgeRef.textContent = '⚡ EMA Lightning · 48 kHz';
+      statusBadgeRef.textContent = 'EMA Lightning · 48 kHz';
     }
     syncPlayerUi();
 
@@ -268,7 +269,7 @@ export function createAiGrammarCoachView(
             }
           });
         }
-        if (statusBadgeRef) statusBadgeRef.textContent = '⚡ EMA Lightning · 48 kHz';
+        if (statusBadgeRef) statusBadgeRef.textContent = 'EMA Lightning · 48 kHz';
       } else if (statusBadgeRef) {
         statusBadgeRef.textContent = res?.error
           ? `EMA ses hatası: ${res.error}`
@@ -325,7 +326,7 @@ export function createAiGrammarCoachView(
 
       const badge = document.createElement('span');
       badge.className = 'ai-coach-voice-badge';
-      badge.textContent = '⚡ EMA Lightning · 48 kHz';
+      badge.textContent = 'EMA Lightning · 48 kHz';
       statusBadgeRef = badge;
 
       const regenBtn = document.createElement('button');
@@ -515,7 +516,7 @@ export function createAiGrammarCoachView(
           const spkBtn = document.createElement('button');
           spkBtn.type = 'button';
           spkBtn.className = 'ai-coach-ex-speak';
-          spkBtn.textContent = '🔊';
+          setIconOnly(spkBtn, 'volume', 13);
           spkBtn.title = 'Örneği İngilizce dinle';
           spkBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -625,7 +626,7 @@ export function createAiGrammarCoachView(
       const offlineBtn = document.createElement('button');
       offlineBtn.type = 'button';
       offlineBtn.className = 'ai-coach-regen-btn';
-      offlineBtn.textContent = '🎧 Hazır Derslere Geç';
+      setIconLabel(offlineBtn, 'headphones', 'Hazır Derslere Geç', 13);
       offlineBtn.addEventListener('click', () => options.onFallbackOffline?.());
       btnRow.appendChild(offlineBtn);
     }

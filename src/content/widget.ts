@@ -7,6 +7,7 @@ import type { OfflineWordEntry } from '../shared/offlineDictionary';
 import { speakEnglishText as speakEnglish } from '../shared/speech';
 import { isAiApiConfigured } from '../shared/storage';
 import { buildInlineTeachMePanel, stopActiveRuleAudio } from '../shared/teachMeDrawer';
+import { setIconLabel } from '../shared/uiIcons';
 import { detectHelpSkillsForQuestion, hasRichTeachMeSkills } from '../shared/weaknessDetector';
 import {
   installWordHoverTooltip,
@@ -253,9 +254,9 @@ export function renderRecallWidget(
     const actions = createEl('div', 'etr-actions');
     const qTeachBtn = createEl(
       'button',
-      `etr-btn etr-btn-teach${shouldGlowTeach ? ' is-glow' : ''}`,
-      isTr ? '🎧 Bana Öğret' : '🎧 Teach Me'
+      `etr-btn etr-btn-teach${shouldGlowTeach ? ' is-glow' : ''}`
     );
+    setIconLabel(qTeachBtn, 'headphones', isTr ? 'Bana Öğret' : 'Teach Me', 13);
     qTeachBtn.type = 'button';
     qTeachBtn.title = isTr
       ? 'Bu cümledeki gramer kurallarını sesli ve yazılı dinle (API bağlıysa canlı AI + EMA)'
@@ -344,10 +345,10 @@ export function renderRecallWidget(
           return;
         }
         errorLine.hidden = false;
-        errorLine.textContent = `⚠ ${res?.error ?? 'Could not reach background service.'}`;
+        errorLine.textContent = res?.error ?? 'Could not reach background service.';
       } catch (err) {
         errorLine.hidden = false;
-        errorLine.textContent = `⚠ Extension reloaded — press F5 to refresh this tab (${
+        errorLine.textContent = `Extension reloaded — press F5 to refresh this tab (${
           err instanceof Error ? err.message : 'disconnected'
         }).`;
       }
@@ -530,11 +531,11 @@ export function renderRecallWidget(
           'etr-bubble-label',
           outcome.evaluation.aiStatus === 'error'
             ? isTr
-              ? '⚠ AI Durumu'
-              : '⚠ AI Status'
+              ? 'AI Durumu'
+              : 'AI Status'
             : isTr
-              ? '✨ AI Değerlendirmesi'
-              : '✨ AI Evaluation'
+              ? 'AI Değerlendirmesi'
+              : 'AI Evaluation'
         )
       );
       aiBubble.appendChild(createEl('div', undefined, outcome.evaluation.aiNote));
@@ -545,7 +546,7 @@ export function renderRecallWidget(
         createEl(
           'span',
           'etr-bubble-label',
-          isTr ? '✨ AI Değerlendirmesi' : '✨ AI Evaluation'
+          isTr ? 'AI Değerlendirmesi' : 'AI Evaluation'
         )
       );
       aiHint.appendChild(
@@ -611,30 +612,36 @@ export function renderRecallWidget(
         box.appendChild(createEl('div', undefined, cleanExplanation));
       }
       let displayProgress = progressText;
-      if (isTr && displayProgress) {
+      if (displayProgress) {
         const addedMatch = displayProgress.match(
-          /^📌 "(.+)" added to focus list \(next check in (\d+) questions\)\.$/
+          /^(?:📌\s*)?"(.+)" added to focus list \(next check in (\d+) questions\)\.$/
         );
         const queuedMatch = displayProgress.match(
-          /^🔁 "(.+)" queued again \(next check in (\d+) questions\)\.$/
+          /^(?:🔁\s*)?"(.+)" queued again \(next check in (\d+) questions\)\.$/
         );
         const stageMatch = displayProgress.match(
-          /^🎯 "(.+)" cleared Stage (\d+) \(next check in (\d+) questions\)\.$/
+          /^(?:🎯\s*)?"(.+)" cleared Stage (\d+) \(next check in (\d+) questions\)\.$/
         );
         const stageFinalMatch = displayProgress.match(
-          /^⏳ "(.+)" cleared Stage (\d+) [–-] final retention test in (\d+) questions!$/
+          /^(?:⏳\s*)?"(.+)" cleared Stage (\d+) [–—-] final retention test in (\d+) questions!$/
         );
-        const masteredMatch = displayProgress.match(/^✅ "(.+)" mastered/i);
-        if (addedMatch) {
-          displayProgress = `📌 "${addedMatch[1]}" odak listesine eklendi (${addedMatch[2]} soru sonra tekrar).`;
-        } else if (queuedMatch) {
-          displayProgress = `🔁 "${queuedMatch[1]}" tekrar sıraya alındı (${queuedMatch[2]} soru sonra tekrar).`;
-        } else if (stageFinalMatch) {
-          displayProgress = `⏳ "${stageFinalMatch[1]}" ${stageFinalMatch[2]}. aşamayı geçti (${stageFinalMatch[3]} soru sonra son kalıcılık testi!).`;
-        } else if (stageMatch) {
-          displayProgress = `🎯 "${stageMatch[1]}" ${stageMatch[2]}. aşamayı geçti (${stageMatch[3]} soru sonra tekrar).`;
-        } else if (masteredMatch) {
-          displayProgress = `✅ "${masteredMatch[1]}" odak hedefi öğrenildi.`;
+        const masteredMatch = displayProgress.match(
+          /^(?:[✅🏆]\s*)?"(.+)" (?:mastered|passed the \+10 question retention check and is mastered)/i
+        );
+        if (isTr) {
+          if (addedMatch) {
+            displayProgress = `"${addedMatch[1]}" odak listesine eklendi (${addedMatch[2]} soru sonra tekrar).`;
+          } else if (queuedMatch) {
+            displayProgress = `"${queuedMatch[1]}" tekrar sıraya alındı (${queuedMatch[2]} soru sonra tekrar).`;
+          } else if (stageFinalMatch) {
+            displayProgress = `"${stageFinalMatch[1]}" ${stageFinalMatch[2]}. aşamayı geçti (${stageFinalMatch[3]} soru sonra son kalıcılık testi).`;
+          } else if (stageMatch) {
+            displayProgress = `"${stageMatch[1]}" ${stageMatch[2]}. aşamayı geçti (${stageMatch[3]} soru sonra tekrar).`;
+          } else if (masteredMatch) {
+            displayProgress = `"${masteredMatch[1]}" odak hedefi tamamlandı.`;
+          }
+        } else {
+          displayProgress = displayProgress.replace(/^[📌🔁🎯⏳🏆✅]\s*/, '');
         }
       }
       box.appendChild(
@@ -671,7 +678,7 @@ export function renderRecallWidget(
     const askAiLabel = createEl(
       'span',
       'etr-label',
-      isTr ? '✨ AI Öğretmene Sor (Neden böyle?):' : '✨ Ask AI Tutor:'
+      isTr ? 'AI Öğretmene Sor:' : 'Ask AI Tutor:'
     );
     const askAiHelpBtn = createGuideHelpButton('tour_ask_ai', {
       isTr,
@@ -707,7 +714,7 @@ export function renderRecallWidget(
       askAiSendBtn.disabled = true;
       askAiSendBtn.textContent = '...';
       askAiOutput.hidden = false;
-      askAiOutput.textContent = isTr ? '✨ AI düşünüyor...' : '✨ Thinking...';
+      askAiOutput.textContent = isTr ? 'AI düşünüyor...' : 'Thinking...';
       const prevHist = [...askAiHistory];
       askAiHistory.push({ role: 'user', text: q });
       const res = await sendBgMessage<{
@@ -778,9 +785,9 @@ export function renderRecallWidget(
 
     const teachOutcomeBtn = createEl(
       'button',
-      `etr-btn etr-btn-teach${shouldGlowTeach ? ' is-glow' : ''}`,
-      isTr ? '🎧 Bana Öğret' : '🎧 Teach Me'
+      `etr-btn etr-btn-teach${shouldGlowTeach ? ' is-glow' : ''}`
     );
+    setIconLabel(teachOutcomeBtn, 'headphones', isTr ? 'Bana Öğret' : 'Teach Me', 13);
     teachOutcomeBtn.type = 'button';
     teachOutcomeBtn.title = isTr
       ? 'Bu cümledeki kuralları sesli ve yazılı dinle (API bağlıysa canlı AI + EMA)'
@@ -827,9 +834,9 @@ export function renderRecallWidget(
 
     const askAiToggleBtn = createEl(
       'button',
-      'etr-btn etr-btn-ai',
-      isTr ? '💬 AI’a Sor' : '💬 Ask AI'
+      'etr-btn etr-btn-ai'
     );
+    setIconLabel(askAiToggleBtn, 'message', isTr ? 'AI’a Sor' : 'Ask AI', 13);
     askAiToggleBtn.type = 'button';
     askAiToggleBtn.title = isTr
       ? 'Bu cümle hakkında yapay zekâya soru sor'

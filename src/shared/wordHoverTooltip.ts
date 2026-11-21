@@ -1,5 +1,6 @@
 import type { OfflineWordEntry } from './offlineDictionary.ts';
 import { speakEnglishText } from './speech.ts';
+import { uiIconSvg } from './uiIcons.ts';
 
 export interface WordHoverTooltipOptions {
   /** Target Document (popup/options) or ShadowRoot (content-script overlay). */
@@ -51,6 +52,7 @@ const EXCLUDED_SELECTOR = [
   '.top-bar',
   '.quick-actions',
   '.duo-mode-tabs',
+  '.duo-map-hud',
   '.duo-lesson-topbar',
   '.duo-lesson-footer',
   '.duo-ex-badge',
@@ -982,7 +984,7 @@ export function installWordHoverTooltip(
     const spkBtn = ownerDoc.createElement('button');
     spkBtn.type = 'button';
     spkBtn.className = `${TOOLTIP_CLASS}-spk`;
-    spkBtn.textContent = '🔊';
+    spkBtn.innerHTML = uiIconSvg('volume', 13);
     spkBtn.title = 'Telaffuzu dinle';
     spkBtn.addEventListener('pointerdown', (ev) => {
       ev.stopPropagation();

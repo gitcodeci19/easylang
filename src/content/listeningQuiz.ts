@@ -492,7 +492,7 @@ export async function launchListeningQuiz(): Promise<void> {
   const cantListenBtn = createEl(
     'button',
     'etr-lq-cant-listen-btn',
-    isTr ? '🔇 Şu an sesi dinleyemiyorum' : "🔇 Can't listen right now"
+    isTr ? 'Şu an sesi dinleyemiyorum' : "Can't listen right now"
   );
   cantListenBtn.type = 'button';
 
@@ -567,8 +567,8 @@ export async function launchListeningQuiz(): Promise<void> {
       'div',
       'etr-lq-prompt',
       isTr
-        ? '🔇 Dinlemeden kabul edildi · Doğru veya yanlış işlenmedi'
-        : '🔇 Accepted without audio · Not scored as right or wrong'
+        ? 'Dinlemeden kabul edildi · Doğru veya yanlış işlenmedi'
+        : 'Accepted without audio · Not scored as right or wrong'
     );
     statusLine.style.fontWeight = '700';
     statusLine.style.color = '#cbd5e1';

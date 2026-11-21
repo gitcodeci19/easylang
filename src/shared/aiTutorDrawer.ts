@@ -86,7 +86,7 @@ export function openAiTutorDrawer(options: OpenAiTutorDrawerOptions): void {
   titleWrap.className = 'ait-title-wrap';
   const titleEl = document.createElement('span');
   titleEl.className = 'ait-title';
-  titleEl.textContent = isTr ? '✨ AI Öğretmene Sor' : '✨ Ask AI Tutor';
+  titleEl.textContent = isTr ? 'AI Öğretmene Sor' : 'Ask AI Tutor';
   titleWrap.appendChild(titleEl);
 
   const headerActions = document.createElement('div');
@@ -167,8 +167,8 @@ export function openAiTutorDrawer(options: OpenAiTutorDrawerOptions): void {
         pinBtn.type = 'button';
         pinBtn.className = 'ait-pin-btn';
         pinBtn.textContent = isTr
-          ? `📌 "${meta.suggestedFocusToken}" zayıf noktama ekle`
-          : `📌 Pin "${meta.suggestedFocusToken}" to focus`;
+          ? `"${meta.suggestedFocusToken}" zayıf noktama ekle`
+          : `Pin "${meta.suggestedFocusToken}" to focus`;
         pinBtn.addEventListener('click', async () => {
           pinBtn.disabled = true;
           pinBtn.textContent = isTr ? 'Ekleniyor...' : 'Saving...';
@@ -231,17 +231,17 @@ export function openAiTutorDrawer(options: OpenAiTutorDrawerOptions): void {
         ...(options.context.userAnswer && options.context.userAnswer !== '(skipped)'
           ? [
               {
-                label: '❓ Neden yanlış?',
+                label: 'Neden yanlış?',
                 prompt: 'Benim cevabım neden yanlış ve doğrusu neden tam olarak böyle kuruluyor?',
               },
             ]
           : []),
         {
-          label: '🔍 Kelime kelime açıkla',
+          label: 'Kelime kelime açıkla',
           prompt: 'Bu cümleyi kelime kelime ve kalıp mantığıyla kısaca açıklar mısın?',
         },
         {
-          label: '✨ 2 günlük örnek',
+          label: '2 günlük örnek',
           prompt: 'Bu yapıyı günlük modern İngilizcede 2 farklı kısa örnekle gösterir misin?',
         },
       ]
@@ -249,17 +249,17 @@ export function openAiTutorDrawer(options: OpenAiTutorDrawerOptions): void {
         ...(options.context.userAnswer && options.context.userAnswer !== '(skipped)'
           ? [
               {
-                label: '❓ Why wrong?',
+                label: 'Why wrong?',
                 prompt: 'Why is my answer wrong and why is the expected sentence phrased that way?',
               },
             ]
           : []),
         {
-          label: '🔍 Word by word',
+          label: 'Word by word',
           prompt: 'Break this sentence down word by word and explain any idiom or grammar rule.',
         },
         {
-          label: '✨ 2 everyday examples',
+          label: '2 everyday examples',
           prompt: 'Give 2 short modern everyday examples using the same pattern.',
         },
       ];
@@ -307,7 +307,7 @@ export function openAiTutorDrawer(options: OpenAiTutorDrawerOptions): void {
     appendBubble('user', q);
     const thinkingRow = appendBubble(
       'assistant',
-      isTr ? '✨ AI düşünüyor...' : '✨ AI is thinking...'
+      isTr ? 'AI düşünüyor...' : 'AI is thinking...'
     );
     thinkingRow.classList.add('is-loading');
 

@@ -1831,4 +1831,27 @@ mark.etr-rule-glow.is-ai {
   color: #fef08a;
   box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.5);
 }
+
+.ui-ico {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+  opacity: 0.9;
+}
+
+.etr-btn,
+.etr-teach-choice-title,
+.ai-coach-regen-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.tm-ex-speak,
+.ai-coach-ex-speak {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 `;

@@ -1168,7 +1168,7 @@ function renderAnchoredQuizBox(
 
       const aiBubble = createEl('div', 'etr-pq-bubble etr-pq-bubble-ai');
       aiBubble.append(
-        createEl('span', 'etr-pq-bubble-label', isTr ? '✨ AI DEĞERLENDİRMESİ' : '✨ AI FEEDBACK'),
+        createEl('span', 'etr-pq-bubble-label', isTr ? 'AI DEĞERLENDİRMESİ' : 'AI FEEDBACK'),
         createEl('div', undefined, evaluation.feedback)
       );
 
@@ -1177,7 +1177,7 @@ function renderAnchoredQuizBox(
       if (challenge.notes) {
         const noteBubble = createEl('div', 'etr-pq-bubble etr-pq-bubble-note');
         noteBubble.append(
-          createEl('span', 'etr-pq-bubble-label', isTr ? '📌 İPUCU' : '📌 HINT'),
+          createEl('span', 'etr-pq-bubble-label', isTr ? 'İPUCU' : 'HINT'),
           createEl('div', undefined, challenge.notes)
         );
         resultBox.append(noteBubble);

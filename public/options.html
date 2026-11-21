@@ -102,7 +102,9 @@
       <!-- Natural No-API Key Onboarding Nudge Bar -->
       <section id="no-api-nudge-bar" class="no-api-bar" hidden>
         <div class="no-api-main">
-          <span class="no-api-icon" aria-hidden="true">🔑</span>
+          <span class="no-api-icon" aria-hidden="true">
+            <svg class="ui-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg>
+          </span>
           <div class="no-api-copy">
             <strong id="no-api-bar-title">Henüz AI API anahtarı eklenmedi</strong>
             <p id="no-api-bar-desc">Challenge modu ve akıllı AI değerlendirmesi için 1 dakikada ücretsiz anahtar alıp ekleyebilirsin.</p>
@@ -118,7 +120,9 @@
       <div id="options-onboarding" class="dash-onboarding-overlay" hidden>
         <div class="dash-onboarding-card">
           <div class="dash-ob-brand">
-            <span class="dash-ob-logo">⚡</span>
+            <span class="dash-ob-logo" aria-hidden="true">
+              <svg class="ui-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </span>
             <span class="dash-ob-brand-name">LingoEx</span>
             <button
               id="dash-ob-guide-btn"
@@ -184,7 +188,7 @@
             <p id="dash-ob-restore-sub" class="dash-ob-sub">Daha önce indirdiğin .json yedeğini seç veya yapıştır.</p>
             <label class="dash-ob-file-drop" for="dash-ob-backup-file">
               <input id="dash-ob-backup-file" type="file" accept=".json,application/json,.txt,.tsv" />
-              <span id="dash-ob-file-label">📁 Dosya Seç (.json)</span>
+              <span id="dash-ob-file-label">Dosya Seç (.json)</span>
             </label>
             <textarea id="dash-ob-backup-text" rows="4" placeholder="{ ... }"></textarea>
             <p id="dash-ob-restore-error" class="dash-ob-error" hidden></p>
@@ -509,7 +513,7 @@
               <div class="file-picker-row">
                 <label class="btn btn-secondary file-picker-btn" for="import-file-input">
                   <input id="import-file-input" type="file" accept=".json,.csv,.tsv,.txt" hidden />
-                  <span data-i18n="btnChooseFile">📁 Dosya Seç</span>
+                  <span data-i18n="btnChooseFile">Dosya Seç</span>
                 </label>
                 <span id="import-file-name" class="muted small" data-i18n="noFileSelected"
                   >Dosya seçilmedi</span
@@ -677,7 +681,7 @@
                   <div class="free-api-title-group">
                     <strong class="free-api-name">Groq</strong>
                     <span class="free-api-tag tag-best" data-i18n="tagGroq"
-                      >⭐ Önerilen (Çok Hızlı &amp; Zeki)</span
+                      >Önerilen (Çok Hızlı &amp; Zeki)</span
                     >
                   </div>
                   <span class="free-api-chevron" aria-hidden="true">▾</span>
@@ -696,7 +700,7 @@
                   <div class="free-api-title-group">
                     <strong class="free-api-name">NVIDIA NIM</strong>
                     <span class="free-api-tag tag-smart" data-i18n="tagNvidia"
-                      >🧠 Yavaş ama Daha Akıllı</span
+                      >Yavaş ama Daha Akıllı</span
                     >
                   </div>
                   <span class="free-api-chevron" aria-hidden="true">▾</span>
@@ -715,7 +719,7 @@
                   <div class="free-api-title-group">
                     <strong class="free-api-name">AMD TokenLab</strong>
                     <span class="free-api-tag tag-backup" data-i18n="tagAmd"
-                      >⚖️ Yavaş / İyi Yedek</span
+                      >Yavaş / İyi Yedek</span
                     >
                   </div>
                   <span class="free-api-chevron" aria-hidden="true">▾</span>

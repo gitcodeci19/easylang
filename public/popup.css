@@ -6703,3 +6703,431 @@ body.remedial-crimson-active .rank-chip {
 .duo-placement-cta:hover:not(:disabled) {
   background: #7376f7;
 }
+
+/* ==================== MONOCHROME SVG UI ICONS (ZERO OS EMOJIS) ==================== */
+.ui-ico {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+  opacity: 0.9;
+}
+
+.duo-mode-tab,
+.rem-ai-scan-btn,
+.rem-rule-peek-btn,
+.duo-teach-btn,
+.duo-ask-ai-btn,
+.duo-combo-pill,
+.duo-audio-cant-listen-btn,
+.rem-chip-title,
+.rem-brief-top-title,
+.rem-ai-toggle-pill,
+.rem-spot-step,
+.duo-audio-big-btn,
+.tm-title,
+.tm-choice-name,
+.tm-skill-pill,
+.ai-coach-regen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.duo-mode-tab {
+  justify-content: center;
+  gap: 6px;
+}
+
+.duo-audio-btn,
+.duo-audio-mini-btn,
+.duo-gb-speak,
+.tm-ex-speak,
+.ai-coach-ex-speak,
+.banner-icon,
+.ob-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rem-card-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #9ea8be;
+  flex-shrink: 0;
+}
+
+.rem-card.is-critical .rem-card-icon {
+  color: #fda4af;
+  background: rgba(244, 63, 94, 0.08);
+  border-color: rgba(244, 63, 94, 0.2);
+}
+
+.duo-complete-badge.rem-complete-badge {
+  width: 52px;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 6px;
+  border-radius: 14px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(129, 140, 248, 0.28);
+  color: #c7d2fe;
+}
+
+/* ==================== STANDALONE MODE BUTTONS & INTEGRATED MAP HUD ==================== */
+/* Mode buttons: 2 standalone side-by-side buttons matching bottom Challenge / Dinle & Yaz */
+.duo-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.duo-mode-tab {
+  height: 34px;
+  padding: 0 26px 0 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 700;
+  box-shadow: none;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.duo-mode-tab:hover,
+.duo-mode-tab.is-remedial:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.duo-mode-tab.is-active,
+.duo-mode-tab.is-path.is-active,
+.duo-mode-tab.is-remedial.is-active {
+  background: rgba(99, 102, 241, 0.14);
+  border: 1px solid rgba(129, 140, 248, 0.44);
+  color: #f8fafc;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.duo-mode-tab.is-active:hover,
+.duo-mode-tab.is-remedial.is-active:hover {
+  background: rgba(99, 102, 241, 0.19);
+  border-color: rgba(129, 140, 248, 0.56);
+}
+
+.duo-mode-tab.is-active .ui-ico {
+  color: #a5b4fc;
+  opacity: 1;
+}
+
+.duo-mode-tab-wrap .duo-tab-help-btn {
+  right: 6px;
+}
+
+.duo-mode-tab-wrap:has(.is-active) .duo-tab-help-btn:not(.is-speaking) {
+  background: rgba(129, 140, 248, 0.16);
+  border-color: rgba(129, 140, 248, 0.34);
+  color: #e0e7ff;
+}
+
+/* Unified full-height Roadmap surface with frosted-glass HUD docked inside */
+.duo-map-surface {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  border: 1px solid var(--border-subtle);
+  background: #0c0e13;
+  overflow: hidden;
+}
+
+.duo-map-surface::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22px;
+  background: linear-gradient(to top, rgba(12, 14, 19, 0.9), transparent);
+  pointer-events: none;
+  z-index: 6;
+}
+
+.duo-map-surface .duo-skill-path {
+  flex: 1;
+  min-height: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 74px 12px 32px;
+  scroll-padding-top: 72px;
+}
+
+.duo-map-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  background: rgba(14, 17, 23, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.duo-map-hud.is-scrolled,
+.duo-map-hud.is-coach-open {
+  background: rgba(14, 17, 23, 0.92);
+  border-bottom-color: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
+}
+
+.duo-map-hud::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 16px;
+  background: linear-gradient(to bottom, rgba(12, 14, 19, 0.6), transparent);
+  pointer-events: none;
+}
+
+.duo-map-hud-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px 3px 11px;
+}
+
+.duo-unit-picker-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  border-radius: 7px;
+  transition: background-color 0.14s ease;
+}
+
+.duo-unit-picker-wrap:hover {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.duo-map-hud .duo-unit-picker {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #f1f5f9;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 3px 22px 3px 5px;
+  margin-left: -5px;
+  cursor: pointer;
+  outline: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duo-unit-picker-chevron {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: color 0.14s ease;
+}
+
+.duo-unit-picker-wrap:hover .duo-unit-picker-chevron {
+  color: var(--text-primary);
+}
+
+.duo-map-hud .duo-unit-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.duo-map-hud .duo-bar-btn {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.045);
+  color: #cbd2e1;
+  font-size: 10.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+
+.duo-map-hud .duo-bar-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+}
+
+.duo-map-hud .duo-bar-btn.is-active {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: rgba(129, 140, 248, 0.38);
+  color: #c7d2fe;
+}
+
+.duo-map-hud .duo-bar-btn.duo-bar-icon-btn {
+  width: 24px;
+  padding: 0;
+  color: var(--text-muted);
+}
+
+.duo-map-hud .duo-bar-btn.duo-bar-icon-btn:hover {
+  color: #f8fafc;
+}
+
+.duo-map-hud-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 10px 7px 11px;
+}
+
+.duo-unit-progress-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.duo-map-hud .duo-unit-submeta {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.duo-unit-mini-bar {
+  width: 44px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.duo-unit-mini-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-purple-bright);
+  transition: width 0.3s ease;
+}
+
+.duo-coach-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  margin-right: -4px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #b8c2d6;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.duo-coach-trigger:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+}
+
+.duo-coach-trigger.is-open {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(129, 140, 248, 0.32);
+  color: #e0e7ff;
+}
+
+.duo-coach-trigger .duo-coach-tag {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.duo-coach-trigger .duo-coach-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-purple-bright);
+  flex-shrink: 0;
+}
+
+.duo-coach-trigger.status-great .duo-coach-dot {
+  background: var(--accent-emerald);
+}
+
+.duo-coach-trigger.status-focus .duo-coach-dot {
+  background: var(--accent-gold);
+}
+
+.duo-coach-trigger .duo-coach-chevron {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  margin-left: 1px;
+}
+
+.duo-coach-drawer {
+  padding: 8px 11px 9px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.duo-coach-drawer .duo-coach-msg {
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.48;
+  color: #cbd5e1;
+  text-align: left;
+}

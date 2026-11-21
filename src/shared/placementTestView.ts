@@ -20,6 +20,7 @@ import {
   saveSettings,
 } from './storage.ts';
 import { stopActiveRuleAudio } from './teachMeDrawer.ts';
+import { setIconOnly } from './uiIcons.ts';
 import type { Card, FeedbackLanguageMode } from './types.ts';
 
 export interface PlacementTestViewOptions {
@@ -258,7 +259,7 @@ export function startPlacementTestSession(options: PlacementTestViewOptions): vo
 
     const modeTag = document.createElement('span');
     modeTag.className = 'duo-placement-top-tag';
-    modeTag.textContent = isTr ? '🎯 Seviye Testi' : '🎯 Placement';
+    modeTag.textContent = isTr ? 'Seviye Testi' : 'Placement';
 
     const topActions = document.createElement('div');
     topActions.className = 'duo-topbar-actions';
@@ -297,7 +298,7 @@ export function startPlacementTestSession(options: PlacementTestViewOptions): vo
       const spk = document.createElement('button');
       spk.type = 'button';
       spk.className = 'duo-audio-mini-btn';
-      spk.textContent = '🔊';
+      setIconOnly(spk, 'volume', 14);
       spk.title = isTr ? 'Telaffuzu dinle' : 'Listen';
       spk.addEventListener('click', () => speakEnglish(ex.audioText, 1.0));
       promptMain.appendChild(spk);

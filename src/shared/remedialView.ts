@@ -10,6 +10,12 @@ import { evaluateEnglishAnswer, evaluateTurkishAnswer } from './matcher';
 import { formatLessonProgressCounter } from './placementTest';
 import { REMEDIAL_SKILL_CATALOG, REMEDIAL_VOICE_TRANSCRIPTS } from './remedialCatalog';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
+import {
+  getRemedialSkillIconName,
+  setIconLabel,
+  setIconOnly,
+  uiIconSvg,
+} from './uiIcons';
 import { attachWordBankTileGesture } from './wordBankDrag';
 import {
   clearActiveRemedialSession,
@@ -102,7 +108,7 @@ export function createModeTabBar(params: {
   pathTab.role = 'tab';
   pathTab.setAttribute('aria-selected', String(params.activeMode === 'path'));
   pathTab.className = `duo-mode-tab is-path ${params.activeMode === 'path' ? 'is-active' : ''}`;
-  pathTab.textContent = params.isTr ? '🗺️ Yol Haritası' : '🗺️ Learning Path';
+  setIconLabel(pathTab, 'map', params.isTr ? 'Yol Haritası' : 'Learning Path', 14);
   pathTab.addEventListener('click', () => {
     if (params.activeMode !== 'path') params.onSelectMode('path');
   });
@@ -123,9 +129,7 @@ export function createModeTabBar(params: {
   remTab.setAttribute('aria-selected', String(params.activeMode === 'remedial'));
   remTab.className = `duo-mode-tab is-remedial ${params.activeMode === 'remedial' ? 'is-active' : ''}`;
 
-  const remLabel = document.createElement('span');
-  remLabel.textContent = params.isTr ? '🔥 Özel Dersler' : '🔥 Remedial Studio';
-  remTab.appendChild(remLabel);
+  setIconLabel(remTab, 'layers', params.isTr ? 'Özel Dersler' : 'Remedial Studio', 14);
 
   if (params.urgentCount > 0) {
     const badge = document.createElement('span');
@@ -242,7 +246,7 @@ export function renderRemedialHub(ctx: RemedialViewContext): void {
   const scanBtn = document.createElement('button');
   scanBtn.type = 'button';
   scanBtn.className = 'rem-ai-scan-btn';
-  scanBtn.textContent = isTr ? '✨ AI Derin Tara' : '✨ AI Deep Scan';
+  setIconLabel(scanBtn, 'sparkles', isTr ? 'AI Derin Tara' : 'AI Deep Scan', 13);
   scanBtn.disabled = !ctx.aiActive;
   scanBtn.title = ctx.aiActive
     ? isTr
@@ -258,7 +262,7 @@ export function renderRemedialHub(ctx: RemedialViewContext): void {
 
   scanBtn.addEventListener('click', async () => {
     scanBtn.disabled = true;
-    scanBtn.textContent = isTr ? '✨ Taranıyor...' : '✨ Scanning...';
+    setIconLabel(scanBtn, 'sparkles', isTr ? 'Taranıyor...' : 'Scanning...', 13);
     scanStatus.hidden = false;
     scanStatus.textContent = isTr
       ? 'Yapay zekâ son hatalarındaki gizli kalıpları tarıyor...'
@@ -287,7 +291,7 @@ export function renderRemedialHub(ctx: RemedialViewContext): void {
         : 'Could not reach AI. Local diagnosis remains active.';
     } finally {
       scanBtn.disabled = !ctx.aiActive;
-      scanBtn.textContent = isTr ? '✨ AI Derin Tara' : '✨ AI Deep Scan';
+      setIconLabel(scanBtn, 'sparkles', isTr ? 'AI Derin Tara' : 'AI Deep Scan', 13);
     }
   });
 
@@ -322,7 +326,6 @@ export function renderRemedialHub(ctx: RemedialViewContext): void {
     listEl.className = 'rem-card-list';
 
     for (const w of ctx.diagnosedWeaknesses) {
-      const spec = REMEDIAL_SKILL_CATALOG[w.skillId];
       const mastery = ctx.remedialProgress[w.skillId];
 
       const card = document.createElement('div');
@@ -336,7 +339,7 @@ export function renderRemedialHub(ctx: RemedialViewContext): void {
 
       const iconEl = document.createElement('span');
       iconEl.className = 'rem-card-icon';
-      iconEl.textContent = spec.icon;
+      setIconOnly(iconEl, getRemedialSkillIconName(w.skillId), 14);
 
       const titleCol = document.createElement('div');
       titleCol.className = 'rem-card-title-col';
@@ -372,7 +375,7 @@ export function renderRemedialHub(ctx: RemedialViewContext): void {
       if (w.aiReason) {
         const aiBox = document.createElement('div');
         aiBox.className = 'rem-evidence-box is-ai';
-        aiBox.textContent = `✨ ${w.aiReason}`;
+        aiBox.textContent = w.aiReason;
         card.appendChild(aiBox);
       } else if (w.evidenceExamples.length > 0) {
         const ev = w.evidenceExamples[0]!;
@@ -443,7 +446,7 @@ export function renderRemedialHub(ctx: RemedialViewContext): void {
 
     const chipTop = document.createElement('span');
     chipTop.className = 'rem-chip-title';
-    chipTop.textContent = `${spec.icon} ${isTr ? spec.titleTr : spec.titleEn}`;
+    setIconLabel(chipTop, getRemedialSkillIconName(spec.skillId), isTr ? spec.titleTr : spec.titleEn, 12);
 
     const chipSub = document.createElement('span');
     chipSub.className = 'rem-chip-sub';
@@ -538,10 +541,9 @@ export function renderRemedialBriefing(
     });
   });
 
-  const specIcon = REMEDIAL_SKILL_CATALOG[plan.skillId]?.icon ?? '🔥';
   const titleEl = document.createElement('div');
   titleEl.className = 'rem-brief-top-title';
-  titleEl.textContent = `${specIcon} ${isTr ? plan.titleTr : plan.titleEn}`;
+  setIconLabel(titleEl, getRemedialSkillIconName(plan.skillId), isTr ? plan.titleTr : plan.titleEn, 14);
 
   const openBriefTutor = (): void => {
     briefTutorOpen = true;
@@ -584,7 +586,7 @@ export function renderRemedialBriefing(
   const askBriefBtn = document.createElement('button');
   askBriefBtn.type = 'button';
   askBriefBtn.className = 'duo-ask-ai-btn is-crimson';
-  askBriefBtn.textContent = isTr ? '💬 AI’a Sor' : '💬 Ask AI';
+  setIconLabel(askBriefBtn, 'message', isTr ? 'AI’a Sor' : 'Ask AI', 13);
   askBriefBtn.title = isTr
     ? 'Bu kural hakkında aklına takılanı yapay zekâya sor'
     : 'Ask the AI tutor any question about this rule';
@@ -650,7 +652,7 @@ export function renderRemedialBriefing(
   const aiToggleBtn = document.createElement('button');
   aiToggleBtn.type = 'button';
   aiToggleBtn.className = 'rem-ai-toggle-pill';
-  aiToggleBtn.textContent = isTr ? '✨ AI Özel Notu ▾' : '✨ AI Coach Note ▾';
+  setIconLabel(aiToggleBtn, 'sparkles', isTr ? 'AI Özel Notu ▾' : 'AI Coach Note ▾', 12);
 
   exHeaderRow.append(exHeader, aiToggleBtn);
   body.appendChild(exHeaderRow);
@@ -664,19 +666,19 @@ export function renderRemedialBriefing(
   aiSlotBody.className = 'rem-ai-note-body';
 
   if (plan.briefing.source === 'ai' && plan.briefing.personalNote) {
-    aiSlotLabel.textContent = isTr ? '✨ AI Özel Öğretmenin Notu' : '✨ Your AI Private Tutor';
+    aiSlotLabel.textContent = isTr ? 'AI Özel Öğretmenin Notu' : 'Your AI Private Tutor';
     aiSlotBody.textContent = plan.briefing.personalNote;
   } else if (weakness?.aiReason) {
-    aiSlotLabel.textContent = isTr ? '✨ AI Koçunun Kişisel Notu' : '✨ AI Coach Note';
+    aiSlotLabel.textContent = isTr ? 'AI Koçunun Kişisel Notu' : 'AI Coach Note';
     aiSlotBody.textContent = weakness.aiReason;
   } else if (weakness && weakness.evidenceExamples.length > 0) {
     const firstEv = weakness.evidenceExamples[0]!;
-    aiSlotLabel.textContent = isTr ? '🎯 Neden Bu Dersi Açtık?' : '🎯 Why This Lesson?';
+    aiSlotLabel.textContent = isTr ? 'Neden Bu Dersi Açtık?' : 'Why This Lesson?';
     aiSlotBody.textContent = isTr
       ? `Geçmişinde "${firstEv.en}" örneğinde takıldın. Yukarıdaki kuralı dinledikten sonra alıştırmalarla pekiştireceğiz.`
       : `You stumbled on "${firstEv.en}" earlier. Review the rule above, then lock it in with interactive drills.`;
   } else {
-    aiSlotLabel.textContent = isTr ? '🔥 Özel Ders Hazır' : '🔥 Workshop Ready';
+    aiSlotLabel.textContent = isTr ? 'Özel Ders Hazır' : 'Workshop Ready';
     aiSlotBody.textContent = isTr
       ? 'Önce kuralı ve tuzakları gör, ardından alıştırmalarla pekiştir.'
       : 'Review the core logic and traps first, then master them via interactive drills.';
@@ -696,7 +698,7 @@ export function renderRemedialBriefing(
 
     const tag = document.createElement('span');
     tag.className = `rem-ex-tag ${ex.isTrap ? 'is-trap' : 'is-good'}`;
-    tag.textContent = ex.isTrap ? '✕' : isAiExtra ? '✨' : '✓';
+    tag.textContent = ex.isTrap ? '✕' : '✓';
     tag.title = ex.isTrap
       ? isTr
         ? 'Yaygın Tuzak (Yanlış)'
@@ -720,7 +722,7 @@ export function renderRemedialBriefing(
       const spkBtn = document.createElement('button');
       spkBtn.type = 'button';
       spkBtn.className = 'duo-audio-mini-btn rem-ex-spk';
-      spkBtn.textContent = '🔊';
+      setIconOnly(spkBtn, 'volume', 14);
       spkBtn.title = isTr ? 'Dinle' : 'Listen';
       spkBtn.addEventListener('click', () => speakEnglish(ex.en, 1.0));
       topLine.appendChild(spkBtn);
@@ -790,19 +792,24 @@ export function renderRemedialBriefing(
     const nextOpen = aiSlot.hidden;
     aiSlot.hidden = !nextOpen;
     aiToggleBtn.classList.toggle('is-open', nextOpen);
-    aiToggleBtn.textContent = nextOpen
-      ? isTr
-        ? '✨ AI Notunu Gizle ▴'
-        : '✨ Hide AI Note ▴'
-      : isTr
-        ? '✨ AI Özel Notu ▾'
-        : '✨ AI Coach Note ▾';
+    setIconLabel(
+      aiToggleBtn,
+      'sparkles',
+      nextOpen
+        ? isTr
+          ? 'AI Notunu Gizle ▴'
+          : 'Hide AI Note ▴'
+        : isTr
+          ? 'AI Özel Notu ▾'
+          : 'AI Coach Note ▾',
+      12
+    );
 
     if (!nextOpen || aiRequested || !ctx.aiActive || plan.briefing.source === 'ai') {
       return;
     }
     aiRequested = true;
-    aiSlotLabel.textContent = isTr ? '✨ AI Koç kişiselleştiriyor...' : '✨ AI Coach personalizing...';
+    aiSlotLabel.textContent = isTr ? 'AI Koç kişiselleştiriyor...' : 'AI Coach personalizing...';
     void chrome.runtime
       .sendMessage({
         type: 'GENERATE_REMEDIAL_BRIEFING',
@@ -829,8 +836,8 @@ export function renderRemedialBriefing(
           if (payload.briefingAi.personalNote) {
             plan.briefing.personalNote = payload.briefingAi.personalNote;
             aiSlotLabel.textContent = isTr
-              ? '✨ AI Özel Öğretmenin Notu'
-              : '✨ Your AI Private Tutor';
+              ? 'AI Özel Öğretmenin Notu'
+              : 'Your AI Private Tutor';
             aiSlotBody.textContent = payload.briefingAi.personalNote;
           }
           const existingEn = new Set(plan.briefing.examples.map((ex) => ex.en.trim().toLowerCase()));
@@ -844,12 +851,12 @@ export function renderRemedialBriefing(
           plan.briefing.source = 'ai';
           persistBriefing();
         } else {
-          aiSlotLabel.textContent = isTr ? '🎯 Ders Özeti' : '🎯 Lesson Overview';
+          aiSlotLabel.textContent = isTr ? 'Ders Özeti' : 'Lesson Overview';
         }
       })
       .catch(() => {
         if (!alive || !root.isConnected) return;
-        aiSlotLabel.textContent = isTr ? '🎯 Ders Özeti' : '🎯 Lesson Overview';
+        aiSlotLabel.textContent = isTr ? 'Ders Özeti' : 'Lesson Overview';
       });
   });
 }
@@ -1047,7 +1054,7 @@ export function startRemedialLessonSession(
     const rulePeekBtn = document.createElement('button');
     rulePeekBtn.type = 'button';
     rulePeekBtn.className = 'rem-rule-peek-btn';
-    rulePeekBtn.textContent = isTr ? '📖 Kural' : '📖 Rule';
+    setIconLabel(rulePeekBtn, 'book', isTr ? 'Kural' : 'Rule', 13);
 
     const openRemTutor = (): void => {
       currentTutorOpen = true;
@@ -1116,7 +1123,7 @@ export function startRemedialLessonSession(
     const teachRemBtn = document.createElement('button');
     teachRemBtn.type = 'button';
     teachRemBtn.className = `duo-teach-btn is-crimson${shouldGlowRemTeach ? ' is-glow' : ''}`;
-    teachRemBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Teach';
+    setIconLabel(teachRemBtn, 'headphones', isTr ? 'Öğret' : 'Teach', 13);
     teachRemBtn.title = isTr
       ? 'Bu sorudaki kuralları sesli ve yazılı dinle (API bağlıysa canlı AI + EMA)'
       : 'Listen & read rules in this drill';
@@ -1125,7 +1132,7 @@ export function startRemedialLessonSession(
     const askRemTopBtn = document.createElement('button');
     askRemTopBtn.type = 'button';
     askRemTopBtn.className = 'duo-ask-ai-btn is-crimson';
-    askRemTopBtn.textContent = isTr ? '💬 AI’a Sor' : '💬 Ask AI';
+    setIconLabel(askRemTopBtn, 'message', isTr ? 'AI’a Sor' : 'Ask AI', 13);
     askRemTopBtn.title = isTr
       ? 'Bu alıştırma hakkında yapay zekâya sor'
       : 'Ask AI tutor about this drill';
@@ -1133,7 +1140,9 @@ export function startRemedialLessonSession(
 
     const comboEl = document.createElement('span');
     comboEl.className = `duo-combo-pill ${combo >= 2 ? 'visible' : ''}`;
-    comboEl.textContent = combo >= 2 ? `${combo}x 🔥` : '';
+    if (combo >= 2) {
+      setIconLabel(comboEl, 'flame', `${combo}x`, 12);
+    }
 
     const topActions = document.createElement('div');
     topActions.className = 'duo-topbar-actions';
@@ -1152,7 +1161,9 @@ export function startRemedialLessonSession(
     const cheatBox = document.createElement('div');
     cheatBox.className = 'rem-cheatsheet';
     cheatBox.hidden = !cheatSheetOpen;
-    cheatBox.textContent = `${isTr ? plan.briefing.goldenRuleTr : plan.briefing.goldenRuleEn}  ${isTr ? plan.briefing.mnemonicTr : plan.briefing.mnemonicEn}`;
+    const rawMnemonic = isTr ? plan.briefing.mnemonicTr : plan.briefing.mnemonicEn;
+    const cleanMnemonic = rawMnemonic.replace(/^[💡]\s*/u, '').replace(/❌/gu, '✕');
+    cheatBox.textContent = `${isTr ? plan.briefing.goldenRuleTr : plan.briefing.goldenRuleEn}  ${cleanMnemonic}`;
     sessionEl.appendChild(cheatBox);
 
     rulePeekBtn.addEventListener('click', () => {
@@ -1333,7 +1344,12 @@ export function startRemedialLessonSession(
       const syncStepper = (): void => {
         if (!spotBugFound) {
           step1Pill.className = 'rem-spot-step is-active is-step1-hero';
-          step1Pill.textContent = isTr ? '⚡ 1. Hatalı kelimeyi işaretle' : '⚡ 1. Tap the wrong word';
+          setIconLabel(
+            step1Pill,
+            'edit',
+            isTr ? '1. Hatalı kelimeyi işaretle' : '1. Tap the wrong word',
+            12
+          );
           step2Pill.className = 'rem-spot-step';
           step2Pill.textContent = isTr ? '2. Doğrusunu seç' : '2. Choose fix';
         } else if (!spotSelectedFix) {
@@ -1531,7 +1547,7 @@ export function startRemedialLessonSession(
       scenBox.dataset.wordLang = isTr ? 'tr' : 'en';
       const scenEyebrow = document.createElement('div');
       scenEyebrow.className = 'rem-scenario-eyebrow';
-      scenEyebrow.textContent = isTr ? '💬 DURUM' : '💬 SITUATION';
+      scenEyebrow.textContent = isTr ? 'DURUM' : 'SITUATION';
       const scenText = document.createElement('div');
       scenText.className = 'rem-scenario-text';
       scenText.textContent = isTr ? ex.promptText : ex.promptSubtext || ex.promptText;
@@ -1590,7 +1606,7 @@ export function startRemedialLessonSession(
         const spk = document.createElement('button');
         spk.type = 'button';
         spk.className = 'duo-audio-mini-btn';
-        spk.textContent = '🔊';
+        setIconOnly(spk, 'volume', 14);
         spk.title = isTr ? 'Telaffuzu dinle' : 'Listen';
         spk.addEventListener('click', () => speakEnglish(ex.card.en, 1.0));
         promptMain.appendChild(spk);
@@ -1882,7 +1898,7 @@ export function startRemedialLessonSession(
       if (snap.aiApproved) {
         const aiTag = document.createElement('span');
         aiTag.className = 'duo-fb-ai-tag';
-        aiTag.textContent = isTr ? '✨ AI Onayı' : '✨ AI Approved';
+        aiTag.textContent = isTr ? 'AI Onayı' : 'AI Approved';
         badgeRow.appendChild(aiTag);
       }
       fbText.appendChild(badgeRow);
@@ -1916,7 +1932,7 @@ export function startRemedialLessonSession(
         const spk = document.createElement('button');
         spk.type = 'button';
         spk.className = 'duo-audio-mini-btn';
-        spk.textContent = '🔊';
+        setIconOnly(spk, 'volume', 14);
         spk.title = isTr ? 'İngilizce cümleyi dinle' : 'Listen';
         spk.addEventListener('click', () => speakEnglish(ex.audioText, 1.0));
         actionsWrap.appendChild(spk);
@@ -1989,7 +2005,7 @@ export function startRemedialLessonSession(
           isCorrect = localRes.isCorrect;
 
           if (!isCorrect && ctx.aiActive && typed.length > 0) {
-            checkBtn.textContent = isTr ? '✨ AI Kontrol Ediyor...' : '✨ AI Checking...';
+            checkBtn.textContent = isTr ? 'AI Kontrol Ediyor...' : 'AI Checking...';
             try {
               const aiResp = (await chrome.runtime.sendMessage({
                 type: 'EVALUATE_ROADMAP_EXERCISE',
@@ -2124,7 +2140,7 @@ export function startRemedialLessonSession(
 
     const badge = document.createElement('div');
     badge.className = 'duo-complete-badge rem-complete-badge';
-    badge.textContent = accuracyPct >= 80 ? '🏆' : '🔥';
+    badge.innerHTML = uiIconSvg(accuracyPct >= 80 ? 'award' : 'check', 28);
 
     const title = document.createElement('h2');
     title.className = 'duo-complete-title';

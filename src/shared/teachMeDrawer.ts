@@ -16,6 +16,7 @@ import { REMEDIAL_QUESTION_AUDIO_WORD_TIMINGS } from './remedialQuestionAudioTim
 import { getRemedialQuestionAudioRelativePath } from './remedialQuestionScripts';
 import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
 import type { FeedbackLanguageMode, VoiceCoachRuleId } from './types';
+import { getVoiceCoachIconName, setIconLabel, setIconOnly } from './uiIcons';
 import { getVoiceCoachRuleSpec, VOICE_COACH_RULE_ORDER } from './voiceCoachCatalog';
 
 let activeRuleAudio: HTMLAudioElement | null = null;
@@ -1197,7 +1198,7 @@ function buildRuleWrittenBody(
       const spk = document.createElement('button');
       spk.type = 'button';
       spk.className = 'tm-ex-speak';
-      spk.textContent = '🔊';
+      setIconOnly(spk, 'volume', 13);
       spk.title = isTr ? 'İngilizceyi dinle' : 'Listen';
       spk.addEventListener('click', () => {
         stopGuideAssistant();
@@ -1317,7 +1318,12 @@ export function openTeachMeDrawer(options: OpenTeachMeDrawerOptions): void {
 
   const title = document.createElement('span');
   title.className = 'tm-title';
-  title.textContent = isTr ? '🎧 Bana Öğret · Kural & Sesli Koç' : '🎧 Teach Me · Rule & Voice Coach';
+  setIconLabel(
+    title,
+    'headphones',
+    isTr ? 'Bana Öğret · Kural & Sesli Koç' : 'Teach Me · Rule & Voice Coach',
+    14
+  );
 
   const headerActions = document.createElement('div');
   headerActions.className = 'tm-header-actions';
@@ -1414,9 +1420,12 @@ export function openTeachMeDrawer(options: OpenTeachMeDrawerOptions): void {
 
         const nameEl = document.createElement('span');
         nameEl.className = 'tm-choice-name';
-        nameEl.textContent = `${spec.icon} ${
-          isTr ? spec.titleTr.split('(')[0]!.trim() : spec.titleEn.split('(')[0]!.trim()
-        }`;
+        setIconLabel(
+          nameEl,
+          getVoiceCoachIconName(sid),
+          isTr ? spec.titleTr.split('(')[0]!.trim() : spec.titleEn.split('(')[0]!.trim(),
+          13
+        );
 
         const hintEl = document.createElement('span');
         hintEl.className = 'tm-choice-cue';
@@ -1453,7 +1462,12 @@ export function openTeachMeDrawer(options: OpenTeachMeDrawerOptions): void {
       pill.className = `tm-skill-pill ${sid === selectedSkill ? 'is-selected' : ''} ${
         isDetected ? 'is-detected' : ''
       }`;
-      pill.textContent = `${spec.icon} ${isTr ? spec.titleTr.split('(')[0]!.trim() : spec.titleEn.split('(')[0]!.trim()}`;
+      setIconLabel(
+        pill,
+        getVoiceCoachIconName(sid),
+        isTr ? spec.titleTr.split('(')[0]!.trim() : spec.titleEn.split('(')[0]!.trim(),
+        12
+      );
       pill.addEventListener('click', () => {
         if (selectedSkill === sid) return;
         selectedSkill = sid;
@@ -1606,11 +1620,11 @@ export function buildInlineTeachMePanel(options: {
     box.classList.toggle('is-ai-mode', aiMode);
     head.textContent = aiMode
       ? isTr
-        ? '✦ AI CANLI ÖĞRETMEN · EMA'
-        : '✦ AI LIVE TEACHER · EMA'
+        ? 'AI CANLI ÖĞRETMEN · EMA'
+        : 'AI LIVE TEACHER · EMA'
       : isTr
-        ? '🎧 HANGİSİNDE TAKILDIN?'
-        : '🎧 WHICH ONE TRIPPED YOU UP?';
+        ? 'HANGİSİNDE TAKILDIN?'
+        : 'WHICH ONE TRIPPED YOU UP?';
     branchSlot.hidden = aiMode;
     pills.hidden = aiMode;
 
@@ -1678,9 +1692,12 @@ export function buildInlineTeachMePanel(options: {
 
       const titleEl = document.createElement('span');
       titleEl.className = 'etr-teach-choice-title';
-      titleEl.textContent = `${spec.icon} ${
-        isTr ? spec.titleTr.split('(')[0]!.trim() : spec.titleEn.split('(')[0]!.trim()
-      }`;
+      setIconLabel(
+        titleEl,
+        getVoiceCoachIconName(sid),
+        isTr ? spec.titleTr.split('(')[0]!.trim() : spec.titleEn.split('(')[0]!.trim(),
+        12
+      );
 
       const cueEl = document.createElement('span');
       cueEl.className = 'etr-teach-choice-cue';

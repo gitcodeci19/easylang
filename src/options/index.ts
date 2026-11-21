@@ -651,7 +651,7 @@ function renderFreeAiCatalog(mode: FeedbackLanguageMode): void {
     headRow.className = 'free-steps-head';
     const title = document.createElement('span');
     title.className = 'free-steps-title';
-    title.textContent = isTr ? '🔑 Adım Adım API Anahtarı Alma' : '🔑 Step-by-Step API Key Setup';
+    title.textContent = isTr ? 'Adım Adım API Anahtarı Alma' : 'Step-by-Step API Key Setup';
 
     const link = document.createElement('a');
     link.className = 'free-steps-link';
