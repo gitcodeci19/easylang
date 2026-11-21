@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LingoEx - Yapay Zekâ ile İngilizce Öğren",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "İnternette gezinirken yapay zekâ asistanın ile İngilizce öğren! Anında sözlük, sesli anlatım ve akıllı pratik kartları.",
   "permissions": [
     "alarms",

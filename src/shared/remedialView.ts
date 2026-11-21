@@ -355,15 +355,15 @@ export function renderRemedialHub(ctx: RemedialViewContext): void {
       sevPill.textContent =
         w.severity === 'critical'
           ? isTr
-            ? 'KRİTİK'
-            : 'CRITICAL'
+            ? 'Öncelikli'
+            : 'Priority'
           : w.severity === 'focus'
             ? isTr
-              ? 'ODAK'
-              : 'FOCUS'
+              ? 'Odak'
+              : 'Focus'
             : isTr
-              ? 'PEKİŞTİR'
-              : 'POLISH';
+              ? 'Pekiştir'
+              : 'Polish';
 
       topRow.append(titleWrap, sevPill);
       card.appendChild(topRow);
@@ -861,52 +861,50 @@ function getExerciseBadgeInfo(
   switch (kind) {
     case 'contrast_duel':
       return {
-        badge: isTr ? '⚔️ İKİLİ DÜELLO' : '⚔️ CONTRAST DUEL',
-        instruction: isTr
-          ? 'Boşluğa hangisi gelmeli? Hızlı karar ver!'
-          : 'Pick the right form for the blank!',
+        badge: isTr ? 'İkili Düello' : 'Contrast Duel',
+        instruction: isTr ? 'Boşluğa uygun olanı seç' : 'Choose the right option',
       };
     case 'spot_fix':
       return {
-        badge: isTr ? '✎ CÜMLE DÜZELTME' : '✎ PROOFREAD & FIX',
+        badge: isTr ? 'Cümle Düzeltme' : 'Spot & Fix',
         instruction: isTr
-          ? 'Cümledeki hatalı kelimeyi bul ve doğrusuyla değiştir.'
-          : 'Find the incorrect word in the sentence and replace it.',
+          ? 'Hatalı kelimeyi işaretle ve doğrusunu seç'
+          : 'Tap the wrong word and replace it',
       };
     case 'scenario_pick':
       return {
-        badge: isTr ? '🎭 GERÇEK HAYAT SENARYOSU' : '🎭 REAL-LIFE SCENARIO',
+        badge: isTr ? 'Senaryo' : 'Scenario',
         instruction: isTr
-          ? 'En doğal İngilizce karşılığı seç:'
-          : 'Choose the most natural English reply:',
+          ? 'En doğal İngilizce karşılığı seç'
+          : 'Choose the most natural reply',
       };
     case 'vocab_recall':
       return {
-        badge: isTr ? '🎯 KELİME ANLAMI' : '🎯 VOCABULARY RECALL',
+        badge: isTr ? 'Kelime' : 'Vocabulary',
         instruction: isTr
-          ? 'Bu kelimenin Türkçe anlamını seç:'
-          : 'Select the Turkish meaning of this word:',
+          ? 'Doğru Türkçe anlamı seç'
+          : 'Select the Turkish meaning',
       };
     case 'cloze_blank':
       return {
-        badge: isTr ? '🧩 BAĞLAM BOŞLUĞU' : '🧩 CONTEXT CLOZE',
+        badge: isTr ? 'Boşluk Doldurma' : 'Fill in the Blank',
         instruction: isTr
-          ? 'Cümleye en uygun seçeneği bul:'
-          : 'Complete the sentence:',
+          ? 'Cümleye en uygun seçeneği seç'
+          : 'Complete the sentence',
       };
     case 'word_bank':
       return {
-        badge: isTr ? '🧱 CÜMLE İNŞASI' : '🧱 SENTENCE BUILDER',
+        badge: isTr ? 'Cümle İnşası' : 'Sentence Builder',
         instruction: isTr
-          ? 'Kelimelere tıklayarak veya sürükleyerek İngilizce cümleyi kur:'
-          : 'Tap or drag tiles to build the English sentence:',
+          ? 'Kelimeleri sıraya dizerek cümleyi kur'
+          : 'Arrange the words to build the sentence',
       };
     case 'free_translation':
       return {
-        badge: isTr ? '🏆 FİNAL MEYDAN OKUMA' : '🏆 FINAL CHALLENGE',
+        badge: isTr ? 'Çeviri' : 'Translation',
         instruction: isTr
-          ? 'Öğrendiğin kuralı kullanarak İngilizceye çevir:'
-          : 'Translate into English using the rule you practiced:',
+          ? 'Cümleyi İngilizceye çevir'
+          : 'Translate into English',
       };
   }
 }
@@ -1016,7 +1014,7 @@ export function startRemedialLessonSession(
 
     const ex = queue[currentIdx]!;
     const hasQuestionVoiceover = Boolean(ex.questionAudioId && ex.questionVoiceScriptTr);
-    const { badge, instruction } = getExerciseBadgeInfo(ex.kind, isTr);
+    const { instruction } = getExerciseBadgeInfo(ex.kind, isTr);
     sessionEl.replaceChildren();
 
     // Top Bar
@@ -1167,15 +1165,11 @@ export function startRemedialLessonSession(
     const stage = document.createElement('div');
     stage.className = 'duo-lesson-stage';
 
-    // Skip redundant exercise type pill on spot_fix since its prominent step header is self-explanatory
-    if (ex.kind !== 'spot_fix' || ex.isRetryRequeue) {
+    // Keep stage clean: only surface a minimal retry pill when re-practicing a missed drill
+    if (ex.isRetryRequeue) {
       const badgeEl = document.createElement('div');
       badgeEl.className = 'duo-ex-badge rem-ex-badge';
-      badgeEl.textContent = ex.isRetryRequeue
-        ? ex.kind === 'spot_fix'
-          ? (isTr ? '🔁 HATA TEKRARI' : '🔁 RETRY')
-          : `${isTr ? '🔁 HATA TEKRARI' : '🔁 RETRY'} · ${badge}`
-        : badge;
+      badgeEl.textContent = isTr ? 'Tekrar' : 'Retry';
       stage.appendChild(badgeEl);
     }
 
@@ -1908,7 +1902,7 @@ export function startRemedialLessonSession(
         fbText.appendChild(solRow);
       }
 
-      if (snap.explanationNote) {
+      if (snap.explanationNote && (!hasQuestionVoiceover || effectiveCorrect)) {
         const noteEl = document.createElement('div');
         noteEl.className = 'duo-fb-note';
         noteEl.textContent = snap.explanationNote;
@@ -1927,24 +1921,6 @@ export function startRemedialLessonSession(
         spk.addEventListener('click', () => speakEnglish(ex.audioText, 1.0));
         actionsWrap.appendChild(spk);
       }
-
-      if (!hasQuestionVoiceover) {
-        const teachRemFbBtn = document.createElement('button');
-        teachRemFbBtn.type = 'button';
-        teachRemFbBtn.className = `duo-teach-mini-btn is-crimson${shouldGlowRemTeach ? ' is-glow' : ''}`;
-        teachRemFbBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Rule';
-        teachRemFbBtn.title = isTr ? 'Sesli ve yazılı kural anlatımını aç' : 'Open voice rule coach';
-        teachRemFbBtn.addEventListener('click', () => void openRemTeachMe());
-        actionsWrap.appendChild(teachRemFbBtn);
-      }
-
-      const askRemFbBtn = document.createElement('button');
-      askRemFbBtn.type = 'button';
-      askRemFbBtn.className = 'duo-ask-ai-mini-btn is-crimson';
-      askRemFbBtn.textContent = isTr ? '💬 Sor' : '💬 Ask';
-      askRemFbBtn.title = isTr ? 'Yapay zekâya nedenini sor' : 'Ask AI tutor why';
-      askRemFbBtn.addEventListener('click', openRemTutor);
-      actionsWrap.appendChild(askRemFbBtn);
 
       const nextBtn = document.createElement('button');
       nextBtn.type = 'button';

@@ -654,35 +654,7 @@ export class RoadmapController {
       })
     );
 
-    // Top-left 5-lesson AI Coach Micro-Report strip
-    const insight =
-      this.coachInsight ?? buildFallbackRoadmapCoachBanner(this.historyRecords, resolvedLang);
-    const coachStrip = document.createElement('div');
-    coachStrip.className = `duo-coach-strip status-${insight.status}`;
-
-    const coachTag = document.createElement('span');
-    coachTag.className = 'duo-coach-tag';
-    coachTag.textContent =
-      insight.lessonCountAnalyzed > 0
-        ? isTr
-          ? insight.source === 'ai'
-            ? `✨ AI · Son ${insight.lessonCountAnalyzed} Ders`
-            : `📊 Son ${insight.lessonCountAnalyzed} Ders`
-          : insight.source === 'ai'
-            ? `✨ AI · Last ${insight.lessonCountAnalyzed}`
-            : `📊 Last ${insight.lessonCountAnalyzed}`
-        : isTr
-          ? '✨ AI Koç'
-          : '✨ AI Coach';
-
-    const coachMsg = document.createElement('span');
-    coachMsg.className = 'duo-coach-msg';
-    coachMsg.textContent = insight.message;
-
-    coachStrip.append(coachTag, coachMsg);
-    root.appendChild(coachStrip);
-
-    // 1. Unified Matte-Carbon Unit Header Bar (Unit Picker + Meta + Guide & Focus buttons)
+    // 1. Minimal, Calm Unit Header Bar (Unit Picker + Concise 1-Line Progress + Quiet Actions)
     const unitBar = document.createElement('div');
     unitBar.className = 'duo-unit-bar';
 
@@ -696,8 +668,8 @@ export class RoadmapController {
       const opt = document.createElement('option');
       opt.value = up.unit.id;
       const title = isTr ? up.unit.titleTr : up.unit.titleEn;
-      const mark = up.isCompleted ? '✓ ' : up.isUnlocked ? '• ' : '';
-      opt.textContent = `${mark}${L.unitPrefix(up.unit.unitNumber)}: ${title} (${up.unit.level})`;
+      const mark = up.isCompleted ? '✓ ' : '';
+      opt.textContent = `${mark}${L.unitPrefix(up.unit.unitNumber)} · ${title}`;
       if (up.unit.id === activeUnit.id) opt.selected = true;
       unitSelect.appendChild(opt);
     }
@@ -705,14 +677,11 @@ export class RoadmapController {
     const subMeta = document.createElement('div');
     subMeta.className = 'duo-unit-submeta';
     subMeta.textContent = isTr
-      ? `Harita: ${courseRank.courseLevel} (${courseRank.completedNodesCount}/${courseRank.totalNodesCount} ders) · ${L.wordsMasteredFmt(
-          activeUnitProg.masteredUnitCards,
-          activeUnitProg.totalUnitCards
-        )} · ${L.dailyXpFmt(this.state.dailyXp, this.state.dailyXpGoal)}`
-      : `Course: ${courseRank.courseLevel} (${courseRank.completedNodesCount}/${courseRank.totalNodesCount} lessons) · ${L.wordsMasteredFmt(
-          activeUnitProg.masteredUnitCards,
-          activeUnitProg.totalUnitCards
-        )} · ${L.dailyXpFmt(this.state.dailyXp, this.state.dailyXpGoal)}`;
+      ? `${activeUnit.level} · ${activeUnitProg.masteredUnitCards}/${activeUnitProg.totalUnitCards} kelime`
+      : `${activeUnit.level} · ${activeUnitProg.masteredUnitCards}/${activeUnitProg.totalUnitCards} words`;
+    subMeta.title = isTr
+      ? `Harita: ${courseRank.courseLevel} (${courseRank.completedNodesCount}/${courseRank.totalNodesCount} ders) · ${L.dailyXpFmt(this.state.dailyXp, this.state.dailyXpGoal)}`
+      : `Course: ${courseRank.courseLevel} (${courseRank.completedNodesCount}/${courseRank.totalNodesCount} lessons) · ${L.dailyXpFmt(this.state.dailyXp, this.state.dailyXpGoal)}`;
 
     unitBarLeft.append(unitSelect, subMeta);
 
@@ -770,6 +739,57 @@ export class RoadmapController {
     // 2. Scrollable S-Curve Roadmap Canvas
     const pathScroll = document.createElement('div');
     pathScroll.className = 'duo-skill-path';
+
+    // Smart collapsible floating AI Coach pill tucked cleanly INSIDE the Roadmap canvas (0px chrome bloat)
+    const insight =
+      this.coachInsight ?? buildFallbackRoadmapCoachBanner(this.historyRecords, resolvedLang);
+    const coachStrip = document.createElement('button');
+    coachStrip.type = 'button';
+    coachStrip.className = `duo-coach-strip status-${insight.status}`;
+    coachStrip.setAttribute('aria-expanded', 'false');
+
+    const coachHead = document.createElement('div');
+    coachHead.className = 'duo-coach-head';
+
+    const coachDot = document.createElement('span');
+    coachDot.className = 'duo-coach-dot';
+    coachDot.setAttribute('aria-hidden', 'true');
+
+    const coachTag = document.createElement('span');
+    coachTag.className = 'duo-coach-tag';
+    coachTag.textContent =
+      insight.lessonCountAnalyzed > 0
+        ? isTr
+          ? insight.source === 'ai'
+            ? `AI Koç · Son ${insight.lessonCountAnalyzed} Ders`
+            : `Son ${insight.lessonCountAnalyzed} Ders Özeti`
+          : insight.source === 'ai'
+            ? `AI Coach · Last ${insight.lessonCountAnalyzed}`
+            : `Last ${insight.lessonCountAnalyzed} Summary`
+        : isTr
+          ? 'AI Koç'
+          : 'AI Coach';
+
+    const coachChevron = document.createElement('span');
+    coachChevron.className = 'duo-coach-chevron';
+    coachChevron.textContent = '▾';
+
+    coachHead.append(coachDot, coachTag, coachChevron);
+
+    const coachMsg = document.createElement('div');
+    coachMsg.className = 'duo-coach-msg';
+    coachMsg.textContent = insight.message;
+    coachMsg.hidden = true;
+
+    coachStrip.append(coachHead, coachMsg);
+    coachStrip.addEventListener('click', () => {
+      const nextOpen = coachMsg.hidden;
+      coachMsg.hidden = !nextOpen;
+      coachStrip.classList.toggle('is-expanded', nextOpen);
+      coachStrip.setAttribute('aria-expanded', String(nextOpen));
+      coachChevron.textContent = nextOpen ? '▴' : '▾';
+    });
+    pathScroll.appendChild(coachStrip);
 
     // Integrated CEFR Placement Exam Gate inside the very top of the Roadmap canvas
     // Visually distinct (Sky/Cyan diagnostic card) so users never confuse it with a regular lesson
@@ -2001,24 +2021,6 @@ export class RoadmapController {
           replaySpk.addEventListener('click', () => speakEnglish(ex.audioText, 1.0));
           actionsWrap.appendChild(replaySpk);
         }
-
-        const teachFbBtn = document.createElement('button');
-        teachFbBtn.type = 'button';
-        teachFbBtn.className = `duo-teach-mini-btn${shouldGlowTeach ? ' is-glow' : ''}`;
-        teachFbBtn.textContent = isTr ? '🎧 Öğret' : '🎧 Rule';
-        teachFbBtn.title = isTr ? 'Bu sorunun kurallarını sesli dinle' : 'Open voice rule coach';
-        teachFbBtn.addEventListener('click', () => void openExerciseTeachMe());
-        actionsWrap.appendChild(teachFbBtn);
-
-        const askFbBtn = document.createElement('button');
-        askFbBtn.type = 'button';
-        askFbBtn.className = 'duo-ask-ai-mini-btn';
-        askFbBtn.textContent = isTr ? '💬 Sor' : '💬 Ask';
-        askFbBtn.title = isTr
-          ? 'Yapay zekâya nedenini sor'
-          : 'Ask AI tutor why';
-        askFbBtn.addEventListener('click', openExerciseTutor);
-        actionsWrap.appendChild(askFbBtn);
 
         const nextBtn = document.createElement('button');
         nextBtn.type = 'button';

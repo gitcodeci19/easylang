@@ -5735,3 +5735,971 @@ mark.tm-rule-glow.is-ai {
   color: #fef08a;
   box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.5);
 }
+
+
+/* ==========================================================================
+   LingoEx Unified Mobile Minimal Theme — Calm Matte Slate & Soft Indigo
+   - Zero neon rainbow buttons, zero glowing box-in-box clutter
+   - 90% calm neutral surfaces + 1 unified Soft Indigo accent (#6366f1)
+   - Muted sage (correct) & muted coral (wrong) ONLY for grading feedback
+   - Preserves `.ai-voice-card` as the single signature centered highlight
+   - Full-bleed mobile focus mode inside active lessons/exams
+   ========================================================================== */
+:root {
+  --bg-root: #111318;
+  --bg-panel: #161920;
+  --bg-elevated: #1d212b;
+  --bg-hover: #252a36;
+  --bg-input: #13161d;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text-primary: #edf0f5;
+  --text-secondary: #9ba3b5;
+  --text-muted: #6c7386;
+
+  --accent-purple: #6366f1;
+  --accent-purple-solid: #6366f1;
+  --accent-purple-bright: #818cf8;
+  --accent-purple-soft: #c7d2fe;
+  --accent-purple-lip: #4f46e5;
+
+  --accent-crimson: #e05263;
+  --accent-crimson-solid: #d9485a;
+  --accent-crimson-soft: #fda4af;
+
+  --accent-emerald: #10b981;
+  --accent-emerald-soft: #6ee7b7;
+
+  --accent-sky: #818cf8;
+  --accent-sky-solid: #6366f1;
+  --accent-sky-soft: #c7d2fe;
+
+  --accent-gold: #d99b38;
+  --accent-gold-soft: #e2c08d;
+
+  --r-sm: 8px;
+  --r-md: 11px;
+  --r-lg: 14px;
+  --r-xl: 16px;
+}
+
+body,
+body.remedial-crimson-active {
+  background-color: var(--bg-root);
+  background-image: none;
+  color: var(--text-primary);
+}
+
+/* Full-bleed mobile exam focus mode: hide home chrome & footer during active lesson/exam */
+.popup:has(.duo-lesson-session) {
+  padding: 0;
+  gap: 0;
+}
+
+.popup:has(.duo-lesson-session) .topbar,
+.popup:has(.duo-lesson-session) .action-bar {
+  display: none;
+}
+
+.popup:has(.duo-lesson-session) .roadmap-stage {
+  border-radius: 0;
+}
+
+.popup:has(.duo-lesson-session) .duo-lesson-session,
+.popup:has(.duo-lesson-session) .duo-lesson-session.is-remedial-crimson {
+  border: none;
+  border-radius: 0;
+  background: var(--bg-root);
+}
+
+/* Unified quiet home topbar & chips */
+.rank-chip,
+body.remedial-crimson-active .rank-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 0 9px;
+}
+
+.switch input:checked + .slider {
+  background-color: var(--accent-purple);
+}
+
+/* Unified segmented mode switcher (iOS-style) */
+.duo-mode-tabs {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.duo-mode-tab {
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+
+.duo-mode-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.duo-mode-tab.is-active,
+.duo-mode-tab.is-path.is-active,
+.duo-mode-tab.is-remedial.is-active {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+}
+
+.duo-mode-tab.is-remedial:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.duo-mode-tab.is-remedial.is-active:hover {
+  background: var(--bg-hover);
+}
+
+.duo-mode-badge,
+.duo-mode-tab.is-remedial.is-active .duo-mode-badge {
+  background: rgba(99, 102, 241, 0.22);
+  color: #c7d2fe;
+  border: 1px solid rgba(129, 140, 248, 0.3);
+}
+
+/* Unified Remedial Hub ("Özel Dersler") — Clean, airy mobile list without red/blue clutter */
+.rem-hero {
+  background: transparent;
+  border: none;
+  border-left: none;
+  border-radius: 0;
+  padding: 6px 2px 4px;
+  gap: 10px;
+}
+
+.rem-hero-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.rem-hero-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.rem-ai-scan-btn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.055);
+  color: #d5dce9;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.rem-ai-scan-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #f8fafc;
+}
+
+.rem-scan-status {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  padding: 7px 10px;
+}
+
+.rem-scroll-body {
+  gap: 10px;
+  padding: 2px 2px 8px 0;
+}
+
+.rem-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 2px 2px 0;
+}
+
+.rem-card-list {
+  gap: 10px;
+}
+
+.rem-card,
+.rem-card.sev-critical,
+.rem-card.sev-focus,
+.rem-card.sev-polish {
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-left: 1px solid var(--border-subtle);
+  transition: background-color 0.14s ease, border-color 0.14s ease;
+}
+
+.rem-card:hover {
+  background: var(--bg-elevated);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.rem-card-title-wrap {
+  gap: 9px;
+}
+
+.rem-card-icon {
+  font-size: 15px;
+  margin-top: 1px;
+}
+
+.rem-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.rem-card-sub {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.38;
+  margin-top: 2px;
+}
+
+.rem-sev-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.rem-sev-pill.sev-critical {
+  background: rgba(224, 82, 99, 0.12);
+  border: 1px solid rgba(224, 82, 99, 0.24);
+  color: #f4a6b0;
+}
+
+.rem-sev-pill.sev-focus {
+  background: rgba(99, 102, 241, 0.14);
+  border: 1px solid rgba(129, 140, 248, 0.26);
+  color: #c7d2fe;
+}
+
+.rem-sev-pill.sev-polish {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.24);
+  color: #6ee7b7;
+}
+
+/* Lightweight hairline note instead of heavy nested bordered box */
+.rem-evidence-box,
+.rem-evidence-box.is-ai {
+  background: transparent;
+  border: none;
+  border-left: 2px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0;
+  padding: 1px 0 1px 10px;
+  margin: 1px 0;
+  font-size: 11px;
+  line-height: 1.42;
+  color: var(--text-muted);
+}
+
+.rem-evidence-box.is-ai {
+  border-left-color: rgba(129, 140, 248, 0.52);
+  color: #b5bdd0;
+}
+
+.rem-card-bottom {
+  padding-top: 2px;
+}
+
+.rem-card-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.rem-enter-btn {
+  height: 29px;
+  padding: 0 13px;
+  border-radius: 9px;
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  background: rgba(99, 102, 241, 0.15);
+  color: #d6dcff;
+  font-size: 11.5px;
+  font-weight: 700;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.rem-enter-btn:hover {
+  background: var(--accent-purple);
+  border-color: var(--accent-purple);
+  color: #ffffff;
+}
+
+.rem-all-catalog {
+  border-radius: 13px;
+  padding: 10px 12px;
+}
+
+.rem-catalog-grid {
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.rem-catalog-chip {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+
+.rem-catalog-chip:hover {
+  border-color: rgba(129, 140, 248, 0.45);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+/* Harmonized Stage 0 Briefing card */
+.rem-golden-rule {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+}
+
+/* Unified home bottom launcher bar */
+.action-bar {
+  gap: 7px;
+}
+
+.act-btn {
+  height: 34px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+.act-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.act-btn.act-primary {
+  background: var(--accent-purple);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.act-btn.act-primary:hover {
+  background: #7275f7;
+}
+
+.act-btn .dot.amber,
+.act-btn .dot.emerald,
+.act-btn .dot.green {
+  background: var(--text-muted);
+  box-shadow: none;
+}
+
+.act-btn:has(.dot.amber):hover,
+.act-btn:has(.dot.emerald):hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+
+/* Unified minimal single-row lesson topbar */
+.duo-lesson-topbar {
+  padding: 12px 16px 10px;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-root);
+}
+
+.duo-lesson-exit {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.duo-lesson-exit:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.duo-q-counter-pill,
+.duo-q-counter-pill.is-crimson {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 4px;
+}
+
+.duo-q-step,
+.duo-placement-top-tag,
+.duo-combo-pill,
+.duo-combo-pill.visible {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+/* ALL secondary & tool buttons share ONE cohesive calm mobile pill style */
+.rem-rule-peek-btn,
+.duo-ask-ai-btn,
+.duo-ask-ai-btn.is-crimson,
+.duo-teach-btn,
+.duo-teach-btn.is-crimson,
+.duo-teach-btn.is-glow,
+.duo-teach-btn.is-crimson.is-glow,
+.duo-audio-mini-btn,
+.duo-btn-secondary {
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #cdd4e3;
+  font-size: 11.5px;
+  font-weight: 600;
+  box-shadow: none;
+  animation: none;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.duo-teach-btn.is-glow::after,
+.duo-teach-btn.is-crimson.is-glow::after {
+  display: none;
+}
+
+.rem-rule-peek-btn:hover,
+.duo-ask-ai-btn:hover,
+.duo-ask-ai-btn.is-crimson:hover,
+.duo-teach-btn:hover,
+.duo-teach-btn.is-crimson:hover,
+.duo-audio-mini-btn:hover,
+.duo-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+  box-shadow: none;
+}
+
+.duo-audio-mini-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 10px;
+}
+
+/* Clean, spacious mobile lesson stage */
+.duo-lesson-stage {
+  padding: 16px 16px 12px;
+  gap: 12px;
+}
+
+.duo-ex-badge,
+.duo-ex-badge.rem-ex-badge,
+.duo-ex-badge.retry,
+.duo-ex-badge.new-word {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  padding: 2px 9px;
+}
+
+.duo-ex-instruction {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Calm prompt & scenario cards — zero harsh yellow, zero box-in-box noise */
+.duo-ex-prompt-card,
+.rem-duel-prompt,
+.rem-proofread-card,
+.rem-scenario-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.rem-duel-prompt {
+  padding: 16px 16px 14px;
+  gap: 8px;
+}
+
+.rem-duel-blank {
+  background: rgba(99, 102, 241, 0.14);
+  border: 1px dashed rgba(129, 140, 248, 0.5);
+  color: #e0e7ff;
+  border-radius: 7px;
+  padding: 1px 8px;
+}
+
+.rem-prompt-sub-plain,
+.rem-prompt-sub-plain.is-meaning-cue,
+.duo-ex-prompt-sub {
+  color: #9ea6b8;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.rem-proofread-meaning {
+  background: rgba(255, 255, 255, 0.025);
+  border-top: 1px solid var(--border-subtle);
+  padding: 10px 15px;
+}
+
+.rem-proofread-lang {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.rem-proofread-meaning-text {
+  color: #a9b1c2;
+  font-size: 13px;
+}
+
+.rem-bug-sentence {
+  border-left: none;
+  padding: 16px 15px;
+}
+
+.rem-spot-stepper {
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.rem-spot-step.is-step1-hero {
+  background: rgba(224, 82, 99, 0.14);
+  border: 1px solid rgba(251, 113, 133, 0.42);
+  color: #ffe4e6;
+}
+
+.rem-scenario-box {
+  border-left: 2px solid var(--accent-purple-bright);
+  padding: 14px 15px;
+}
+
+.rem-scenario-eyebrow {
+  color: var(--text-muted);
+}
+
+/* Unified choice cards & word-bank tiles — ONE clean Soft Indigo selection color everywhere */
+.duo-choice-card {
+  background: var(--bg-panel);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  color: var(--text-primary);
+  box-shadow: none;
+  transition: background-color 0.14s ease, border-color 0.14s ease, transform 0.1s ease;
+}
+
+.duo-choice-card:hover,
+.duo-lesson-session.is-remedial-crimson .duo-choice-card:hover {
+  background: var(--bg-elevated);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.duo-choice-card.selected,
+.duo-lesson-session.is-remedial-crimson .duo-choice-card.selected {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: #818cf8;
+  color: #f8fafc;
+  box-shadow: none;
+}
+
+.duo-choice-key {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: 7px;
+}
+
+.duo-choice-card.selected .duo-choice-key,
+.duo-lesson-session.is-remedial-crimson .duo-choice-card.selected .duo-choice-key {
+  background: var(--accent-purple);
+  border-color: var(--accent-purple);
+  color: #ffffff;
+}
+
+.duo-wb-tile {
+  background: var(--bg-elevated);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+.duo-wb-tile.placed,
+.duo-lesson-session.is-remedial-crimson .duo-wb-tile.placed {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(129, 140, 248, 0.55);
+  color: #eef2ff;
+  box-shadow: none;
+}
+
+.duo-free-input,
+.duo-lesson-session.is-remedial-crimson .duo-free-input {
+  background: var(--bg-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--text-primary);
+}
+
+.duo-free-input:focus,
+.duo-lesson-session.is-remedial-crimson .duo-free-input:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.18);
+}
+
+/* Muted matte grading states (low glare, high clarity) */
+.duo-choice-card.is-result-correct,
+.duo-lesson-session.is-remedial-crimson .duo-choice-card.is-result-correct {
+  background: rgba(16, 185, 129, 0.11);
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #d1fae5;
+  box-shadow: none;
+}
+
+.duo-choice-card.is-result-correct .duo-choice-key,
+.duo-lesson-session.is-remedial-crimson .duo-choice-card.is-result-correct .duo-choice-key {
+  background: rgba(16, 185, 129, 0.28);
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #ecfdf5;
+}
+
+.duo-choice-card.is-result-wrong,
+.duo-lesson-session.is-remedial-crimson .duo-choice-card.is-result-wrong {
+  background: rgba(224, 82, 99, 0.11);
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #ffe4e6;
+  box-shadow: none;
+}
+
+.duo-choice-card.is-result-wrong .duo-choice-key,
+.duo-lesson-session.is-remedial-crimson .duo-choice-card.is-result-wrong .duo-choice-key {
+  background: rgba(224, 82, 99, 0.28);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fff1f2;
+}
+
+/* Clean mobile bottom action footer & unified primary CTA */
+.duo-lesson-footer {
+  padding: 12px 16px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-subtle);
+  gap: 10px;
+}
+
+.duo-lesson-footer.is-correct {
+  background: rgba(16, 185, 129, 0.08);
+  border-top-color: rgba(52, 211, 153, 0.24);
+}
+
+.duo-lesson-footer.is-wrong {
+  background: rgba(224, 82, 99, 0.08);
+  border-top-color: rgba(248, 113, 113, 0.24);
+}
+
+.duo-btn-secondary {
+  height: 36px;
+  padding: 0 15px;
+  border-radius: 10px;
+}
+
+.duo-btn-check,
+.duo-btn-continue,
+.duo-lesson-session.is-remedial-crimson .duo-btn-check,
+.duo-lesson-session.is-remedial-crimson .rem-start-btn {
+  height: 36px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent-purple);
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 700;
+  box-shadow: none;
+  transition: background-color 0.14s ease, opacity 0.14s ease;
+}
+
+.duo-btn-check:hover:not(:disabled),
+.duo-btn-continue:hover:not(:disabled),
+.duo-lesson-session.is-remedial-crimson .duo-btn-check:hover:not(:disabled),
+.duo-lesson-session.is-remedial-crimson .rem-start-btn:hover {
+  background: #7376f7;
+}
+
+.duo-btn-check:disabled,
+.duo-lesson-session.is-remedial-crimson .duo-btn-check:disabled {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.duo-btn-continue.ok {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.duo-btn-continue.ok:hover:not(:disabled) {
+  background: #14c98d;
+}
+
+.duo-btn-continue.err {
+  background: #d9485a;
+  color: #ffffff;
+}
+
+.duo-btn-continue.err:hover:not(:disabled) {
+  background: #e45768;
+}
+
+/* Preserved signature `.ai-voice-card` — softened outer glow so it harmonizes gracefully */
+.ai-voice-card {
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.12);
+}
+
+.ai-voice-card:hover {
+  box-shadow: 0 6px 18px rgba(129, 140, 248, 0.2);
+}
+
+.ai-voice-card.is-playing,
+.ai-voice-card.is-auto-triggered {
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.22);
+}
+
+/* Harmonized Placement Exam card & Remedial Hub cards */
+.duo-placement-node {
+  background: var(--bg-panel);
+  border: 1px dashed rgba(129, 140, 248, 0.36);
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.duo-placement-node:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: rgba(129, 140, 248, 0.58);
+  box-shadow: none;
+}
+
+.duo-placement-node-badge,
+.duo-placement-node-cta {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(129, 140, 248, 0.32);
+  color: #c7d2fe;
+}
+
+
+/* ==================== ROADMAP UNIT HEADER & IN-CANVAS AI COACH PILL ==================== */
+.duo-unit-bar {
+  padding: 7px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-left: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  gap: 8px;
+}
+
+.duo-unit-bar-left {
+  gap: 2px;
+}
+
+.duo-unit-picker {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+
+.duo-unit-submeta {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.duo-bar-btn {
+  height: 27px;
+  padding: 0 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd2e1;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.duo-bar-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+}
+
+.duo-bar-btn.is-active {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: rgba(129, 140, 248, 0.36);
+  color: #c7d2fe;
+}
+
+/* Smart sticky collapsible AI Coach pill inside the scrollable Yol Haritası canvas */
+.duo-coach-strip {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  align-self: center;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 94%;
+  padding: 5px 12px;
+  margin: 0 auto 2px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(22, 25, 32, 0.88);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+  color: var(--text-secondary);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.14s ease, border-color 0.14s ease, border-radius 0.16s ease, padding 0.16s ease;
+}
+
+.duo-coach-strip:hover {
+  background: rgba(30, 34, 44, 0.94);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-primary);
+}
+
+.duo-coach-strip.is-expanded {
+  width: 94%;
+  align-items: flex-start;
+  border-radius: 13px;
+  padding: 9px 12px;
+  background: rgba(22, 25, 32, 0.96);
+  border-color: rgba(129, 140, 248, 0.32);
+}
+
+.duo-coach-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.duo-coach-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-purple-bright);
+  flex-shrink: 0;
+}
+
+.duo-coach-strip.status-great .duo-coach-dot {
+  background: var(--accent-emerald);
+}
+
+.duo-coach-strip.status-focus .duo-coach-dot {
+  background: var(--accent-gold);
+}
+
+.duo-coach-tag,
+.duo-coach-strip.status-great .duo-coach-tag,
+.duo-coach-strip.status-focus .duo-coach-tag {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #d6dce9;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.duo-coach-chevron {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.duo-coach-msg {
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+/* Harmonized Placement Exam banner inside Yol Haritası */
+.duo-placement-banner {
+  background: var(--bg-panel);
+  border: 1px dashed rgba(129, 140, 248, 0.34);
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.duo-placement-banner.is-done {
+  border-style: solid;
+  border-color: rgba(52, 211, 153, 0.28);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.duo-placement-eyebrow {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(129, 140, 248, 0.28);
+  color: #c7d2fe;
+}
+
+.duo-placement-cta {
+  background: var(--accent-purple);
+  border-color: transparent;
+  border-radius: 9px;
+}
+
+.duo-placement-cta:hover:not(:disabled) {
+  background: #7376f7;
+}
