@@ -1,5 +1,6 @@
 import * as esbuild from 'esbuild';
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { gzipSync } from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,13 +14,20 @@ async function copyStaticAssets() {
   await mkdir(distDir, { recursive: true });
   await cp(publicDir, distDir, { recursive: true, force: true });
 
-  // Copy ONNX Runtime Web WASM binaries locally for MV3 CSP compliance
+  // Compact and gzip built-in cards deck inside dist/ (4.44 MB -> ~0.71 MB; Chrome DecompressionStream reads it in ~15ms)
+  const distCardsJson = path.join(distDir, 'data', 'cards.json');
+  const rawCards = await readFile(distCardsJson, 'utf8');
+  const compactCards = JSON.stringify(JSON.parse(rawCards));
+  await writeFile(path.join(distDir, 'data', 'cards.json.gz'), gzipSync(Buffer.from(compactCards, 'utf8'), { level: 9 }));
+  await rm(distCardsJson, { force: true });
+
+  // Copy ONNX Runtime Web SIMD WASM binary locally for MV3 CSP compliance (Chrome 116+ always supports WASM SIMD)
   const ortDistDir = path.join(rootDir, 'node_modules/onnxruntime-web/dist');
   const ttsDistDir = path.join(distDir, 'tts');
   await mkdir(ttsDistDir, { recursive: true });
-  for (const wasmFile of ['ort-wasm-simd.wasm', 'ort-wasm.wasm']) {
-    await cp(path.join(ortDistDir, wasmFile), path.join(ttsDistDir, wasmFile), { force: true });
-  }
+  await cp(path.join(ortDistDir, 'ort-wasm-simd.wasm'), path.join(ttsDistDir, 'ort-wasm-simd.wasm'), {
+    force: true,
+  });
 }
 
 async function runBuild() {
@@ -64,26 +72,6 @@ async function runBuild() {
       entryPoints: [path.join(rootDir, 'src/offscreen/ttsOffscreen.ts')],
       outfile: path.join(distDir, 'tts-offscreen.js'),
       format: 'esm',
-      plugins: [
-        {
-          name: 'emscripten-node-stub',
-          setup(build) {
-            // Expose bundled Emscripten piper_phonemize ESM glue for multi-voice (EN + TR İlkiz) synthesis
-            build.onResolve({ filter: /^piper-phonemize$/ }, () => ({
-              path: path.join(rootDir, 'node_modules/@mintplex-labs/piper-tts-web/dist/piper-o91UDS6e.js'),
-            }));
-            // Emscripten's piper_phonemize wrapper contains Node-only guarded branches for fs/path
-            build.onResolve({ filter: /^(fs|path|crypto)$/ }, (args) => ({
-              path: args.path,
-              namespace: 'node-stub',
-            }));
-            build.onLoad({ filter: /.*/, namespace: 'node-stub' }, () => ({
-              contents: 'export default {};',
-              loader: 'js',
-            }));
-          },
-        },
-      ],
     },
   ];
 

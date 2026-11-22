@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LingoEx - Yapay Zekâ ile İngilizce Öğren",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "İnternette gezinirken yapay zekâ asistanın ile İngilizce öğren! Anında sözlük, sesli anlatım ve akıllı pratik kartları.",
   "permissions": [
     "alarms",
@@ -44,9 +44,9 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "audio/remedial/*.mp3",
-        "audio/remedial_questions/*.mp3",
-        "audio/assistant/*.mp3"
+        "audio/remedial/*.ogg",
+        "audio/remedial_questions/*.ogg",
+        "audio/assistant/*.ogg"
       ],
       "matches": ["<all_urls>"]
     }

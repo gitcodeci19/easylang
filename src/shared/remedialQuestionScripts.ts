@@ -18,7 +18,7 @@ export function getRemedialQuestionAudioId(
 }
 
 export function getRemedialQuestionAudioRelativePath(audioId: string): string {
-  return `${REMEDIAL_QUESTION_AUDIO_DIR}/${audioId}.mp3`;
+  return `${REMEDIAL_QUESTION_AUDIO_DIR}/${audioId}.ogg`;
 }
 
 /**

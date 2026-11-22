@@ -71,7 +71,7 @@ export function stopActiveRuleAudio(includeCoach = true): void {
 }
 
 export function getRemedialAudioRelativePath(skillId: VoiceCoachRuleId): string {
-  return `audio/remedial/${skillId}.mp3`;
+  return `audio/remedial/${skillId}.ogg`;
 }
 
 function resolveExtensionRelativeUrl(rel: string): string {

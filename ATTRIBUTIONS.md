@@ -17,9 +17,14 @@ The built-in English–Turkish flashcard deck (`public/data/cards.json`, 10,968 
    - Used optionally only when you right-click highlighted English text on a webpage and add it to your custom deck without AI translation enabled.
 
 5. **mesm-tts (`Heart` v2g & PDN WebAssembly engine)** (`https://huggingface.co/mesmertech/mesm-tts`)
-   - Offline English neural voice (`public/tts/mesm_heart_v2g.pdn` + `public/tts/mesm_pdn.wasm`), distilled from **Kokoro-82M** (`hexgrad/Kokoro-82M`) and **Paradee-8M v1.1** (`sahilmahendrakar/Paradee-8M-v1.1`), with Misaki eSpeak mapping (`hexgrad/misaki`).
+   - Offline English neural voice (`public/tts/mesm_heart_v2g.pdn` + `public/tts/mesm_pdn.wasm`), distilled from **Kokoro-82M** (`hexgrad/Kokoro-82M`) and **Paradee-8M v1.1** (`sahilmahendrakar/Paradee-8M-v1.1`).
+   - Pure-JS American-English Misaki G2P (`src/shared/misakiG2p.ts`) and compressed lexicons (`public/tts/us_gold.fc.txt.gz`, `public/tts/us_silver.fc.txt.gz`), adapted from `hexgrad/misaki` and `mesmertech/mesm-tts`.
    - License: **Apache License 2.0**.
 
 6. **EMA Lightning (Turkish 48 kHz Neural TTS)** (`https://huggingface.co/canberkkkkkk/ema-lightning`)
-   - Offline Turkish grammar coach voice (`public/tts/ema/`).
+   - Offline Turkish grammar coach voice (`public/tts/ema/`, per-channel `int8`-packed ONNX weights).
    - License: **Apache License 2.0**.
+
+7. **ONNX Runtime Web** (`https://github.com/microsoft/onnxruntime`)
+   - Browser WebAssembly SIMD inference runtime (`ort-wasm-simd.wasm`) used for EMA Lightning.
+   - License: **MIT License**.

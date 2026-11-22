@@ -81,7 +81,7 @@ export function registerBeforeGuidePlayHook(hook: () => void): void {
 }
 
 export function getGuideAudioRelativePath(guideId: AssistantGuideId): string {
-  return `audio/assistant/${guideId}.mp3`;
+  return `audio/assistant/${guideId}.ogg`;
 }
 
 function resolveGuideAudioUrl(guideId: AssistantGuideId): string {

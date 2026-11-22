@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import {
   DEFAULT_ENGLISH_TTS_RATE,
   SLOW_ENGLISH_TTS_RATE,
 } from '../src/shared/speech.ts';
 import {
   applyMesmLevelAndTrim,
+  createMesmPdnEngine,
   getMesmVoiceOpfsName,
   getMesmVoiceUrl,
   isMesmVoiceMode,
@@ -19,6 +21,11 @@ import {
   splitMesmSentences,
   tokenizeMesmPhonemes,
 } from '../src/shared/mesmTtsFrontend.ts';
+import {
+  createMisakiG2p,
+  fallbackRuleBasedMisaki,
+  parseMisakiLexicon,
+} from '../src/shared/misakiG2p.ts';
 
 test('normalizeTtsVoiceMode migrates all legacy/removed English voice modes cleanly to mesm_heart', () => {
   assert.equal(normalizeTtsVoiceMode('mesm_heart'), 'mesm_heart');
@@ -121,4 +128,33 @@ test('bundled public/tts/mesm_pdn.wasm and mesm_heart_v2g.pdn exist and are vali
 test('default and slow English TTS rate constants match 0.85x and 0.50x', () => {
   assert.equal(DEFAULT_ENGLISH_TTS_RATE, 0.85);
   assert.equal(SLOW_ENGLISH_TTS_RATE, 0.5);
+});
+
+test('bundled gzipped Misaki US lexicons load cleanly, handle compounds/stems/OOV, and synthesize audio via mesm_pdn.wasm', async () => {
+  const ttsDir = path.resolve(import.meta.dirname, '../public/tts');
+  const goldTxt = gunzipSync(fs.readFileSync(path.join(ttsDir, 'us_gold.fc.txt.gz'))).toString('utf8');
+  const silverTxt = gunzipSync(fs.readFileSync(path.join(ttsDir, 'us_silver.fc.txt.gz'))).toString('utf8');
+  const g2p = createMisakiG2p(parseMisakiLexicon(goldTxt), parseMisakiLexicon(silverTxt));
+
+  assert.equal(g2p.phonemize('Have'), 'hˈæv');
+  assert.equal(g2p.phonemize('home'), 'hˈOm');
+  assert.ok(g2p.phonemize('denied').includes('d'), 'expected -ied stem to resolve');
+  assert.ok(g2p.phonemize('webpages').length >= 5, 'expected compound word to resolve');
+  assert.ok(g2p.phonemize('café').length >= 3, 'expected accented word to resolve');
+  assert.ok(g2p.phonemize('$12.50').includes('dˈɑləɹz'), 'expected currency to resolve');
+  assert.ok(fallbackRuleBasedMisaki('LingoEx').length >= 5, 'expected OOV fallback to produce phonemes');
+
+  const sentencePh = g2p.phonemize('Have you ever tried cooking traditional dishes at home?');
+  const ids = tokenizeMesmPhonemes(sentencePh);
+  assert.equal(ids[0], 0);
+  assert.equal(ids[ids.length - 1], 0);
+
+  const wasmBytes = fs.readFileSync(path.join(ttsDir, 'mesm_pdn.wasm'));
+  const pdnBytes = fs.readFileSync(path.join(ttsDir, 'mesm_heart_v2g.pdn'));
+  const engine = await createMesmPdnEngine(
+    new Uint8Array(wasmBytes.buffer, wasmBytes.byteOffset, wasmBytes.byteLength),
+    new Uint8Array(pdnBytes.buffer, pdnBytes.byteOffset, pdnBytes.byteLength)
+  );
+  const pcm = applyMesmLevelAndTrim(engine.synth(Int32Array.from(ids), 0.85), 2.4);
+  assert.ok(pcm.length > 24000 * 1.5, `expected >1.5s synthesized audio, got ${pcm.length} samples`);
 });

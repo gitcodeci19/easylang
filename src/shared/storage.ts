@@ -162,9 +162,22 @@ export function createEmptyDailyStats(dateKey: string = getLocalDateKey()): Dail
   };
 }
 
-/** Load built-in cards packaged in data/cards.json (cached in memory). */
+/** Load built-in cards packaged in data/cards.json.gz (with raw JSON fallback, cached in memory). */
 export async function loadBuiltinCards(): Promise<Card[]> {
   if (builtinCardsCache) return builtinCardsCache;
+  try {
+    const gzRes = await fetch(chrome.runtime.getURL('data/cards.json.gz'));
+    if (gzRes.ok && gzRes.body && typeof DecompressionStream !== 'undefined') {
+      const text = await new Response(
+        gzRes.body.pipeThrough(new DecompressionStream('gzip'))
+      ).text();
+      const parsed = JSON.parse(text) as Card[];
+      builtinCardsCache = parsed;
+      return parsed;
+    }
+  } catch {
+    // Fall through to plain JSON fallback
+  }
   const url = chrome.runtime.getURL('data/cards.json');
   const response = await fetch(url);
   if (!response.ok) {

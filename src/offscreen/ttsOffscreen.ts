@@ -1,5 +1,4 @@
 import * as ort from 'onnxruntime-web';
-import { createPiperPhonemize } from 'piper-phonemize';
 import { splitBilingualCoachSegments, stripCoachMarkupForDisplay } from '../shared/bilingualTtsSplit.ts';
 import {
   DEFAULT_ENGLISH_TTS_RATE,
@@ -21,11 +20,14 @@ import {
   MESM_HEART_VOICE,
   MESM_SAMPLE_RATE,
   type MesmPdnEngine,
-  normalizeMesmText,
-  postProcessEspeakToMisaki,
   splitMesmSentences,
   tokenizeMesmPhonemes,
 } from '../shared/mesmTtsFrontend.ts';
+import {
+  createMisakiG2p,
+  type MisakiG2pEngine,
+  parseMisakiLexicon,
+} from '../shared/misakiG2p.ts';
 import type { CoachPlaybackProgress, NeuralTtsStatus, TtsVoiceMode } from '../shared/types.ts';
 
 const TR_VOICE_ID = 'tr_TR-ema-lightning' as const;
@@ -75,9 +77,15 @@ interface OffscreenTtsMessage {
 function getLocalWasmUrls() {
   return {
     onnxDir: chrome.runtime.getURL('tts/'),
-    piperWasm: chrome.runtime.getURL('tts/piper_phonemize.wasm'),
-    piperData: chrome.runtime.getURL('tts/piper_phonemize.data'),
   };
+}
+
+async function fetchBundledGzipText(relPath: string): Promise<string> {
+  const res = await fetch(chrome.runtime.getURL(relPath));
+  if (!res.ok || !res.body) {
+    throw new Error(`Misaki lexicon asset missing (${relPath}, HTTP ${res.status})`);
+  }
+  return new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text();
 }
 
 async function readOpfsFile(fileName: string): Promise<Blob | null> {
@@ -429,8 +437,8 @@ async function cleanupLegacyTtsOpfs(): Promise<void> {
 
 /**
  * Single permanent English neural TTS runner (`mesmertech/mesm-tts` Heart `v2g.pdn`, Apache-2.0,
- * 24 kHz, 2.3 MB). Loads directly from bundled `tts/mesm_heart_v2g.pdn` (with OPFS/HF fallback)
- * and runs on 1 CPU thread via `tts/mesm_pdn.wasm` (~50x-90x real-time, zero GPU usage).
+ * 24 kHz, 2.3 MB). Loads directly from bundled `tts/mesm_heart_v2g.pdn` + gzipped Misaki US
+ * lexicons (`1.23 MB`) and runs on 1 CPU thread via `tts/mesm_pdn.wasm` (~50x-90x real-time).
  */
 class EnglishMesmRunner {
   readonly status: NeuralTtsStatus = {
@@ -442,6 +450,8 @@ class EnglishMesmRunner {
   };
 
   private wasmBytesPromise: Promise<ArrayBuffer> | null = null;
+  private g2pPromise: Promise<MisakiG2pEngine> | null = null;
+  private g2p: MisakiG2pEngine | null = null;
   private engine: MesmPdnEngine | null = null;
   private initPromise: Promise<MesmPdnEngine> | null = null;
   private readonly onStatusChange: (status: NeuralTtsStatus) => void;
@@ -465,7 +475,7 @@ class EnglishMesmRunner {
   }
 
   async refreshAvailability(): Promise<boolean> {
-    if (this.engine && this.status.ready) {
+    if (this.engine && this.g2p && this.status.ready) {
       this.status.cached = true;
       this.status.progressPercent = 100;
       return true;
@@ -500,8 +510,20 @@ class EnglishMesmRunner {
     return this.wasmBytesPromise;
   }
 
+  private loadG2p(): Promise<MisakiG2pEngine> {
+    if (!this.g2pPromise) {
+      this.g2pPromise = Promise.all([
+        fetchBundledGzipText('tts/us_gold.fc.txt.gz'),
+        fetchBundledGzipText('tts/us_silver.fc.txt.gz'),
+      ]).then(([goldTxt, silverTxt]) =>
+        createMisakiG2p(parseMisakiLexicon(goldTxt), parseMisakiLexicon(silverTxt))
+      );
+    }
+    return this.g2pPromise;
+  }
+
   async ensureReady(): Promise<MesmPdnEngine> {
-    if (this.engine && this.status.ready) return this.engine;
+    if (this.engine && this.g2p && this.status.ready) return this.engine;
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async (): Promise<MesmPdnEngine> => {
@@ -530,9 +552,10 @@ class EnglishMesmRunner {
           pdnBuf = await pdnBlob.arrayBuffer();
         }
 
-        const wasmBytes = await this.loadWasmBytes();
+        const [wasmBytes, g2pEngine] = await Promise.all([this.loadWasmBytes(), this.loadG2p()]);
         const engine = await createMesmPdnEngine(wasmBytes, new Uint8Array(pdnBuf));
 
+        this.g2p = g2pEngine;
         this.engine = engine;
         this.status.cached = true;
         this.status.ready = true;
@@ -561,12 +584,19 @@ class EnglishMesmRunner {
     options?: { embeddedCoach?: boolean }
   ): Promise<{ pcm: Float32Array; sampleRate: number }> {
     const engine = await this.ensureReady();
+    const g2p = this.g2p!;
     const meta = MESM_HEART_VOICE;
     const embeddedCoach = Boolean(options?.embeddedCoach);
-    const baseText = formatTextForEnglishTts(text, true) || text.trim();
-    const normalizedText = normalizeMesmText(baseText) || baseText;
-    const sentences = splitMesmSentences(normalizedText);
-    const urls = getLocalWasmUrls();
+    const baseText = (formatTextForEnglishTts(text, true) || text.trim())
+      // Expand clock times ("3:05" -> "3 oh 5", "8:00" -> "8 o'clock") cleanly for Misaki
+      .replace(/(?<!:)\b([1-9]|1[0-2]):([0-5]\d)\b(?!:)/g, (_m, hStr: string, mStr: string) => {
+        const h = Number(hStr);
+        const min = Number(mStr);
+        if (min === 0) return `${h} o'clock`;
+        if (min < 10) return `${h} oh ${min}`;
+        return `${h} ${min}`;
+      });
+    const sentences = splitMesmSentences(baseText);
     const speedVal = Math.max(
       0.45,
       Math.min(1.5, Number.isFinite(requestedRate) ? requestedRate : DEFAULT_ENGLISH_TTS_RATE)
@@ -576,39 +606,7 @@ class EnglishMesmRunner {
     const silenceGap = gapSamples > 0 ? new Float32Array(gapSamples) : null;
 
     for (const sentence of sentences) {
-      const rawIpa = await new Promise<string>((resolve, reject) => {
-        void createPiperPhonemize({
-          print: (data) => {
-            try {
-              const parsed = JSON.parse(data) as { phonemes?: string[] };
-              resolve(Array.isArray(parsed.phonemes) ? parsed.phonemes.join('') : '');
-            } catch (err) {
-              reject(err);
-            }
-          },
-          printErr: (msg) => {
-            if (msg && !msg.includes('espeak')) reject(new Error(msg));
-          },
-          locateFile: (url) => {
-            if (url.endsWith('.wasm')) return urls.piperWasm;
-            if (url.endsWith('.data')) return urls.piperData;
-            return url;
-          },
-        })
-          .then((mod) => {
-            mod.callMain([
-              '-l',
-              'en-us',
-              '--input',
-              JSON.stringify([{ text: sentence }]),
-              '--espeak_data',
-              '/espeak-ng-data',
-            ]);
-          })
-          .catch(reject);
-      });
-
-      const misaki = postProcessEspeakToMisaki(rawIpa);
+      const misaki = g2p.phonemize(sentence);
       // Ensure isolated word tiles have terminal punctuation so utterance-end prosody stays stable
       const punctuatedMisaki =
         misaki && !/[.!?…;:,"”)]$/.test(misaki) ? `${misaki}.` : misaki;

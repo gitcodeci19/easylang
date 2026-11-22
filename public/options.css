@@ -9645,9 +9645,11 @@ tbody tr:hover {
 
 .rem-prompt-sub-plain,
 .rem-prompt-sub-plain.is-meaning-cue,
-.duo-ex-prompt-sub {
+.duo-ex-prompt-sub,
+.duo-ex-prompt-sub.is-meaning-cue {
   color: #475569;
   font-weight: 600;
+  border-top-color: #e2e8f0;
 }
 
 .rem-spot-stepper {

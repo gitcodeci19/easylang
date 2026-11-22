@@ -306,15 +306,15 @@ test('all 18 Remedial workshops generate clean non-ambiguous cloze_blank and tro
   }
 });
 
-test('all 35 bundled ElevenLabs voiceover MP3 files, transcripts, and word timings exist and align 1-to-1', () => {
+test('all 35 bundled ElevenLabs voiceover Opus OGG files, transcripts, and word timings exist and align 1-to-1', () => {
   const audioDir = path.resolve(process.cwd(), 'public', 'audio', 'remedial');
   assert.equal(VOICE_COACH_RULE_ORDER.length, 35, 'Expected 35 voice-coach rules');
 
   for (const ruleId of VOICE_COACH_RULE_ORDER) {
-    const filePath = path.join(audioDir, `${ruleId}.mp3`);
-    assert.ok(fs.existsSync(filePath), `Missing bundled MP3 for ${ruleId}: ${filePath}`);
+    const filePath = path.join(audioDir, `${ruleId}.ogg`);
+    assert.ok(fs.existsSync(filePath), `Missing bundled OGG for ${ruleId}: ${filePath}`);
     const stat = fs.statSync(filePath);
-    assert.ok(stat.size > 50_000, `MP3 too small / corrupt for ${ruleId}: ${stat.size} bytes`);
+    assert.ok(stat.size > 12_000, `OGG too small / corrupt for ${ruleId}: ${stat.size} bytes`);
 
     const spec = getVoiceCoachRuleSpec(ruleId);
     const transcript = spec.transcriptTr;
@@ -354,7 +354,7 @@ test('all 35 bundled ElevenLabs voiceover MP3 files, transcripts, and word timin
   }
 });
 
-test('Voice Guide Assistant metadata, manifest exposure, and bundled MP3 assets are valid', () => {
+test('Voice Guide Assistant metadata, manifest exposure, and bundled OGG assets are valid', () => {
   assert.equal(ASSISTANT_GUIDE_ORDER.length, 16, 'Expected 16 guide assistant slots');
   assert.equal(new Set(ASSISTANT_GUIDE_ORDER).size, 16, 'Duplicate guide assistant IDs');
 
@@ -364,11 +364,11 @@ test('Voice Guide Assistant metadata, manifest exposure, and bundled MP3 assets 
   };
   const allExposed = (manifest.web_accessible_resources ?? []).flatMap((r) => r.resources ?? []);
   assert.ok(
-    allExposed.includes('audio/assistant/*.mp3'),
-    'manifest.json must expose audio/assistant/*.mp3 in web_accessible_resources'
+    allExposed.includes('audio/assistant/*.ogg'),
+    'manifest.json must expose audio/assistant/*.ogg in web_accessible_resources'
   );
 
-  // onboarding_restore.mp3 is pending user download (A3); verify all 15 bundled MP3s strictly
+  // onboarding_restore.ogg is pending user download (A3); verify all 15 bundled OGGs strictly
   const pendingGuides = new Set(['onboarding_restore']);
   for (const guideId of ASSISTANT_GUIDE_ORDER) {
     const labels = ASSISTANT_GUIDE_LABELS[guideId];
@@ -383,13 +383,13 @@ test('Voice Guide Assistant metadata, manifest exposure, and bundled MP3 assets 
     if (pendingGuides.has(guideId) && !fs.existsSync(absPath)) {
       continue;
     }
-    assert.ok(fs.existsSync(absPath), `Missing assistant MP3: ${absPath}`);
+    assert.ok(fs.existsSync(absPath), `Missing assistant OGG: ${absPath}`);
     const stat = fs.statSync(absPath);
-    assert.ok(stat.size > 50_000, `Assistant MP3 too small / corrupt for ${guideId}: ${stat.size} bytes`);
+    assert.ok(stat.size > 12_000, `Assistant OGG too small / corrupt for ${guideId}: ${stat.size} bytes`);
   }
 });
 
-test('all 92 per-question Remedial ElevenLabs MP3 files exist, have valid headers, zero orphans, and are exposed in manifest', () => {
+test('all 92 per-question Remedial ElevenLabs Opus OGG files exist, have valid headers, zero orphans, and are exposed in manifest', () => {
   const questionAudioDir = path.resolve(process.cwd(), 'public', ...REMEDIAL_QUESTION_AUDIO_DIR.split('/'));
   const expectedIds = Object.keys(REMEDIAL_QUESTION_SCRIPTS);
   assert.equal(expectedIds.length, 92, 'Expected 92 per-question scripts');
@@ -400,30 +400,29 @@ test('all 92 per-question Remedial ElevenLabs MP3 files exist, have valid header
   };
   const allExposed = (manifest.web_accessible_resources ?? []).flatMap((r) => r.resources ?? []);
   assert.ok(
-    allExposed.includes(`${REMEDIAL_QUESTION_AUDIO_DIR}/*.mp3`),
-    `manifest.json must expose ${REMEDIAL_QUESTION_AUDIO_DIR}/*.mp3 in web_accessible_resources`
+    allExposed.includes(`${REMEDIAL_QUESTION_AUDIO_DIR}/*.ogg`),
+    `manifest.json must expose ${REMEDIAL_QUESTION_AUDIO_DIR}/*.ogg in web_accessible_resources`
   );
 
   const actualFiles = fs
     .readdirSync(questionAudioDir)
-    .filter((f) => f.toLowerCase().endsWith('.mp3'))
+    .filter((f) => f.toLowerCase().endsWith('.ogg'))
     .sort();
-  assert.equal(actualFiles.length, 92, `Expected 92 MP3 files in ${questionAudioDir}, got ${actualFiles.length}`);
+  assert.equal(actualFiles.length, 92, `Expected 92 OGG files in ${questionAudioDir}, got ${actualFiles.length}`);
 
-  const expectedFileSet = new Set(expectedIds.map((id) => `${id}.mp3`));
+  const expectedFileSet = new Set(expectedIds.map((id) => `${id}.ogg`));
   for (const actual of actualFiles) {
-    assert.ok(expectedFileSet.has(actual), `Unexpected orphan MP3 in remedial_questions: ${actual}`);
+    assert.ok(expectedFileSet.has(actual), `Unexpected orphan OGG in remedial_questions: ${actual}`);
   }
 
   for (const audioId of expectedIds) {
-    const filePath = path.join(questionAudioDir, `${audioId}.mp3`);
-    assert.ok(fs.existsSync(filePath), `Missing question MP3: ${filePath}`);
+    const filePath = path.join(questionAudioDir, `${audioId}.ogg`);
+    assert.ok(fs.existsSync(filePath), `Missing question OGG: ${filePath}`);
     const buf = fs.readFileSync(filePath);
-    assert.ok(buf.length > 50_000, `Question MP3 too small / corrupt for ${audioId}: ${buf.length} bytes`);
+    assert.ok(buf.length > 12_000, `Question OGG too small / corrupt for ${audioId}: ${buf.length} bytes`);
     const validHeader =
-      (buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) ||
-      (buf[0] === 0xff && (buf[1]! & 0xe0) === 0xe0);
-    assert.ok(validHeader, `Invalid MP3 header for ${audioId}`);
+      buf[0] === 0x4f && buf[1] === 0x67 && buf[2] === 0x67 && buf[3] === 0x53; // OggS
+    assert.ok(validHeader, `Invalid Ogg Opus header for ${audioId}`);
 
     // Verify 1-to-1 acoustic word timings for karaoke highlighting
     const script = REMEDIAL_QUESTION_SCRIPTS[audioId]!;
