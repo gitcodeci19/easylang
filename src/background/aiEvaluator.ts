@@ -1076,7 +1076,7 @@ export async function evaluateRoadmapAnswerWithAi(
   if (params.direction === 'en-to-tr') {
     const contextNote =
       params.kind === 'word_bank'
-        ? 'Turkish sentence built from word tiles (accept natural Turkish word order if accurate)'
+        ? 'Turkish sentence built from word tiles (accept natural Turkish word order only if grammatically valid and no required meaning/word is missing; reject scrambled or broken syntax)'
         : 'Open Turkish translation in learning path';
     // When a word card is exercised via its example sentence (e.g. en-to-tr word_bank),
     // evaluate against the actual prompted sentence & expected Turkish sentence instead of the lone headword.
@@ -1115,7 +1115,7 @@ export async function evaluateRoadmapAnswerWithAi(
         'You are an experienced Turkish-to-English language teacher.',
         `Evaluate whether the learner's English answer accurately translates the Turkish prompt. Write all "note" feedback in clear, natural ${feedbackLang}.`,
         params.kind === 'word_bank'
-          ? 'The user arranged English word tiles. Accept valid alternative English word orders (e.g. adverb placement) if grammatical and faithful in meaning.'
+          ? 'The user arranged English word tiles. Accept valid alternative English word orders (e.g. adverb or time-phrase placement) ONLY if the sentence is grammatically well-formed and preserves all required meaning. Strictly reject scrambled word order, misplaced prepositions/articles, or missing content words.'
           : 'Accept valid English synonyms (e.g., big/large, maybe/perhaps, kids/children, start/begin), contractions (don\'t = do not), natural phrasings, and minor 1-2 character spelling typos (note any typo gently). Reject opposite meanings, wrong tense/polarity, or wrong vocabulary.',
         `Respond ONLY with valid JSON: {"isCorrect": boolean, "note": "1-2 concise sentences in ${feedbackLang}", "weakPoint": null}`,
       ].join(' ');

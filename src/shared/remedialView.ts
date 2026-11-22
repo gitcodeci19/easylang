@@ -5,7 +5,7 @@ import {
   stopGuideAssistant,
 } from './guideAssistant';
 import { resolveSupportedLanguage } from './i18n';
-import { evaluateEnglishAnswer, evaluateTurkishAnswer } from './matcher';
+import { evaluateEnglishAnswer, evaluateTurkishAnswer, evaluateWordBankAnswer } from './matcher';
 import { formatLessonProgressCounter } from './placementTest';
 import { REMEDIAL_SKILL_CATALOG, REMEDIAL_VOICE_TRANSCRIPTS } from './remedialCatalog';
 import { playCorrectSfx, playLessonCompleteSfx, playTapSfx, playWrongSfx } from './sfx';
@@ -2002,8 +2002,42 @@ export function startRemedialLessonSession(
               (ex.correctFixToken ?? '').trim().toLowerCase();
         } else if (ex.kind === 'word_bank') {
           const built = placedTiles.map((p) => p.text).join(' ').trim();
-          const res = evaluateEnglishAnswer(built, ex.expectedAnswers, ex.card.type);
+          const wbCandidates = Array.from(
+            new Set([
+              ...(ex.targetTokens?.length ? [ex.targetTokens.join(' ')] : []),
+              ...ex.expectedAnswers,
+            ].filter(Boolean))
+          );
+          const wbDir = ex.direction === 'en-to-tr' ? 'en-to-tr' : 'tr-to-en';
+          const res = evaluateWordBankAnswer(built, wbCandidates, wbDir);
           isCorrect = res.isCorrect;
+
+          if (!isCorrect && ctx.aiActive && built.length > 0) {
+            checkBtn.textContent = isTr ? 'AI Kontrol Ediyor...' : 'AI Checking...';
+            try {
+              const aiResp = (await chrome.runtime.sendMessage({
+                type: 'EVALUATE_ROADMAP_EXERCISE',
+                card: ex.card,
+                direction: wbDir,
+                kind: 'word_bank',
+                promptText: ex.promptText,
+                expectedAnswers: wbCandidates,
+                userAnswer: built,
+                localCorrect: false,
+                localScore: Math.round(res.similarity * 100),
+                recordProgress: false,
+              } satisfies ExtensionMessage)) as { ok?: boolean; result?: AnswerOutcomeResult };
+              if (aiResp?.ok && aiResp.result?.evaluation) {
+                isCorrect = aiResp.result.evaluation.isCorrect;
+                if (isCorrect) aiApproved = true;
+                if (aiResp.result.evaluation.aiNote) {
+                  extraNote = aiResp.result.evaluation.aiNote;
+                }
+              }
+            } catch {
+              // Keep strict local word-bank evaluation if AI call fails
+            }
+          }
         } else {
           const typed = freeInputEl?.value.trim() ?? '';
           const localRes =

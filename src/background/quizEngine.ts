@@ -13,7 +13,7 @@ import {
   upsertConceptNote,
 } from '../shared/concepts';
 import { getCardsForUnit } from '../shared/curriculum';
-import { evaluateEnglishAnswer, evaluateTurkishAnswer } from '../shared/matcher';
+import { evaluateEnglishAnswer, evaluateTurkishAnswer, evaluateWordBankAnswer } from '../shared/matcher';
 import {
   isAiConceptCard,
   recordCorrectProgress,
@@ -659,18 +659,53 @@ export async function handleEvaluateRoadmapExercise(
   const evalCardType = kind === 'word_bank' ? 'sentence' : card.type;
   let evaluation: AnswerEvaluation;
 
-  if (direction === 'en-to-tr') {
+  if (kind === 'word_bank') {
+    const wbDir = direction === 'en-to-tr' ? 'en-to-tr' : 'tr-to-en';
+    const fallbackCandidates =
+      wbDir === 'en-to-tr'
+        ? [...(card.exampleTr ? [card.exampleTr] : []), ...card.acceptedTr]
+        : [card.exampleEn || card.en];
+    const wbCandidates = Array.from(
+      new Set((expectedAnswers.length > 0 ? expectedAnswers : fallbackCandidates).filter(Boolean))
+    );
+    const localWb = evaluateWordBankAnswer(userAnswer, wbCandidates, wbDir);
+    evaluation = localWb;
+
+    if (!localWb.isCorrect && hasConfiguredAiProvider(aiConfig)) {
+      const aiRes = await evaluateRoadmapAnswerWithAi(
+        { card, direction: wbDir, kind, promptText, expectedAnswers: wbCandidates, userAnswer },
+        aiConfig
+      );
+      if (aiRes.ok) {
+        evaluation = {
+          isCorrect: aiRes.isCorrect,
+          matchKind: aiRes.isCorrect ? 'ai' : 'none',
+          matchedTranslation: aiRes.isCorrect ? userAnswer.trim() : evaluation.matchedTranslation,
+          similarity: aiRes.isCorrect ? 1 : evaluation.similarity,
+          aiNote: aiRes.note,
+          aiStatus: 'used',
+          aiProviderIndex: aiRes.providerIndex,
+          weakPoint: aiRes.weakPoint,
+        };
+      } else if (aiRes.reason === 'error') {
+        evaluation = {
+          ...evaluation,
+          aiStatus: 'error',
+          aiNote: `AI unavailable (${aiRes.errorMessage ?? 'unknown error'}) — local matcher applied.`,
+        };
+      }
+    } else if (!localWb.isCorrect && !hasConfiguredAiProvider(aiConfig)) {
+      evaluation = { ...evaluation, aiStatus: 'disabled' };
+    }
+  } else if (direction === 'en-to-tr') {
     const trCandidates = Array.from(new Set([...expectedAnswers, ...card.acceptedTr].filter(Boolean)));
     const localEval = evaluateTurkishAnswer(userAnswer, trCandidates, evalCardType);
     const isStrongLocal =
-      localCorrect ||
       localEval.matchKind === 'exact' ||
       localEval.matchKind === 'normalized' ||
       (kind === 'free_translation' && localEval.isCorrect && localEval.similarity >= 0.86);
 
-    evaluation = localCorrect
-      ? { isCorrect: true, matchKind: 'exact', matchedTranslation: expectedAnswers[0] ?? null, similarity: 1 }
-      : localEval;
+    evaluation = localEval;
 
     if (!isStrongLocal && hasConfiguredAiProvider(aiConfig)) {
       const aiRes = await evaluateRoadmapAnswerWithAi(
@@ -704,14 +739,11 @@ export async function handleEvaluateRoadmapExercise(
     );
     const localEn = evaluateEnglishAnswer(userAnswer, enCandidates, evalCardType);
     const isStrongLocal =
-      localCorrect ||
       localEn.matchKind === 'exact' ||
       localEn.matchKind === 'normalized' ||
       (kind === 'free_translation' && localEn.isCorrect && localEn.similarity >= 0.88);
 
-    evaluation = localCorrect
-      ? { isCorrect: true, matchKind: 'exact', matchedTranslation: expectedAnswers[0] ?? card.en, similarity: 1 }
-      : localEn;
+    evaluation = localEn;
 
     if (!isStrongLocal && hasConfiguredAiProvider(aiConfig)) {
       const aiRes = await evaluateRoadmapAnswerWithAi(

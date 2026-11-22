@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   evaluateEnglishAnswer,
   evaluateTurkishAnswer,
+  evaluateWordBankAnswer,
   levenshteinDistance,
   normalizeTurkish,
 } from '../src/shared/matcher.ts';
@@ -213,6 +214,107 @@ test('offline Turkish matcher accepts natural numbers, apostrophes, colloquial p
     evaluateEnglishAnswer(
       "The bus didn't arrive until 09:00 AM",
       ["The bus didn't arrive until 9:00 AM."],
+      'sentence'
+    ).isCorrect,
+    true
+  );
+});
+
+test('evaluateWordBankAnswer enforces strict token order and blocks scrambled, missing, or extra tiles', () => {
+  const targetEn = ['My wife works from home three days a week in our upstairs study room.'];
+
+  // Exact screenshot regression: scrambled prepositions/nouns + missing "study"
+  const scrambled = evaluateWordBankAnswer(
+    'My wife works three days in a week from upstairs our room home',
+    targetEn,
+    'tr-to-en'
+  );
+  assert.equal(scrambled.isCorrect, false);
+  assert.equal(scrambled.matchKind, 'none');
+
+  // Missing a single content word ("study") even in otherwise right order must fail
+  const missingWord = evaluateWordBankAnswer(
+    'My wife works from home three days a week in our upstairs room',
+    targetEn,
+    'tr-to-en'
+  );
+  assert.equal(missingWord.isCorrect, false);
+
+  // Inserting a distractor tile ("sweep") must fail
+  const extraDistractor = evaluateWordBankAnswer(
+    'My wife works from home three days a week in our upstairs study room sweep',
+    targetEn,
+    'tr-to-en'
+  );
+  assert.equal(extraDistractor.isCorrect, false);
+
+  // Exact sequence (without trailing period) passes cleanly
+  const validEn = evaluateWordBankAnswer(
+    'My wife works from home three days a week in our upstairs study room',
+    targetEn,
+    'tr-to-en'
+  );
+  assert.equal(validEn.isCorrect, true);
+  assert.equal(validEn.matchKind, 'normalized');
+
+  // Contraction normalization still passes when exact sequence matches
+  const validContraction = evaluateWordBankAnswer(
+    "I don't want to wait",
+    ['I do not want to wait.'],
+    'tr-to-en'
+  );
+  assert.equal(validContraction.isCorrect, true);
+
+  // Turkish word_bank also enforces strict order and rejects missing/scrambled words
+  const targetTr = ['Eşim haftada üç gün üst kattaki çalışma odamızda evden çalışıyor.'];
+  assert.equal(
+    evaluateWordBankAnswer(
+      'Eşim haftada üç gün üst kattaki çalışma odamızda evden çalışıyor',
+      targetTr,
+      'en-to-tr'
+    ).isCorrect,
+    true
+  );
+  assert.equal(
+    evaluateWordBankAnswer(
+      'Eşim üç gün çalışma evden odamızda haftada çalışıyor',
+      targetTr,
+      'en-to-tr'
+    ).isCorrect,
+    false
+  );
+});
+
+test('evaluateEnglishAnswer blocks scrambled word order, subject-object inversions, and repeated-word gaming', () => {
+  const targetEn = ['My wife works from home three days a week in our upstairs study room.'];
+
+  // Broken word order + missing "study" must also fail free-translation offline matcher
+  assert.equal(
+    evaluateEnglishAnswer(
+      'My wife works three days in a week from upstairs our room home',
+      targetEn,
+      'sentence'
+    ).isCorrect,
+    false
+  );
+
+  // Subject/object inversion with identical words must fail
+  assert.equal(
+    evaluateEnglishAnswer('The man bit the dog', ['The dog bit the man.'], 'sentence').isCorrect,
+    false
+  );
+
+  // Repeated-word gaming must fail
+  assert.equal(
+    evaluateEnglishAnswer('wife works wife works wife works', targetEn, 'sentence').isCorrect,
+    false
+  );
+
+  // Genuine clause-level movement preserving phrase structure still passes offline
+  assert.equal(
+    evaluateEnglishAnswer(
+      'My wife works from home in our upstairs study room three days a week',
+      targetEn,
       'sentence'
     ).isCorrect,
     true

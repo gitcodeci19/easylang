@@ -16,7 +16,7 @@ import {
   type RoadmapState,
 } from './curriculum';
 import { resolveSupportedLanguage } from './i18n';
-import { evaluateEnglishAnswer, evaluateTurkishAnswer } from './matcher';
+import { evaluateEnglishAnswer, evaluateTurkishAnswer, evaluateWordBankAnswer } from './matcher';
 import {
   createModeTabBar,
   renderRemedialBriefing,
@@ -2088,23 +2088,31 @@ export class RoadmapController {
             let localCorrect = false;
             let localScore = 0;
             let needsAiCheck = false;
+            let evalExpectedAnswers = ex.expectedAnswers;
 
             if (ex.kind === 'audio_dictation') {
               const dictEval = evaluateDictationAnswer(expectedJoined, userAns);
               localCorrect = dictEval.isCorrect;
               localScore = dictEval.accuracyPercent;
               needsAiCheck = !localCorrect && localScore >= 65;
+            } else if (ex.kind === 'word_bank') {
+              const wbDir = ex.direction === 'en-to-tr' ? 'en-to-tr' : 'tr-to-en';
+              const wbCandidates = Array.from(
+                new Set([expectedJoined, ...ex.expectedAnswers].filter(Boolean))
+              );
+              evalExpectedAnswers = wbCandidates;
+              const localWb = evaluateWordBankAnswer(userAns, wbCandidates, wbDir);
+              localCorrect = localWb.isCorrect;
+              localScore = Math.round(localWb.similarity * 100);
+              needsAiCheck = !localCorrect && userAns.trim().length > 0;
             } else if (ex.direction === 'en-to-tr') {
               const trCandidates = Array.from(
                 new Set([...ex.expectedAnswers, ...ex.card.acceptedTr].filter(Boolean))
               );
               const localTr = evaluateTurkishAnswer(userAns, trCandidates, evalCardType);
-              const dictMatch =
-                ex.kind === 'word_bank' && evaluateDictationAnswer(expectedJoined, userAns).isCorrect;
-              localCorrect = dictMatch || localTr.isCorrect;
-              localScore = Math.round((dictMatch ? 1 : localTr.similarity) * 100);
+              localCorrect = localTr.isCorrect;
+              localScore = Math.round(localTr.similarity * 100);
               const isStrong =
-                dictMatch ||
                 localTr.matchKind === 'exact' ||
                 localTr.matchKind === 'normalized' ||
                 (ex.kind === 'free_translation' && localTr.isCorrect && localTr.similarity >= 0.86);
@@ -2118,12 +2126,9 @@ export class RoadmapController {
                 ].filter(Boolean))
               );
               const localEn = evaluateEnglishAnswer(userAns, enCandidates, evalCardType);
-              const dictMatch =
-                ex.kind === 'word_bank' && evaluateDictationAnswer(expectedJoined, userAns).isCorrect;
-              localCorrect = dictMatch || localEn.isCorrect;
-              localScore = Math.round((dictMatch ? 1 : localEn.similarity) * 100);
+              localCorrect = localEn.isCorrect;
+              localScore = Math.round(localEn.similarity * 100);
               const isStrong =
-                dictMatch ||
                 localEn.matchKind === 'exact' ||
                 localEn.matchKind === 'normalized' ||
                 (ex.kind === 'free_translation' && localEn.isCorrect && localEn.similarity >= 0.88);
@@ -2137,7 +2142,7 @@ export class RoadmapController {
               direction: ex.direction,
               kind: ex.kind,
               promptText: ex.promptText,
-              expectedAnswers: ex.expectedAnswers,
+              expectedAnswers: evalExpectedAnswers,
               userAnswer: userAns,
               localCorrect,
               localScore,

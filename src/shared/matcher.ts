@@ -1032,6 +1032,53 @@ function canonicalizeEnglishPhrases(normInput: string): string {
   return s.replace(/\s+/g, ' ').trim();
 }
 
+function tokenLcsLength(
+  a: string[],
+  b: string[],
+  eq: (x: string, y: string) => boolean
+): number {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0 || n === 0) return 0;
+  let prev = new Array<number>(n + 1).fill(0);
+  let curr = new Array<number>(n + 1).fill(0);
+  for (let i = 1; i <= m; i += 1) {
+    curr.fill(0);
+    for (let j = 1; j <= n; j += 1) {
+      if (eq(a[i - 1]!, b[j - 1]!)) {
+        curr[j] = (prev[j - 1] ?? 0) + 1;
+      } else {
+        curr[j] = Math.max(prev[j] ?? 0, curr[j - 1] ?? 0);
+      }
+    }
+    const tmp = prev;
+    prev = curr;
+    curr = tmp;
+  }
+  return prev[n] ?? 0;
+}
+
+function tokenBigramF1(
+  a: string[],
+  b: string[],
+  eq: (x: string, y: string) => boolean
+): number {
+  if (a.length < 2 || b.length < 2) return 1;
+  const usedB = new Array<boolean>(b.length - 1).fill(false);
+  let matched = 0;
+  for (let i = 0; i < a.length - 1; i += 1) {
+    for (let j = 0; j < b.length - 1; j += 1) {
+      if (usedB[j]) continue;
+      if (eq(a[i]!, b[j]!) && eq(a[i + 1]!, b[j + 1]!)) {
+        usedB[j] = true;
+        matched += 1;
+        break;
+      }
+    }
+  }
+  return (2 * matched) / (a.length - 1 + (b.length - 1));
+}
+
 function englishOverlapScore(userTokens: string[], candTokens: string[]): number {
   const userHasNeg = userTokens.some((t) => EN_NEGATION_WORDS.has(t));
   const candHasNeg = candTokens.some((t) => EN_NEGATION_WORDS.has(t));
@@ -1053,19 +1100,125 @@ function englishOverlapScore(userTokens: string[], candTokens: string[]): number
     return false;
   };
 
-  let matchedC = 0;
+  // Greedy 1-to-1 matching prevents repeated-word gaming (e.g. "wife wife wife").
+  const usedU = new Array<boolean>(effU.length).fill(false);
+  let matched = 0;
   for (const ct of effC) {
-    if (effU.some((ut) => tokenMatches(ut, ct))) matchedC += 1;
-  }
-  let matchedU = 0;
-  for (const ut of effU) {
-    if (effC.some((ct) => tokenMatches(ut, ct))) matchedU += 1;
+    const idx = effU.findIndex((ut, i) => !usedU[i] && tokenMatches(ut, ct));
+    if (idx !== -1) {
+      usedU[idx] = true;
+      matched += 1;
+    }
   }
 
-  const recall = matchedC / effC.length;
-  const precision = matchedU / effU.length;
+  const recall = matched / effC.length;
+  const precision = matched / effU.length;
   if (recall + precision === 0) return 0;
-  return (2 * recall * precision) / (recall + precision);
+  const contentF1 = (2 * recall * precision) / (recall + precision);
+
+  // Guard against scrambled word order and subject/object inversions (e.g. "The man bit the dog").
+  const contentLcs = tokenLcsLength(effU, effC, tokenMatches);
+  const contentLcsF1 = (2 * contentLcs) / (effU.length + effC.length);
+  if (effC.length >= 3 && contentLcsF1 < 0.6) return 0;
+
+  const allBigramF1 = tokenBigramF1(userTokens, candTokens, tokenMatches);
+  if (candTokens.length >= 6 && allBigramF1 < 0.45) return 0;
+
+  return 0.75 * contentF1 + 0.25 * Math.max(contentLcsF1, allBigramF1);
+}
+
+/**
+ * Strictly evaluate a Word Bank tile arrangement without AI.
+ * Because word tiles are pre-spelled and come directly from the target sentence,
+ * local matching requires an exact or normalized full-sequence match (preserving
+ * every word, preposition, and token order). Valid alternative word orders are
+ * left for AI verification when AI is active.
+ */
+export function evaluateWordBankAnswer(
+  userInput: string,
+  expectedAnswers: string[],
+  direction: 'en-to-tr' | 'tr-to-en'
+): AnswerEvaluation {
+  const rawTrimmed = userInput.trim();
+  if (!rawTrimmed) {
+    return { isCorrect: false, matchKind: 'none', matchedTranslation: null, similarity: 0 };
+  }
+
+  let bestScore = 0;
+  let bestTarget: string | null = null;
+
+  if (direction === 'tr-to-en') {
+    const normUser = normalizeEnglish(rawTrimmed);
+    if (!normUser) {
+      return { isCorrect: false, matchKind: 'none', matchedTranslation: null, similarity: 0 };
+    }
+    const uTokens = normUser.split(' ').filter(Boolean);
+
+    for (const cand of expectedAnswers) {
+      const normCand = normalizeEnglish(cand);
+      if (!normCand) continue;
+
+      if (rawTrimmed.toLowerCase() === cand.trim().toLowerCase()) {
+        return { isCorrect: true, matchKind: 'exact', matchedTranslation: cand, similarity: 1 };
+      }
+      if (normUser === normCand) {
+        return { isCorrect: true, matchKind: 'normalized', matchedTranslation: cand, similarity: 1 };
+      }
+
+      const cTokens = normCand.split(' ').filter(Boolean);
+      const lcs = tokenLcsLength(uTokens, cTokens, (a, b) => a === b);
+      const denom = Math.max(uTokens.length, cTokens.length);
+      const sim = denom > 0 ? lcs / denom : 0;
+      if (sim > bestScore || bestTarget === null) {
+        bestScore = sim;
+        bestTarget = cand;
+      }
+    }
+
+    return {
+      isCorrect: false,
+      matchKind: 'none',
+      matchedTranslation: bestTarget,
+      similarity: bestScore,
+    };
+  }
+
+  const normUser = normalizeTurkish(rawTrimmed);
+  if (!normUser) {
+    return { isCorrect: false, matchKind: 'none', matchedTranslation: null, similarity: 0 };
+  }
+  const foldedUser = foldTurkishDiacritics(rawTrimmed);
+  const uTokens = foldedUser.split(' ').filter(Boolean);
+
+  for (const cand of expectedAnswers) {
+    const normCand = normalizeTurkish(cand);
+    if (!normCand) continue;
+
+    if (rawTrimmed.toLocaleLowerCase('tr-TR') === cand.trim().toLocaleLowerCase('tr-TR')) {
+      return { isCorrect: true, matchKind: 'exact', matchedTranslation: cand, similarity: 1 };
+    }
+
+    const foldedCand = foldTurkishDiacritics(cand);
+    if (normUser === normCand || foldedUser === foldedCand) {
+      return { isCorrect: true, matchKind: 'normalized', matchedTranslation: cand, similarity: 1 };
+    }
+
+    const cTokens = foldedCand.split(' ').filter(Boolean);
+    const lcs = tokenLcsLength(uTokens, cTokens, (a, b) => a === b);
+    const denom = Math.max(uTokens.length, cTokens.length);
+    const sim = denom > 0 ? lcs / denom : 0;
+    if (sim > bestScore || bestTarget === null) {
+      bestScore = sim;
+      bestTarget = cand;
+    }
+  }
+
+  return {
+    isCorrect: false,
+    matchKind: 'none',
+    matchedTranslation: bestTarget,
+    similarity: bestScore,
+  };
 }
 
 /**
