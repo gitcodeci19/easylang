@@ -523,7 +523,7 @@ export function createAiGrammarCoachView(
             stopActiveTurkishCoachAudio();
             options.onBeforeAudioPlay?.();
             stopGuideAssistant();
-            speakEnglish(ex.en, 1.0);
+            speakEnglish(ex.en);
           });
 
           exTop.append(enSpan, spkBtn);

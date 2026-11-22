@@ -15,3 +15,11 @@ The built-in English–Turkish flashcard deck (`public/data/cards.json`, 10,968 
 
 4. **MyMemory Translation API** (`https://mymemory.translated.net`)
    - Used optionally only when you right-click highlighted English text on a webpage and add it to your custom deck without AI translation enabled.
+
+5. **mesm-tts (`Heart` v2g & PDN WebAssembly engine)** (`https://huggingface.co/mesmertech/mesm-tts`)
+   - Offline English neural voice (`public/tts/mesm_heart_v2g.pdn` + `public/tts/mesm_pdn.wasm`), distilled from **Kokoro-82M** (`hexgrad/Kokoro-82M`) and **Paradee-8M v1.1** (`sahilmahendrakar/Paradee-8M-v1.1`), with Misaki eSpeak mapping (`hexgrad/misaki`).
+   - License: **Apache License 2.0**.
+
+6. **EMA Lightning (Turkish 48 kHz Neural TTS)** (`https://huggingface.co/canberkkkkkk/ema-lightning`)
+   - Offline Turkish grammar coach voice (`public/tts/ema/`).
+   - License: **Apache License 2.0**.

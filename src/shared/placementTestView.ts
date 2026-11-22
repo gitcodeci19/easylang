@@ -311,7 +311,7 @@ export function startPlacementTestSession(options: PlacementTestViewOptions): vo
       spk.className = 'duo-audio-mini-btn';
       setIconOnly(spk, 'volume', 14);
       spk.title = isTr ? 'Telaffuzu dinle' : 'Listen';
-      spk.addEventListener('click', () => speakEnglish(ex.audioText, 1.0));
+      spk.addEventListener('click', () => speakEnglish(ex.audioText));
       promptMain.appendChild(spk);
     }
 

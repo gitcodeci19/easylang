@@ -13,7 +13,7 @@ async function copyStaticAssets() {
   await mkdir(distDir, { recursive: true });
   await cp(publicDir, distDir, { recursive: true, force: true });
 
-  // Copy ONNX Runtime Web single-threaded WASM binaries locally for MV3 CSP compliance
+  // Copy ONNX Runtime Web WASM binaries locally for MV3 CSP compliance
   const ortDistDir = path.join(rootDir, 'node_modules/onnxruntime-web/dist');
   const ttsDistDir = path.join(distDir, 'tts');
   await mkdir(ttsDistDir, { recursive: true });

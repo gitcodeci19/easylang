@@ -511,6 +511,7 @@ async function dispatchToTtsOffscreenNow(payload: {
   text?: string;
   rate?: number;
   queue?: boolean;
+  voiceMode?: string;
   requestId?: string;
   command?: 'pause' | 'resume' | 'stop' | 'seek' | 'rate';
   value?: number;
@@ -533,6 +534,7 @@ async function sendToTtsOffscreen(payload: {
   text?: string;
   rate?: number;
   queue?: boolean;
+  voiceMode?: string;
   requestId?: string;
   command?: 'pause' | 'resume' | 'stop' | 'seek' | 'rate';
   value?: number;
@@ -931,11 +933,14 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage & { target?: str
         break;
       }
       case 'SPEAK_NEURAL_TTS': {
+        const settings = await getSettings();
+        const voiceMode = message.voiceMode ?? settings.ttsVoiceMode ?? 'mesm_heart';
         const res = await sendToTtsOffscreen({
           action: 'SPEAK',
           text: message.text,
           rate: message.rate,
           queue: message.queue,
+          voiceMode,
         });
         sendResponse(res ?? { ok: false, error: 'No response from TTS offscreen' });
         break;
@@ -946,12 +951,16 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage & { target?: str
         break;
       }
       case 'PREPARE_NEURAL_TTS': {
-        const res = await sendToTtsOffscreen({ action: 'PREPARE' });
+        const settings = await getSettings();
+        const voiceMode = message.voiceMode ?? settings.ttsVoiceMode ?? 'mesm_heart';
+        const res = await sendToTtsOffscreen({ action: 'PREPARE', voiceMode });
         sendResponse(res ?? { ok: false, error: 'No response from TTS offscreen' });
         break;
       }
       case 'GET_NEURAL_TTS_STATUS': {
-        const res = await sendToTtsOffscreen({ action: 'STATUS' });
+        const settings = await getSettings();
+        const voiceMode = message.voiceMode ?? settings.ttsVoiceMode ?? 'mesm_heart';
+        const res = await sendToTtsOffscreen({ action: 'STATUS', voiceMode });
         sendResponse(res ?? { ok: false });
         break;
       }

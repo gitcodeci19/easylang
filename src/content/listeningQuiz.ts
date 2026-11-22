@@ -1,6 +1,11 @@
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
 import { playCorrectSfx, playWrongSfx } from '../shared/sfx';
-import { cancelEnglishSpeech, speakEnglishText as speakSentence } from '../shared/speech';
+import {
+  cancelEnglishSpeech,
+  DEFAULT_ENGLISH_TTS_RATE,
+  SLOW_ENGLISH_TTS_RATE,
+  speakEnglishText as speakSentence,
+} from '../shared/speech';
 import { evaluateDictationAnswer } from '../shared/srs';
 import type {
   ExtensionMessage,
@@ -599,14 +604,14 @@ export async function launchListeningQuiz(): Promise<void> {
     if (liveYt) {
       liveYt.replayVideoSegment();
     } else {
-      speakSentence(sentenceEn, 0.96);
+      speakSentence(sentenceEn, DEFAULT_ENGLISH_TTS_RATE);
     }
   });
 
   const playSlowBtn = createEl('button', 'etr-lq-audio-btn', ui.playSlow);
   playSlowBtn.type = 'button';
   playSlowBtn.addEventListener('click', () => {
-    speakSentence(sentenceEn, 0.72);
+    speakSentence(sentenceEn, SLOW_ENGLISH_TTS_RATE);
   });
 
   const cantListenBtn = createEl(
@@ -662,7 +667,7 @@ export async function launchListeningQuiz(): Promise<void> {
   if (liveYt) {
     liveYt.replayVideoSegment();
   } else {
-    speakSentence(sentenceEn, 0.96);
+    speakSentence(sentenceEn, DEFAULT_ENGLISH_TTS_RATE);
   }
   requestAnimationFrame(() => textarea.focus({ preventScroll: true }));
 

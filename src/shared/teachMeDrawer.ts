@@ -674,26 +674,12 @@ export function createQuestionVoiceCard(options: {
   const miniActions = document.createElement('div');
   miniActions.className = 'ai-voice-mini-actions';
 
-  const restartBtn = document.createElement('button');
-  restartBtn.type = 'button';
-  restartBtn.className = 'ai-voice-ghost-btn';
-  restartBtn.textContent = '↺';
-  restartBtn.title = isTr ? 'Baştan oynat' : 'Restart';
-
-  const speeds = [0.85, 1.0, 1.15];
-  let speedIdx = 1;
-  const speedBtn = document.createElement('button');
-  speedBtn.type = 'button';
-  speedBtn.className = 'ai-voice-ghost-btn';
-  speedBtn.textContent = '1.0x';
-  speedBtn.title = isTr ? 'Oynatma hızı' : 'Playback speed';
-
   const scriptToggleBtn = document.createElement('button');
   scriptToggleBtn.type = 'button';
   scriptToggleBtn.className = 'ai-voice-ghost-btn is-script-btn';
   scriptToggleBtn.textContent = isTr ? 'Metni Gör ▾' : 'Script ▾';
 
-  miniActions.append(restartBtn, speedBtn, scriptToggleBtn);
+  miniActions.append(scriptToggleBtn);
   controlsMeta.append(timeSpan, miniActions);
   controlsWrap.append(rangeEl, controlsMeta);
 
@@ -720,7 +706,7 @@ export function createQuestionVoiceCard(options: {
   let webAudioDecoded: AudioBuffer | null = null;
   let webAudioStartCtxTime = 0;
   let webAudioOffsetSec = 0;
-  let webAudioRate = speeds[speedIdx] ?? 1.0;
+  const webAudioRate = 1.0;
   let syncRafId: number | null = null;
   let knownDurationSec = 0;
   let playedManually = false;
@@ -880,7 +866,6 @@ export function createQuestionVoiceCard(options: {
       const clampedStart = Math.max(0, Math.min(decoded.duration - 0.05, startOffsetSec));
       const src = ctx.createBufferSource();
       src.buffer = decoded;
-      webAudioRate = speeds[speedIdx] ?? 1.0;
       src.playbackRate.value = webAudioRate;
       src.connect(ctx.destination);
       activeWebAudioSource = src;
@@ -911,9 +896,8 @@ export function createQuestionVoiceCard(options: {
     if (audio) return audio;
     const el = new Audio(resolvedTrackUrl);
     el.preload = 'metadata';
-    const initialRate = speeds[speedIdx] ?? 1.0;
-    el.defaultPlaybackRate = initialRate;
-    el.playbackRate = initialRate;
+    el.defaultPlaybackRate = 1.0;
+    el.playbackRate = 1.0;
     el.addEventListener('loadedmetadata', () => {
       if (Number.isFinite(el.duration) && el.duration > 0) {
         knownDurationSec = el.duration;
@@ -965,9 +949,8 @@ export function createQuestionVoiceCard(options: {
     }
     activeRuleAudio = el;
     activeRuleStopCallback = resetUi;
-    const rate = speeds[speedIdx] ?? 1.0;
-    el.defaultPlaybackRate = rate;
-    el.playbackRate = rate;
+    el.defaultPlaybackRate = 1.0;
+    el.playbackRate = 1.0;
     try {
       await el.play();
     } catch {
@@ -1023,17 +1006,6 @@ export function createQuestionVoiceCard(options: {
     void togglePlay();
   });
 
-  restartBtn.addEventListener('click', () => {
-    playedManually = true;
-    isAutoTriggered = false;
-    card.classList.remove('is-auto-triggered');
-    if (isPlayingWebAudio) {
-      void playViaWebAudioFallback(0);
-      return;
-    }
-    void startPlayback(true);
-  });
-
   rangeEl.addEventListener('input', () => {
     const target = Number(rangeEl.value);
     if (!Number.isFinite(target)) return;
@@ -1046,22 +1018,6 @@ export function createQuestionVoiceCard(options: {
     const el = ensureAudio();
     el.currentTime = target;
     syncedScript.update(target * 1000, !el.paused);
-  });
-
-  speedBtn.addEventListener('click', () => {
-    if (isPlayingWebAudio && activeWebAudioCtx) {
-      webAudioOffsetSec = getWebAudioCurrentSec();
-      webAudioStartCtxTime = activeWebAudioCtx.currentTime;
-    }
-    speedIdx = (speedIdx + 1) % speeds.length;
-    const rate = speeds[speedIdx] ?? 1.0;
-    webAudioRate = rate;
-    speedBtn.textContent = `${rate.toFixed(rate === 1 ? 1 : 2).replace(/\.00$/, '.0')}x`;
-    if (audio) {
-      audio.defaultPlaybackRate = rate;
-      audio.playbackRate = rate;
-    }
-    if (activeWebAudioSource) activeWebAudioSource.playbackRate.value = rate;
   });
 
   scriptToggleBtn.addEventListener('click', () => {
@@ -1201,7 +1157,7 @@ function buildRuleWrittenBody(
       spk.addEventListener('click', () => {
         stopGuideAssistant();
         stopActiveRuleAudio();
-        speakEnglish(ex.en, 1.0);
+        speakEnglish(ex.en);
       });
       top.appendChild(spk);
     }

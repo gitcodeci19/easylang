@@ -214,8 +214,11 @@ export interface SpeakOptions {
   mode?: TtsVoiceMode;
 }
 
+export const DEFAULT_ENGLISH_TTS_RATE = 0.85;
+export const SLOW_ENGLISH_TTS_RATE = 0.5;
+
 /**
- * Speak English text exclusively using the local Piper AI neural voice (`en_US-hfc_female-medium`).
+ * Speak English text exclusively using the local neural voice engine (`mesm-tts` or Piper).
  * Browser `window.speechSynthesis` is never used.
  *
  * Rapid word-bank tile taps (`isQuickTile: true`) queue sequentially instead of cutting off
@@ -223,7 +226,7 @@ export interface SpeakOptions {
  */
 export function speakEnglishText(
   text: string,
-  rate: number = 1.0,
+  rate: number = DEFAULT_ENGLISH_TTS_RATE,
   options: SpeakOptions = {}
 ): void {
   const spoken = formatTextForEnglishTts(text, true);

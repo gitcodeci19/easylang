@@ -113,8 +113,8 @@ function makeStandardNodes(unitTitleTr: string, unitTitleEn: string): UnitNodeDe
       kind: 'duo_radio',
       titleTr: `${unitTitleTr} · Radyo & Dikte`,
       titleEn: `${unitTitleEn} · Audio Lab & Dictation`,
-      subtitleTr: 'Gerçek hızda ve yavaş (0.75x) dinleyerek cümleyi yakala',
-      subtitleEn: 'Listen at 1.0x and 0.75x speed and transcribe what you hear',
+      subtitleTr: 'Normal (0.85x) ve yavaş (0.50x) dinleyerek cümleyi yakala',
+      subtitleEn: 'Listen at 0.85x and 0.50x speed and transcribe what you hear',
       xpReward: 20,
     },
     {

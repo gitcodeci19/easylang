@@ -1,7 +1,10 @@
-import * as ort from 'onnxruntime-web/wasm';
+import * as ort from 'onnxruntime-web';
 import { createPiperPhonemize } from 'piper-phonemize';
 import { splitBilingualCoachSegments, stripCoachMarkupForDisplay } from '../shared/bilingualTtsSplit.ts';
-import { formatTextForEnglishTts } from '../shared/speech.ts';
+import {
+  DEFAULT_ENGLISH_TTS_RATE,
+  formatTextForEnglishTts,
+} from '../shared/speech.ts';
 import {
   buildEmaPieceInputs,
   buildEmaTimeline,
@@ -10,13 +13,24 @@ import {
   normalizeEmaTurkishText,
   resampleLinear,
 } from '../shared/emaFrontend.ts';
-import type { CoachPlaybackProgress, NeuralTtsStatus } from '../shared/types.ts';
+import {
+  applyMesmLevelAndTrim,
+  createMesmPdnEngine,
+  getMesmVoiceOpfsName,
+  getMesmVoiceUrl,
+  MESM_HEART_VOICE,
+  MESM_SAMPLE_RATE,
+  type MesmPdnEngine,
+  normalizeMesmText,
+  postProcessEspeakToMisaki,
+  splitMesmSentences,
+  tokenizeMesmPhonemes,
+} from '../shared/mesmTtsFrontend.ts';
+import type { CoachPlaybackProgress, NeuralTtsStatus, TtsVoiceMode } from '../shared/types.ts';
 
-const EN_VOICE_ID = 'en_US-hfc_female-medium' as const;
 const TR_VOICE_ID = 'tr_TR-ema-lightning' as const;
 const MAX_EN_WAV_CACHE = 96;
 const MAX_COACH_WAV_CACHE = 6;
-const MAX_PIPER_CHUNK_CHARS = 360;
 
 // Force single-threaded WASM inside MV3 offscreen documents (no SharedArrayBuffer / blob worker CSP issues).
 const ortRuntime = (ort as unknown as { default?: typeof ort }).default ?? ort;
@@ -36,13 +50,6 @@ try {
   // Ignore if non-configurable
 }
 
-interface PiperModelConfig {
-  audio: { sample_rate: number };
-  espeak: { voice: string };
-  inference: { noise_scale: number; length_scale: number; noise_w: number };
-  speaker_id_map?: Record<string, number>;
-}
-
 interface EmaModelConfig {
   vocab: string[];
   sample_rate: number;
@@ -59,6 +66,7 @@ interface OffscreenTtsMessage {
   text?: string;
   rate?: number;
   queue?: boolean;
+  voiceMode?: TtsVoiceMode;
   requestId?: string;
   command?: 'pause' | 'resume' | 'stop' | 'seek' | 'rate';
   value?: number;
@@ -154,229 +162,6 @@ function pcm2wav(buffer: Float32Array, sampleRate: number): ArrayBuffer {
     p += 2;
   }
   return view.buffer;
-}
-
-function splitPiperChunks(text: string): string[] {
-  const trimmed = text.trim();
-  if (!trimmed) return [];
-  if (trimmed.length <= MAX_PIPER_CHUNK_CHARS) return [trimmed];
-  const sentences = trimmed.match(/[^.!?…\n]+[.!?…]*\s*/g) ?? [trimmed];
-  const out: string[] = [];
-  let cur = '';
-  for (const s of sentences) {
-    if ((cur + s).length > MAX_PIPER_CHUNK_CHARS && cur.trim()) {
-      out.push(cur.trim());
-      cur = s;
-    } else {
-      cur += s;
-    }
-  }
-  if (cur.trim()) out.push(cur.trim());
-  return out;
-}
-
-/**
- * English Piper neural runner (`en_US-hfc_female-medium`, 22.05 kHz, cached in OPFS).
- */
-class EnglishPiperRunner {
-  readonly status: NeuralTtsStatus = {
-    voiceId: EN_VOICE_ID,
-    cached: false,
-    ready: false,
-    downloading: false,
-    progressPercent: 0,
-  };
-
-  private initPromise: Promise<void> | null = null;
-  private modelConfig: PiperModelConfig | null = null;
-  private ortSession: ort.InferenceSession | null = null;
-  private readonly opfsModel = 'en_US-hfc_female-medium.onnx';
-  private readonly opfsConfig = 'en_US-hfc_female-medium.onnx.json';
-  private readonly remoteModel =
-    'https://huggingface.co/diffusionstudio/piper-voices/resolve/main/en/en_US/hfc_female/medium/en_US-hfc_female-medium.onnx';
-  private readonly remoteConfig =
-    'https://huggingface.co/diffusionstudio/piper-voices/resolve/main/en/en_US/hfc_female/medium/en_US-hfc_female-medium.onnx.json';
-  private readonly onStatusChange: () => void;
-
-  constructor(onStatusChange: () => void) {
-    this.onStatusChange = onStatusChange;
-  }
-
-  async refreshAvailability(): Promise<boolean> {
-    if (this.status.ready) {
-      this.status.cached = true;
-      this.status.progressPercent = 100;
-      return true;
-    }
-    const opfsBlob = await readOpfsFile(this.opfsModel);
-    this.status.cached = Boolean(opfsBlob);
-    if (this.status.cached && !this.status.downloading) {
-      this.status.progressPercent = 100;
-    }
-    return this.status.cached;
-  }
-
-  async ensureReady(): Promise<void> {
-    if (this.ortSession && this.modelConfig && this.status.ready) return;
-    if (this.initPromise) return this.initPromise;
-
-    this.initPromise = (async () => {
-      this.status.error = undefined;
-      try {
-        let configBlob = await readOpfsFile(this.opfsConfig);
-        if (!configBlob) {
-          configBlob = await fetchRemoteBlobWithProgress(this.remoteConfig);
-          await writeOpfsFile(this.opfsConfig, configBlob);
-        }
-        this.modelConfig = JSON.parse(await configBlob.text()) as PiperModelConfig;
-
-        let modelBlob = await readOpfsFile(this.opfsModel);
-        if (!modelBlob) {
-          this.status.downloading = true;
-          this.status.progressPercent = 1;
-          this.onStatusChange();
-          modelBlob = await fetchRemoteBlobWithProgress(this.remoteModel, (loaded, total) => {
-            if (total > 0) {
-              const pct = Math.max(1, Math.min(99, Math.round((loaded / total) * 100)));
-              if (pct !== this.status.progressPercent) {
-                this.status.downloading = true;
-                this.status.progressPercent = pct;
-                this.onStatusChange();
-              }
-            }
-          });
-          await writeOpfsFile(this.opfsModel, modelBlob);
-        }
-
-        if (ortRuntime.env?.wasm) {
-          ortRuntime.env.wasm.wasmPaths = getLocalWasmUrls().onnxDir;
-        }
-        this.ortSession = await ortRuntime.InferenceSession.create(await modelBlob.arrayBuffer(), {
-          executionProviders: ['wasm'],
-        });
-
-        this.status.cached = true;
-        this.status.ready = true;
-        this.status.downloading = false;
-        this.status.progressPercent = 100;
-        this.status.error = undefined;
-        this.onStatusChange();
-      } catch (err) {
-        this.initPromise = null;
-        this.ortSession = null;
-        this.status.ready = false;
-        this.status.downloading = false;
-        this.status.error = err instanceof Error ? err.message : String(err);
-        this.onStatusChange();
-        throw err;
-      }
-    })();
-
-    return this.initPromise;
-  }
-
-  async synthesizePcm(
-    text: string,
-    options?: { embeddedCoach?: boolean; lengthScaleMultiplier?: number }
-  ): Promise<{ pcm: Float32Array; sampleRate: number }> {
-    await this.ensureReady();
-    const cfg = this.modelConfig!;
-    const session = this.ortSession!;
-    const embeddedCoach = Boolean(options?.embeddedCoach);
-    const lengthScaleMultiplier =
-      typeof options?.lengthScaleMultiplier === 'number' && Number.isFinite(options.lengthScaleMultiplier)
-        ? Math.max(0.7, Math.min(1.45, options.lengthScaleMultiplier))
-        : 1.0;
-    const normalizedText = formatTextForEnglishTts(text, true) || text.trim();
-    const preparedText =
-      embeddedCoach && normalizedText && !/[.!?]$/.test(normalizedText)
-        ? `${normalizedText}.`
-        : normalizedText;
-    const chunks = splitPiperChunks(preparedText);
-    const urls = getLocalWasmUrls();
-    const parts: Float32Array[] = [];
-
-    const noiseScale = embeddedCoach
-      ? Math.min(cfg.inference.noise_scale, 0.52)
-      : cfg.inference.noise_scale;
-    const lengthScale = embeddedCoach
-      ? cfg.inference.length_scale * 1.12
-      : cfg.inference.length_scale * lengthScaleMultiplier;
-    const noiseW = embeddedCoach
-      ? Math.min(cfg.inference.noise_w, 0.6)
-      : cfg.inference.noise_w;
-
-    for (const chunk of chunks) {
-      const phonemeIds = await new Promise<number[]>((resolve, reject) => {
-        void createPiperPhonemize({
-          print: (data) => {
-            try {
-              const parsed = JSON.parse(data) as { phoneme_ids?: number[] };
-              resolve(Array.isArray(parsed.phoneme_ids) ? parsed.phoneme_ids : []);
-            } catch (err) {
-              reject(err);
-            }
-          },
-          printErr: (msg) => {
-            if (msg && !msg.includes('espeak')) reject(new Error(msg));
-          },
-          locateFile: (url) => {
-            if (url.endsWith('.wasm')) return urls.piperWasm;
-            if (url.endsWith('.data')) return urls.piperData;
-            return url;
-          },
-        })
-          .then((mod) => {
-            mod.callMain([
-              '-l',
-              cfg.espeak.voice,
-              '--input',
-              JSON.stringify([{ text: chunk }]),
-              '--espeak_data',
-              '/espeak-ng-data',
-            ]);
-          })
-          .catch(reject);
-      });
-
-      if (phonemeIds.length === 0) continue;
-
-      const feeds: Record<string, ort.Tensor> = {
-        input: new ortRuntime.Tensor('int64', BigInt64Array.from(phonemeIds.map((n) => BigInt(n))), [
-          1,
-          phonemeIds.length,
-        ]),
-        input_lengths: new ortRuntime.Tensor('int64', BigInt64Array.from([BigInt(phonemeIds.length)]), [1]),
-        scales: new ortRuntime.Tensor(
-          'float32',
-          new Float32Array([noiseScale, lengthScale, noiseW]),
-          [3]
-        ),
-      };
-      if (cfg.speaker_id_map && Object.keys(cfg.speaker_id_map).length > 0) {
-        feeds.sid = new ortRuntime.Tensor('int64', BigInt64Array.from([0n]), [1]);
-      }
-
-      const outputs = await session.run(feeds);
-      const rawOut = outputs.output?.data;
-      if (rawOut instanceof Float32Array) {
-        parts.push(rawOut);
-      }
-    }
-
-    const totalLen = parts.reduce((sum, p) => sum + p.length, 0);
-    const merged = new Float32Array(totalLen);
-    let offset = 0;
-    for (const p of parts) {
-      merged.set(p, offset);
-      offset += p.length;
-    }
-    const sampleRate = cfg.audio.sample_rate || 22050;
-    return {
-      pcm: embeddedCoach ? trimAndFadeEmbeddedEnglishPcm(merged, sampleRate) : merged,
-      sampleRate,
-    };
-  }
 }
 
 function trimAndFadeEmbeddedEnglishPcm(pcm: Float32Array, sampleRate: number): Float32Array {
@@ -613,11 +398,251 @@ class EmaLightningRunner {
   }
 }
 
-function broadcastEnStatus(): void {
+async function cleanupLegacyTtsOpfs(): Promise<void> {
+  try {
+    const root = await navigator.storage.getDirectory();
+    const dir = await root.getDirectoryHandle('piper', { create: false });
+    const legacyFiles = [
+      'en_US-hfc_female-medium.onnx',
+      'en_US-hfc_female-medium.onnx.json',
+      'kokoro_82m_v1_q8.onnx',
+      'kokoro_voice_af_heart.bin',
+      'kokoro_voice_af_bella.bin',
+      'kokoro_voice_bf_emma.bin',
+      'kokoro_voice_am_michael.bin',
+      'kitten_tts_nano_v0_8_int8.onnx',
+      'kitten_tts_nano_v0_8_voices.npz',
+      'mesm_heart_v1.pdn',
+      'mesm_hadley_v1.pdn',
+      'mesm_bryony_v1.pdn',
+      'mesm_miles_v1.pdn',
+    ];
+    for (const fileName of legacyFiles) {
+      await dir.removeEntry(fileName).catch(() => {
+        // Ignore if file was never cached
+      });
+    }
+  } catch {
+    // Ignore when OPFS directory does not exist yet
+  }
+}
+
+/**
+ * Single permanent English neural TTS runner (`mesmertech/mesm-tts` Heart `v2g.pdn`, Apache-2.0,
+ * 24 kHz, 2.3 MB). Loads directly from bundled `tts/mesm_heart_v2g.pdn` (with OPFS/HF fallback)
+ * and runs on 1 CPU thread via `tts/mesm_pdn.wasm` (~50x-90x real-time, zero GPU usage).
+ */
+class EnglishMesmRunner {
+  readonly status: NeuralTtsStatus = {
+    voiceId: 'mesm_heart',
+    cached: false,
+    ready: false,
+    downloading: false,
+    progressPercent: 0,
+  };
+
+  private wasmBytesPromise: Promise<ArrayBuffer> | null = null;
+  private engine: MesmPdnEngine | null = null;
+  private initPromise: Promise<MesmPdnEngine> | null = null;
+  private readonly onStatusChange: (status: NeuralTtsStatus) => void;
+
+  constructor(onStatusChange: (status: NeuralTtsStatus) => void) {
+    this.onStatusChange = onStatusChange;
+  }
+
+  getStatus(): NeuralTtsStatus {
+    return { ...this.status };
+  }
+
+  private async fetchBundledPdn(): Promise<ArrayBuffer | null> {
+    try {
+      const res = await fetch(chrome.runtime.getURL(MESM_HEART_VOICE.bundledRelPath));
+      if (!res.ok) return null;
+      return await res.arrayBuffer();
+    } catch {
+      return null;
+    }
+  }
+
+  async refreshAvailability(): Promise<boolean> {
+    if (this.engine && this.status.ready) {
+      this.status.cached = true;
+      this.status.progressPercent = 100;
+      return true;
+    }
+    try {
+      const res = await fetch(chrome.runtime.getURL(MESM_HEART_VOICE.bundledRelPath), { method: 'HEAD' });
+      if (res.ok) {
+        this.status.cached = true;
+        this.status.progressPercent = 100;
+        return true;
+      }
+    } catch {
+      // Fall through to OPFS check
+    }
+    const blob = await readOpfsFile(getMesmVoiceOpfsName('mesm_heart'));
+    this.status.cached = Boolean(blob);
+    if (this.status.cached && !this.status.downloading) {
+      this.status.progressPercent = 100;
+    }
+    return this.status.cached;
+  }
+
+  private loadWasmBytes(): Promise<ArrayBuffer> {
+    if (!this.wasmBytesPromise) {
+      this.wasmBytesPromise = fetch(chrome.runtime.getURL('tts/mesm_pdn.wasm')).then((res) => {
+        if (!res.ok) {
+          throw new Error(`mesm-tts WASM motoru yüklenemedi (HTTP ${res.status})`);
+        }
+        return res.arrayBuffer();
+      });
+    }
+    return this.wasmBytesPromise;
+  }
+
+  async ensureReady(): Promise<MesmPdnEngine> {
+    if (this.engine && this.status.ready) return this.engine;
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = (async (): Promise<MesmPdnEngine> => {
+      this.status.error = undefined;
+      try {
+        let pdnBuf = await this.fetchBundledPdn();
+        if (!pdnBuf) {
+          const opfsName = getMesmVoiceOpfsName('mesm_heart');
+          let pdnBlob = await readOpfsFile(opfsName);
+          if (!pdnBlob) {
+            this.status.downloading = true;
+            this.status.progressPercent = 1;
+            this.onStatusChange(this.getStatus());
+            pdnBlob = await fetchRemoteBlobWithProgress(getMesmVoiceUrl('mesm_heart'), (loaded, total) => {
+              if (total > 0) {
+                const pct = Math.max(1, Math.min(99, Math.round((loaded / total) * 99)));
+                if (pct !== this.status.progressPercent) {
+                  this.status.downloading = true;
+                  this.status.progressPercent = pct;
+                  this.onStatusChange(this.getStatus());
+                }
+              }
+            });
+            await writeOpfsFile(opfsName, pdnBlob);
+          }
+          pdnBuf = await pdnBlob.arrayBuffer();
+        }
+
+        const wasmBytes = await this.loadWasmBytes();
+        const engine = await createMesmPdnEngine(wasmBytes, new Uint8Array(pdnBuf));
+
+        this.engine = engine;
+        this.status.cached = true;
+        this.status.ready = true;
+        this.status.downloading = false;
+        this.status.progressPercent = 100;
+        this.status.error = undefined;
+        this.onStatusChange(this.getStatus());
+        return engine;
+      } catch (err) {
+        this.initPromise = null;
+        this.engine = null;
+        this.status.ready = false;
+        this.status.downloading = false;
+        this.status.error = err instanceof Error ? err.message : String(err);
+        this.onStatusChange(this.getStatus());
+        throw err;
+      }
+    })();
+
+    return this.initPromise;
+  }
+
+  async synthesizePcm(
+    text: string,
+    requestedRate = DEFAULT_ENGLISH_TTS_RATE,
+    options?: { embeddedCoach?: boolean }
+  ): Promise<{ pcm: Float32Array; sampleRate: number }> {
+    const engine = await this.ensureReady();
+    const meta = MESM_HEART_VOICE;
+    const embeddedCoach = Boolean(options?.embeddedCoach);
+    const baseText = formatTextForEnglishTts(text, true) || text.trim();
+    const normalizedText = normalizeMesmText(baseText) || baseText;
+    const sentences = splitMesmSentences(normalizedText);
+    const urls = getLocalWasmUrls();
+    const speedVal = Math.max(
+      0.45,
+      Math.min(1.5, Number.isFinite(requestedRate) ? requestedRate : DEFAULT_ENGLISH_TTS_RATE)
+    );
+    const parts: Float32Array[] = [];
+    const gapSamples = Math.round(MESM_SAMPLE_RATE * 0.11 * meta.gapScale);
+    const silenceGap = gapSamples > 0 ? new Float32Array(gapSamples) : null;
+
+    for (const sentence of sentences) {
+      const rawIpa = await new Promise<string>((resolve, reject) => {
+        void createPiperPhonemize({
+          print: (data) => {
+            try {
+              const parsed = JSON.parse(data) as { phonemes?: string[] };
+              resolve(Array.isArray(parsed.phonemes) ? parsed.phonemes.join('') : '');
+            } catch (err) {
+              reject(err);
+            }
+          },
+          printErr: (msg) => {
+            if (msg && !msg.includes('espeak')) reject(new Error(msg));
+          },
+          locateFile: (url) => {
+            if (url.endsWith('.wasm')) return urls.piperWasm;
+            if (url.endsWith('.data')) return urls.piperData;
+            return url;
+          },
+        })
+          .then((mod) => {
+            mod.callMain([
+              '-l',
+              'en-us',
+              '--input',
+              JSON.stringify([{ text: sentence }]),
+              '--espeak_data',
+              '/espeak-ng-data',
+            ]);
+          })
+          .catch(reject);
+      });
+
+      const misaki = postProcessEspeakToMisaki(rawIpa);
+      // Ensure isolated word tiles have terminal punctuation so utterance-end prosody stays stable
+      const punctuatedMisaki =
+        misaki && !/[.!?…;:,"”)]$/.test(misaki) ? `${misaki}.` : misaki;
+      const tokenIds = tokenizeMesmPhonemes(punctuatedMisaki);
+      if (tokenIds.length === 0) continue;
+
+      const rawOut = engine.synth(Int32Array.from(tokenIds), speedVal);
+      if (rawOut.length > 0) {
+        if (parts.length > 0 && silenceGap) {
+          parts.push(silenceGap);
+        }
+        parts.push(applyMesmLevelAndTrim(rawOut, meta.gainDb, MESM_SAMPLE_RATE));
+      }
+    }
+
+    const totalLen = parts.reduce((sum, p) => sum + p.length, 0);
+    const merged = new Float32Array(totalLen);
+    let offset = 0;
+    for (const p of parts) {
+      merged.set(p, offset);
+      offset += p.length;
+    }
+    return {
+      pcm: embeddedCoach ? trimAndFadeEmbeddedEnglishPcm(merged, MESM_SAMPLE_RATE) : merged,
+      sampleRate: MESM_SAMPLE_RATE,
+    };
+  }
+}
+
+function broadcastEnStatus(customStatus?: NeuralTtsStatus): void {
   try {
     void chrome.runtime.sendMessage({
       type: 'NEURAL_TTS_PROGRESS',
-      status: { ...enRunner.status },
+      status: customStatus ? { ...customStatus } : mesmRunner.getStatus(),
     });
   } catch {
     // Ignore when no listener is open
@@ -635,8 +660,9 @@ function broadcastTrStatus(): void {
   }
 }
 
-const enRunner = new EnglishPiperRunner(broadcastEnStatus);
+const mesmRunner = new EnglishMesmRunner((st) => broadcastEnStatus(st));
 const trRunner = new EmaLightningRunner(broadcastTrStatus);
+void cleanupLegacyTtsOpfs();
 
 let synthQueue: Promise<void> = Promise.resolve();
 let activePlaySeq = 0;
@@ -740,7 +766,7 @@ function playWavBlob(
 
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
-  const safeRate = Math.max(0.65, Math.min(1.5, Number.isFinite(rate) ? rate : 1.0));
+  const safeRate = Math.max(0.45, Math.min(1.5, Number.isFinite(rate) ? rate : 1.0));
   // HTML5 audio.load() resets playbackRate to defaultPlaybackRate; set both so non-1.0x rates stick reliably
   audio.defaultPlaybackRate = safeRate;
   audio.playbackRate = safeRate;
@@ -855,10 +881,9 @@ async function enqueueSynthesis<T>(fn: () => Promise<T>): Promise<T> {
 function getOrSynthEnWav(
   cleaned: string,
   epoch: number,
-  lengthScaleMultiplier = 1.0
+  requestedRate = DEFAULT_ENGLISH_TTS_RATE
 ): Promise<Blob | null> {
-  const multKey = lengthScaleMultiplier.toFixed(2);
-  const cacheKey = multKey === '1.00' ? cleaned : `${cleaned}@ls=${multKey}`;
+  const cacheKey = `mesm_heart|${requestedRate.toFixed(2)}|${cleaned}`;
   const cached = enWavCache.get(cacheKey);
   if (cached) {
     putLru(enWavCache, cacheKey, cached, MAX_EN_WAV_CACHE);
@@ -871,11 +896,11 @@ function getOrSynthEnWav(
       putLru(enWavCache, cacheKey, again, MAX_EN_WAV_CACHE);
       return again;
     }
-    await enRunner.ensureReady();
+
+    await mesmRunner.ensureReady();
     if (epoch !== activePlaySeq) return null;
-    const { pcm, sampleRate } = await enRunner.synthesizePcm(cleaned, {
-      lengthScaleMultiplier,
-    });
+    const { pcm, sampleRate } = await mesmRunner.synthesizePcm(cleaned, requestedRate);
+    if (pcm.length === 0) return null;
     const blob = new Blob([pcm2wav(pcm, sampleRate)], { type: 'audio/wav' });
     putLru(enWavCache, cacheKey, blob, MAX_EN_WAV_CACHE);
     return blob;
@@ -905,16 +930,18 @@ async function drainEnPlaybackQueue(): Promise<void> {
   }
 }
 
-async function handleSpeakEnglish(text: string, rate: number, queue = false): Promise<void> {
+async function handleSpeakEnglish(
+  text: string,
+  rate: number,
+  queue = false
+): Promise<void> {
   const cleaned = text.trim();
   if (!cleaned) return;
 
-  const safeRate = Math.max(0.65, Math.min(1.5, Number.isFinite(rate) ? rate : 1.0));
-  // For slow 0.75x dictation clicks, use Piper's native neural length_scale so slow articulation
-  // sounds natural without HTML5 time-stretch wobble, and play the resulting WAV at 1.0x.
-  const useNativeSlow = safeRate <= 0.85;
-  const lengthScaleMultiplier = useNativeSlow ? Math.min(1.45, 1 / safeRate) : 1.0;
-  const playbackRate = useNativeSlow ? 1.0 : safeRate;
+  const safeRate = Math.max(
+    0.45,
+    Math.min(1.5, Number.isFinite(rate) ? rate : DEFAULT_ENGLISH_TTS_RATE)
+  );
 
   let myEpoch: number;
   if (!queue || activeCoachRequestId !== null) {
@@ -930,9 +957,9 @@ async function handleSpeakEnglish(text: string, rate: number, queue = false): Pr
   }
   enPlaybackQueue.push({
     text: cleaned,
-    rate: playbackRate,
+    rate: 1.0,
     epoch: myEpoch,
-    wavPromise: getOrSynthEnWav(cleaned, myEpoch, lengthScaleMultiplier),
+    wavPromise: getOrSynthEnWav(cleaned, myEpoch, safeRate),
   });
   void drainEnPlaybackQueue();
 }
@@ -977,7 +1004,7 @@ function normalizeRmsToward(pcm: Float32Array, targetRms: number): Float32Array 
 
 /**
  * Synthesize a single Turkish AI grammar rule using EMA Lightning (48 kHz studio Turkish voice,
- * calm 0.87 teacher pace) for Turkish prose and HFC Female (48 kHz upsampled, RMS-matched) for
+ * calm 0.87 teacher pace) for Turkish prose and mesm-tts Heart (48 kHz upsampled, RMS-matched) for
  * quoted English words, returning exact per-word `[startMs, endMs]` timings for karaoke sync.
  */
 async function handleSpeakTurkishCoach(
@@ -1010,7 +1037,7 @@ async function handleSpeakTurkishCoach(
   let canUseEnglishVoice = false;
   if (hasEnglishSegments) {
     try {
-      await enRunner.ensureReady();
+      await mesmRunner.ensureReady();
       canUseEnglishVoice = true;
     } catch {
       canUseEnglishVoice = false;
@@ -1035,7 +1062,9 @@ async function handleSpeakTurkishCoach(
       const seg = segments[i]!;
       let pcm48: Float32Array;
       if (seg.lang === 'en' && canUseEnglishVoice) {
-        const { pcm, sampleRate } = await enRunner.synthesizePcm(seg.text, { embeddedCoach: true });
+        const { pcm, sampleRate } = await mesmRunner.synthesizePcm(seg.text, DEFAULT_ENGLISH_TTS_RATE, {
+          embeddedCoach: true,
+        });
         pcm48 = resampleLinear(pcm, sampleRate, targetSampleRate);
         pcm48 = normalizeRmsToward(pcm48, observedEmaRms > 0 ? observedEmaRms : 0.14);
       } else {
@@ -1154,22 +1183,29 @@ chrome.runtime.onMessage.addListener((message: OffscreenTtsMessage, _sender, sen
         break;
       }
       case 'STATUS': {
-        await Promise.all([enRunner.refreshAvailability(), trRunner.refreshAvailability()]);
+        await Promise.all([
+          mesmRunner.refreshAvailability(),
+          trRunner.refreshAvailability(),
+        ]);
         sendResponse({
           ok: true,
-          status: { ...enRunner.status },
+          status: mesmRunner.getStatus(),
           trStatus: { ...trRunner.status },
         });
         break;
       }
       case 'PREPARE': {
-        await enRunner.ensureReady();
-        sendResponse({ ok: true, status: { ...enRunner.status } });
+        await mesmRunner.ensureReady();
+        sendResponse({ ok: true, status: mesmRunner.getStatus() });
         break;
       }
       case 'SPEAK': {
-        await handleSpeakEnglish(message.text ?? '', message.rate ?? 1.0, Boolean(message.queue));
-        sendResponse({ ok: true, status: { ...enRunner.status } });
+        await handleSpeakEnglish(
+          message.text ?? '',
+          message.rate ?? DEFAULT_ENGLISH_TTS_RATE,
+          Boolean(message.queue)
+        );
+        sendResponse({ ok: true, status: mesmRunner.getStatus() });
         break;
       }
       case 'COACH_SPEAK': {
@@ -1198,7 +1234,7 @@ chrome.runtime.onMessage.addListener((message: OffscreenTtsMessage, _sender, sen
     sendResponse({
       ok: false,
       error: err instanceof Error ? err.message : String(err),
-      status: { ...enRunner.status },
+      status: mesmRunner.getStatus(),
       trStatus: { ...trRunner.status },
     });
   });

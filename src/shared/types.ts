@@ -41,7 +41,7 @@ export interface UserCardProgress {
 }
 
 export type ContentMode = 'mixed' | 'word' | 'sentence';
-export type TtsVoiceMode = 'hybrid' | 'neural' | 'natural' | 'local';
+export type TtsVoiceMode = 'hybrid' | 'neural' | 'natural' | 'local' | 'mesm_heart';
 
 export interface NeuralTtsStatus {
   voiceId: string;
@@ -727,10 +727,17 @@ export type ExtensionMessage =
   | { type: 'RUN_STORAGE_HYGIENE' }
   | { type: 'GET_STATUS' }
   | { type: 'SETTINGS_UPDATED' }
-  | { type: 'SPEAK_NEURAL_TTS'; text: string; rate?: number; reqId?: number; queue?: boolean }
+  | {
+      type: 'SPEAK_NEURAL_TTS';
+      text: string;
+      rate?: number;
+      reqId?: number;
+      queue?: boolean;
+      voiceMode?: TtsVoiceMode;
+    }
   | { type: 'CANCEL_NEURAL_TTS' }
-  | { type: 'PREPARE_NEURAL_TTS' }
-  | { type: 'GET_NEURAL_TTS_STATUS' }
+  | { type: 'PREPARE_NEURAL_TTS'; voiceMode?: TtsVoiceMode }
+  | { type: 'GET_NEURAL_TTS_STATUS'; voiceMode?: TtsVoiceMode }
   | {
       type: 'GENERATE_AI_GRAMMAR_COACH';
       sentenceEn: string;

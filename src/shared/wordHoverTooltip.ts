@@ -1,5 +1,5 @@
 import type { OfflineWordEntry } from './offlineDictionary.ts';
-import { speakEnglishText } from './speech.ts';
+import { DEFAULT_ENGLISH_TTS_RATE, speakEnglishText } from './speech.ts';
 import { uiIconSvg } from './uiIcons.ts';
 
 export interface WordHoverTooltipOptions {
@@ -1085,7 +1085,7 @@ export function installWordHoverTooltip(
     });
     spkBtn.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      speakEnglishText(entry.query, 0.95, { isQuickTile: true });
+      speakEnglishText(entry.query, DEFAULT_ENGLISH_TTS_RATE, { isQuickTile: true });
     });
     meta.appendChild(spkBtn);
 

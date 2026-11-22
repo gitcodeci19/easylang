@@ -9,7 +9,11 @@ import { evaluateEnglishAnswer, evaluateTurkishAnswer } from './matcher';
 import { formatLessonProgressCounter } from './placementTest';
 import { REMEDIAL_SKILL_CATALOG, REMEDIAL_VOICE_TRANSCRIPTS } from './remedialCatalog';
 import { playCorrectSfx, playLessonCompleteSfx, playTapSfx, playWrongSfx } from './sfx';
-import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
+import {
+  cancelEnglishSpeech,
+  DEFAULT_ENGLISH_TTS_RATE,
+  speakEnglishText as speakEnglish,
+} from './speech';
 import {
   getRemedialSkillIconName,
   setIconLabel,
@@ -709,7 +713,7 @@ export function renderRemedialBriefing(
       spkBtn.className = 'duo-audio-mini-btn rem-ex-spk';
       setIconOnly(spkBtn, 'volume', 14);
       spkBtn.title = isTr ? 'Dinle' : 'Listen';
-      spkBtn.addEventListener('click', () => speakEnglish(ex.en, 1.0));
+      spkBtn.addEventListener('click', () => speakEnglish(ex.en));
       topLine.appendChild(spkBtn);
     }
 
@@ -1293,7 +1297,7 @@ export function startRemedialLessonSession(
           btns.forEach((b) => b.classList.toggle('selected', b === btn));
           const blankEl = promptCard.querySelector('.rem-duel-blank');
           if (blankEl) blankEl.textContent = ch;
-          speakEnglish(ch, 1.0, { isQuickTile: ch.trim().split(/\s+/).length <= 3 });
+          speakEnglish(ch, DEFAULT_ENGLISH_TTS_RATE, { isQuickTile: ch.trim().split(/\s+/).length <= 3 });
           updateCheckEnabled();
           persistLesson(false);
         });
@@ -1510,7 +1514,7 @@ export function startRemedialLessonSession(
           if (targetTokBtn) {
             renderTokenDiff(targetTokBtn, buggyTok, fChoice);
           }
-          speakEnglish(fChoice, 1.0, { isQuickTile: fChoice.trim().split(/\s+/).length <= 3 });
+          speakEnglish(fChoice, DEFAULT_ENGLISH_TTS_RATE, { isQuickTile: fChoice.trim().split(/\s+/).length <= 3 });
           syncStepper();
           updateCheckEnabled();
           persistLesson(false);
@@ -1570,7 +1574,7 @@ export function startRemedialLessonSession(
           currentDraft.selectedChoice = ch;
           playTapSfx();
           btns.forEach((b) => b.classList.toggle('selected', b === btn));
-          speakEnglish(ch, 1.0);
+          speakEnglish(ch);
           updateCheckEnabled();
           persistLesson(false);
         });
@@ -1606,7 +1610,7 @@ export function startRemedialLessonSession(
         spk.className = 'duo-audio-mini-btn';
         setIconOnly(spk, 'volume', 14);
         spk.title = isTr ? 'Telaffuzu dinle' : 'Listen';
-        spk.addEventListener('click', () => speakEnglish(ex.card.en, 1.0));
+        spk.addEventListener('click', () => speakEnglish(ex.card.en));
         promptMain.appendChild(spk);
       }
       const pText = document.createElement('div');
@@ -1644,7 +1648,7 @@ export function startRemedialLessonSession(
           playTapSfx();
           btns.forEach((b) => b.classList.toggle('selected', b === btn));
           if (ex.kind === 'cloze_blank' || ex.direction === 'tr-to-en') {
-            speakEnglish(ch, 1.0, { isQuickTile: ch.trim().split(/\s+/).length <= 3 });
+            speakEnglish(ch, DEFAULT_ENGLISH_TTS_RATE, { isQuickTile: ch.trim().split(/\s+/).length <= 3 });
           }
           updateCheckEnabled();
           persistLesson(false);
@@ -1769,12 +1773,12 @@ export function startRemedialLessonSession(
               bankTray,
               isLocked: () => locked,
               onTap: () => {
-                speakEnglish(tok, 1.0, { isQuickTile: true });
+                speakEnglish(tok, DEFAULT_ENGLISH_TTS_RATE, { isQuickTile: true });
                 placedTiles.push({ bankIdx: i, text: tok });
                 commitPlacedTilesChange();
               },
               onDropIntoAnswer: (insertIndex) => {
-                speakEnglish(tok, 1.0, { isQuickTile: true });
+                speakEnglish(tok, DEFAULT_ENGLISH_TTS_RATE, { isQuickTile: true });
                 const clamped = Math.max(0, Math.min(placedTiles.length, insertIndex));
                 placedTiles.splice(clamped, 0, { bankIdx: i, text: tok });
                 commitPlacedTilesChange();
@@ -1938,7 +1942,7 @@ export function startRemedialLessonSession(
         spk.className = 'duo-audio-mini-btn';
         setIconOnly(spk, 'volume', 14);
         spk.title = isTr ? 'İngilizce cümleyi dinle' : 'Listen';
-        spk.addEventListener('click', () => speakEnglish(ex.audioText, 1.0));
+        spk.addEventListener('click', () => speakEnglish(ex.audioText));
         actionsWrap.appendChild(spk);
       }
 

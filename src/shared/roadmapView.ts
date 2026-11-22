@@ -38,7 +38,12 @@ import {
 } from './placementTest';
 import { startPlacementTestSession } from './placementTestView';
 import { playCorrectSfx, playLessonCompleteSfx, playTapSfx, playWrongSfx } from './sfx';
-import { cancelEnglishSpeech, speakEnglishText as speakEnglish } from './speech';
+import {
+  cancelEnglishSpeech,
+  DEFAULT_ENGLISH_TTS_RATE,
+  SLOW_ENGLISH_TTS_RATE,
+  speakEnglishText as speakEnglish,
+} from './speech';
 import { evaluateDictationAnswer } from './srs';
 import { setIconLabel, setIconOnly, uiIconSvg } from './uiIcons';
 import { attachWordBankTileGesture } from './wordBankDrag';
@@ -1167,7 +1172,7 @@ export class RoadmapController {
       spk.type = 'button';
       spk.className = 'duo-audio-mini-btn';
       setIconOnly(spk, 'volume', 14);
-      spk.addEventListener('click', () => speakEnglish(kp.en, 1.0));
+      spk.addEventListener('click', () => speakEnglish(kp.en));
 
       const txt = document.createElement('div');
       txt.innerHTML = `
@@ -1195,7 +1200,7 @@ export class RoadmapController {
       spk.type = 'button';
       spk.className = 'duo-audio-mini-btn';
       setIconOnly(spk, 'volume', 14);
-      spk.addEventListener('click', () => speakEnglish(card.en, 1.0));
+      spk.addEventListener('click', () => speakEnglish(card.en));
 
       const content = document.createElement('div');
       content.className = 'duo-guide-word-text';
@@ -1554,19 +1559,19 @@ export class RoadmapController {
         const playNormal = document.createElement('button');
         playNormal.type = 'button';
         playNormal.className = 'duo-audio-big-btn';
-        playNormal.innerHTML = `${uiIconSvg('volume', 16)} <span>1.0x</span>`;
+        playNormal.innerHTML = `${uiIconSvg('volume', 16)} <span>0.85x</span>`;
         playNormal.addEventListener('click', () => {
           cancelAutoPlay();
-          speakEnglish(ex.audioText, 1.0);
+          speakEnglish(ex.audioText, DEFAULT_ENGLISH_TTS_RATE);
         });
 
         const playSlow = document.createElement('button');
         playSlow.type = 'button';
         playSlow.className = 'duo-audio-slow-btn';
-        playSlow.innerHTML = '<span>0.75x</span>';
+        playSlow.innerHTML = '<span>0.50x</span>';
         playSlow.addEventListener('click', () => {
           cancelAutoPlay();
-          speakEnglish(ex.audioText, 0.72);
+          speakEnglish(ex.audioText, SLOW_ENGLISH_TTS_RATE);
         });
 
         audioRow.append(playNormal, playSlow);
@@ -1592,7 +1597,7 @@ export class RoadmapController {
           autoPlayTimer = setTimeout(() => {
             autoPlayTimer = null;
             if (promptCard.isConnected) {
-              speakEnglish(ex.audioText, 1.0);
+              speakEnglish(ex.audioText);
             }
           }, 220);
         }
@@ -1610,7 +1615,7 @@ export class RoadmapController {
           setIconOnly(spk, 'volume', 14);
           spk.addEventListener('click', () => {
             cancelAutoPlay();
-            speakEnglish(ex.audioText, 1.0);
+            speakEnglish(ex.audioText);
           });
           promptMain.appendChild(spk);
         }
@@ -1638,7 +1643,7 @@ export class RoadmapController {
           autoPlayTimer = setTimeout(() => {
             autoPlayTimer = null;
             if (promptCard.isConnected) {
-              speakEnglish(ex.audioText, 1.0);
+              speakEnglish(ex.audioText);
             }
           }, 220);
         }
@@ -1697,7 +1702,7 @@ export class RoadmapController {
             if (choicesAreEnglish) {
               cancelAutoPlay();
               const isShortChoice = choiceText.trim().split(/\s+/).length <= 3;
-              speakEnglish(choiceText, 1.0, { isQuickTile: isShortChoice });
+              speakEnglish(choiceText, DEFAULT_ENGLISH_TTS_RATE, { isQuickTile: isShortChoice });
             }
             refreshCheckDisabled();
             persistActiveSession(currentIdx, false);
@@ -1831,7 +1836,7 @@ export class RoadmapController {
                   playTapSfx();
                   usedIndices.push(idx);
                   if (ex.direction !== 'en-to-tr') {
-                    speakEnglish(word, 1.0, { isQuickTile: true });
+                    speakEnglish(word, DEFAULT_ENGLISH_TTS_RATE, { isQuickTile: true });
                   }
                   commitUsedIndicesChange();
                 },
@@ -1839,7 +1844,7 @@ export class RoadmapController {
                   const clamped = Math.max(0, Math.min(usedIndices.length, insertIndex));
                   usedIndices.splice(clamped, 0, idx);
                   if (ex.direction !== 'en-to-tr') {
-                    speakEnglish(word, 1.0, { isQuickTile: true });
+                    speakEnglish(word, DEFAULT_ENGLISH_TTS_RATE, { isQuickTile: true });
                   }
                   commitUsedIndicesChange();
                 },
@@ -2013,7 +2018,7 @@ export class RoadmapController {
           replaySpk.className = 'duo-audio-mini-btn';
           setIconOnly(replaySpk, 'volume', 14);
           replaySpk.title = isTr ? 'İngilizce telaffuzu dinle' : 'Listen to pronunciation';
-          replaySpk.addEventListener('click', () => speakEnglish(ex.audioText, 1.0));
+          replaySpk.addEventListener('click', () => speakEnglish(ex.audioText));
           actionsWrap.appendChild(replaySpk);
         }
 

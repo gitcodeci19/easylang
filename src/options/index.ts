@@ -15,6 +15,10 @@ import {
 } from '../shared/guideAssistant';
 import { resolveSupportedLanguage } from '../shared/i18n';
 import {
+  MESM_HEART_VOICE,
+  normalizeTtsVoiceMode,
+} from '../shared/mesmTtsFrontend';
+import {
   extractDisplayMeanings,
   formatDisplayMeaningsInline,
 } from '../shared/meaningFormatter';
@@ -495,7 +499,7 @@ async function loadSettingsIntoForm(): Promise<void> {
   includeUserCardsInput.checked = s.includeUserCards;
   skipFullscreenInput.checked = s.skipFullscreen;
   autoSpeakInput.checked = s.autoSpeak;
-  ttsVoiceModeSelect.value = 'neural';
+  ttsVoiceModeSelect.value = normalizeTtsVoiceMode(s.ttsVoiceMode);
   autoTranslateInput.checked = s.autoTranslateContextMenu;
 
   const boxes = Array.from(levelsGroup.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
@@ -1075,7 +1079,7 @@ settingsForm.addEventListener('submit', async (e) => {
     includeUserCards: includeUserCardsInput.checked,
     skipFullscreen: skipFullscreenInput.checked,
     autoSpeak: autoSpeakInput.checked,
-    ttsVoiceMode: 'neural',
+    ttsVoiceMode: normalizeTtsVoiceMode(ttsVoiceModeSelect.value),
     autoTranslateContextMenu: autoTranslateInput.checked,
   });
 
@@ -1812,33 +1816,46 @@ async function initDashboard(): Promise<void> {
 
 function renderNeuralTtsStatus(status?: NeuralTtsStatus | null): void {
   if (!neuralTtsStatusEl || !neuralTtsTestBtn) return;
+  const engineLabel = MESM_HEART_VOICE.labelTr;
+  const sizeLabel = MESM_HEART_VOICE.sizeLabel;
+
   if (!status) {
-    neuralTtsStatusEl.textContent = 'Yapay Zeka Sesi (Piper · 60 MB): İlk kullanımda otomatik indirilir.';
+    neuralTtsStatusEl.textContent = `${engineLabel} (${sizeLabel}): Çevrimdışı hazır.`;
     neuralTtsTestBtn.disabled = false;
-    neuralTtsTestBtn.textContent = '▶ İndir & Test Et';
+    neuralTtsTestBtn.textContent = '▶ Sesi Dinle';
     return;
   }
   if (status.downloading) {
-    neuralTtsStatusEl.textContent = `Yapay Zeka Sesi indiriliyor… %${status.progressPercent} (tek seferlik, 60 MB)`;
+    neuralTtsStatusEl.textContent = `${engineLabel} indiriliyor… %${status.progressPercent} (tek seferlik, ${sizeLabel})`;
     neuralTtsTestBtn.disabled = true;
     neuralTtsTestBtn.textContent = `%${status.progressPercent}…`;
     return;
   }
   if (status.error) {
-    neuralTtsStatusEl.textContent = `Yapay Zeka Sesi hatası: ${status.error}`;
+    neuralTtsStatusEl.textContent = `${engineLabel} hatası: ${status.error}`;
     neuralTtsTestBtn.disabled = false;
     neuralTtsTestBtn.textContent = '↻ Tekrar Dene';
     return;
   }
   if (status.cached || status.ready) {
-    neuralTtsStatusEl.textContent = '✓ Yapay Zeka Sesi (Piper · HFC Female) çevrimdışı önbellekte hazır.';
+    neuralTtsStatusEl.textContent = `✓ ${engineLabel} (${sizeLabel}) çevrimdışı hazır.`;
     neuralTtsTestBtn.disabled = false;
     neuralTtsTestBtn.textContent = '▶ Sesi Dinle';
     return;
   }
-  neuralTtsStatusEl.textContent = 'Yapay Zeka Sesi (Piper · 60 MB): İndirilmedi (Brave/Opera için otomatik iner).';
+  neuralTtsStatusEl.textContent = `${engineLabel} (${sizeLabel}): İlk kullanımda otomatik indirilir.`;
   neuralTtsTestBtn.disabled = false;
   neuralTtsTestBtn.textContent = '▶ İndir & Test Et';
+}
+
+function querySelectedTtsStatus(): void {
+  const voiceMode = normalizeTtsVoiceMode(ttsVoiceModeSelect?.value);
+  chrome.runtime
+    .sendMessage({ type: 'GET_NEURAL_TTS_STATUS', voiceMode } satisfies ExtensionMessage)
+    .then((res: { ok?: boolean; status?: NeuralTtsStatus } | undefined) => {
+      renderNeuralTtsStatus(res?.ok ? res.status : null);
+    })
+    .catch(() => renderNeuralTtsStatus(null));
 }
 
 function initNeuralTtsControls(): void {
@@ -1850,26 +1867,32 @@ function initNeuralTtsControls(): void {
     }
   });
 
-  chrome.runtime
-    .sendMessage({ type: 'GET_NEURAL_TTS_STATUS' } satisfies ExtensionMessage)
-    .then((res: { ok?: boolean; status?: NeuralTtsStatus } | undefined) => {
-      renderNeuralTtsStatus(res?.ok ? res.status : null);
-    })
-    .catch(() => renderNeuralTtsStatus(null));
+  ttsVoiceModeSelect?.addEventListener('change', async () => {
+    const voiceMode = normalizeTtsVoiceMode(ttsVoiceModeSelect.value);
+    await saveSettings({ ttsVoiceMode: voiceMode });
+    await chrome.runtime.sendMessage({ type: 'SETTINGS_UPDATED' } satisfies ExtensionMessage);
+    querySelectedTtsStatus();
+  });
+
+  querySelectedTtsStatus();
 
   neuralTtsTestBtn.addEventListener('click', async () => {
+    const voiceMode = normalizeTtsVoiceMode(ttsVoiceModeSelect?.value);
     neuralTtsTestBtn.disabled = true;
     neuralTtsTestBtn.textContent = 'Hazırlanıyor…';
     try {
+      await saveSettings({ ttsVoiceMode: voiceMode });
       const prep = (await chrome.runtime.sendMessage({
         type: 'PREPARE_NEURAL_TTS',
+        voiceMode,
       } satisfies ExtensionMessage)) as { ok?: boolean; status?: NeuralTtsStatus } | undefined;
       if (prep?.status) renderNeuralTtsStatus(prep.status);
       if (prep?.ok) {
         await chrome.runtime.sendMessage({
           type: 'SPEAK_NEURAL_TTS',
           text: 'Hello! LingoEx neural voice is ready on this browser.',
-          rate: 1.0,
+          rate: 0.85,
+          voiceMode,
         } satisfies ExtensionMessage);
       }
     } catch {
