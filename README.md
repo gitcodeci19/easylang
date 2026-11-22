@@ -1,4 +1,4 @@
-# LingoEx
+# LingoEx - Yapay Zekâ Destekli Dil Öğrenme Tarayıcı Eklentisi
 
 Tarayıcınızda gezinirken aktif hatırlama, sesli dikte ve yapay zekâ destekli kişisel derslerle İngilizce öğrenmenizi sağlayan açık kaynaklı Chrome / Edge / Brave eklentisi.
 
