@@ -201,11 +201,11 @@ export function openAiTutorDrawer(options: OpenAiTutorDrawerOptions): void {
     emptyHint.className = 'ait-empty-hint';
     emptyHint.textContent = options.aiActive
       ? isTr
-        ? 'Aklına takılanı doğrudan sor (ör. "Neden run kullanılıyor, koşmak değil mi?") veya alttaki hızlı butonlardan birine tıkla:'
-        : 'Ask anything confusing about this sentence, or tap a quick question below:'
+        ? 'Bu soruyla ilgili aklına takılanı yaz.'
+        : 'Ask anything about this question.'
       : isTr
-        ? 'AI Öğretmen şu an kapalı. Ayarlar → AI - API Ayarları bölümünden ücretsiz Groq/NVIDIA/AMD anahtarı ekleyerek anlık soru sorabilirsin.'
-        : 'AI Tutor is off. Add a free Groq/NVIDIA/AMD API key in Settings → AI Evaluation to ask live questions.';
+        ? 'AI Öğretmen kapalı. Ayarlar → Yapay Zekâ bölümünden ücretsiz API anahtarı ekleyebilirsin.'
+        : 'AI Tutor is off. Add a free API key in Settings → AI to ask questions.';
     messagesEl.appendChild(emptyHint);
   } else {
     for (const turn of history) {
@@ -214,58 +214,14 @@ export function openAiTutorDrawer(options: OpenAiTutorDrawerOptions): void {
   }
   panel.appendChild(messagesEl);
 
-  // Quick-question chips
-  const chipsWrap = document.createElement('div');
-  chipsWrap.className = 'ait-quick-chips';
-
-  const quickPrompts: Array<{ label: string; prompt: string }> = isTr
-    ? [
-        ...(options.context.userAnswer && options.context.userAnswer !== '(skipped)'
-          ? [
-              {
-                label: 'Neden yanlış?',
-                prompt: 'Benim cevabım neden yanlış ve doğrusu neden tam olarak böyle kuruluyor?',
-              },
-            ]
-          : []),
-        {
-          label: 'Kelime kelime açıkla',
-          prompt: 'Bu cümleyi kelime kelime ve kalıp mantığıyla kısaca açıklar mısın?',
-        },
-        {
-          label: '2 günlük örnek',
-          prompt: 'Bu yapıyı günlük modern İngilizcede 2 farklı kısa örnekle gösterir misin?',
-        },
-      ]
-    : [
-        ...(options.context.userAnswer && options.context.userAnswer !== '(skipped)'
-          ? [
-              {
-                label: 'Why wrong?',
-                prompt: 'Why is my answer wrong and why is the expected sentence phrased that way?',
-              },
-            ]
-          : []),
-        {
-          label: 'Word by word',
-          prompt: 'Break this sentence down word by word and explain any idiom or grammar rule.',
-        },
-        {
-          label: '2 everyday examples',
-          prompt: 'Give 2 short modern everyday examples using the same pattern.',
-        },
-      ];
-
-  // Input form
+  // Unified clean composer bar (no cluttered suggested-question chips)
   const inputRow = document.createElement('form');
   inputRow.className = 'ait-input-row';
 
   const inputEl = document.createElement('input');
   inputEl.type = 'text';
   inputEl.className = 'ait-input';
-  inputEl.placeholder = isTr
-    ? 'Örn: Neden "run" kullanılıyor, koşmak değil mi?'
-    : 'e.g. Why is "run" used here?';
+  inputEl.placeholder = isTr ? 'Sorunu yaz…' : 'Type your question…';
   inputEl.autocomplete = 'off';
   inputEl.disabled = !options.aiActive;
   if (options.draftQuestion) {
@@ -357,25 +313,13 @@ export function openAiTutorDrawer(options: OpenAiTutorDrawerOptions): void {
     }
   };
 
-  for (const qp of quickPrompts) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'ait-chip';
-    chip.textContent = qp.label;
-    chip.disabled = !options.aiActive;
-    chip.addEventListener('click', () => {
-      void submitQuestion(qp.prompt);
-    });
-    chipsWrap.appendChild(chip);
-  }
-
   inputRow.addEventListener('submit', (e) => {
     e.preventDefault();
     void submitQuestion(inputEl.value);
   });
 
   inputRow.append(inputEl, sendBtn);
-  panel.append(chipsWrap, inputRow);
+  panel.append(inputRow);
   overlay.appendChild(panel);
   options.host.appendChild(overlay);
 

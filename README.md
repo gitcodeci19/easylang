@@ -36,7 +36,7 @@ Tarayıcınızda gezinirken aktif hatırlama, sesli dikte ve yapay zekâ destekl
 
 ## Kurulum (Chrome / Edge / Brave)
 
-1. **[Releases](https://github.com/gitcodeci19/easylang/releases/latest)** sayfasından `LingoEx-v2.2.2-Ultimate.zip` dosyasını indirip bir klasöre çıkartın.
+1. **[Releases](https://github.com/gitcodeci19/easylang/releases/latest)** sayfasından `LingoEx-v2.3.0-Ultimate.zip` dosyasını indirip bir klasöre çıkartın.
 2. Tarayıcıda `chrome://extensions` adresini açıp sağ üstten **Geliştirici modu**nu etkinleştirin.
 3. **Paketlenmemiş öğe yükle** butonuna tıklayıp çıkarttığınız klasörü seçin.
 

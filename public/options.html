@@ -6,6 +6,8 @@
     <title>LingoEx</title>
     <link rel="icon" type="image/png" href="icons/icon48.png" />
     <link rel="stylesheet" href="options.css" />
+    <link id="theme-light-css" rel="stylesheet" href="options-light.css" />
+    <script src="theme-init.js"></script>
   </head>
   <body>
     <div class="layout">
@@ -34,6 +36,10 @@
           <p class="summary-line" id="summary-line">...</p>
         </div>
         <div class="topbar-actions">
+          <button id="options-theme-toggle-btn" class="btn btn-theme-toggle" type="button" title="Gece / Gündüz Modu">
+            <span id="options-theme-icon" class="theme-toggle-ico" aria-hidden="true"></span>
+            <span id="options-theme-label">Gece Modu</span>
+          </button>
           <select id="topbar-lang-select" class="lang-select" title="Dil / Language">
             <option value="auto">AUTO</option>
             <option value="tr">TR</option>

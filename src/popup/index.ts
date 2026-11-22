@@ -22,23 +22,29 @@ import {
   saveAiConfig,
   saveSettings,
 } from '../shared/storage';
+import {
+  applyDocumentTheme,
+  buildThemeToggleSvg,
+  normalizeThemeMode,
+} from '../shared/theme';
 import type {
   Card,
   ExtensionMessage,
   FeedbackLanguageMode,
   StatusSnapshot,
+  UiThemeMode,
 } from '../shared/types';
 import { installWordHoverTooltip } from '../shared/wordHoverTooltip';
 
-const enabledToggle = document.getElementById('enabled-toggle') as HTMLInputElement;
 const popupLangSelect = document.getElementById('popup-lang-select') as HTMLSelectElement;
 const countdownText = document.getElementById('countdown-text') as HTMLElement;
 const rankChip = document.getElementById('rank-chip') as HTMLElement;
-const miniTelemetry = document.getElementById('mini-telemetry') as HTMLElement;
 
+const themeToggleBtn = document.getElementById('theme-toggle-btn') as HTMLButtonElement;
 const muteHourBtn = document.getElementById('mute-hour-btn') as HTMLButtonElement;
 const toggleBlockSiteBtn = document.getElementById('toggle-block-site-btn') as HTMLButtonElement;
 const openOptionsBtn = document.getElementById('open-options-btn') as HTMLButtonElement;
+const openOptionsLabel = document.getElementById('open-options-label') as HTMLElement;
 
 const roadmapMount = document.getElementById('popup-roadmap-mount') as HTMLElement;
 
@@ -46,8 +52,6 @@ const triggerNowBtn = document.getElementById('trigger-now-btn') as HTMLButtonEl
 const triggerNowLabel = document.getElementById('trigger-now-label') as HTMLElement;
 const pageQuizBtn = document.getElementById('page-quiz-btn') as HTMLButtonElement;
 const pageQuizLabel = document.getElementById('page-quiz-label') as HTMLElement;
-const listeningQuizBtn = document.getElementById('listening-quiz-btn') as HTMLButtonElement;
-const listeningQuizLabel = document.getElementById('listening-quiz-label') as HTMLElement;
 const popupFeedback = document.getElementById('popup-feedback') as HTMLElement;
 
 import {
@@ -102,6 +106,26 @@ function formatRemaining(ms: number, isTr: boolean): string {
   return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
+function formatDisplayHost(hostname: string): string {
+  const clean = hostname.trim();
+  if (!clean) return clean;
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+function syncPopupThemeButton(mode: UiThemeMode, isTr: boolean): void {
+  themeToggleBtn.replaceChildren(buildThemeToggleSvg(mode, 13));
+  themeToggleBtn.classList.toggle('is-active', mode === 'dark');
+  themeToggleBtn.title =
+    mode === 'dark'
+      ? isTr
+        ? 'Gündüz Moduna Geç (Sıcak Altın)'
+        : 'Switch to Light Mode'
+      : isTr
+        ? 'Gece Moduna Geç'
+        : 'Switch to Dark Mode';
+  themeToggleBtn.setAttribute('aria-label', themeToggleBtn.title);
+}
+
 function updateCurrentTabBlockButton(status: StatusSnapshot, isTr: boolean): void {
   const url = currentActiveTab?.url;
   if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
@@ -117,40 +141,38 @@ function updateCurrentTabBlockButton(status: StatusSnapshot, isTr: boolean): voi
     return;
   }
 
+  const displayHost = formatDisplayHost(hostname);
   const blocked = isUrlBlocked(url, status.settings.blockedDomains);
   toggleBlockSiteBtn.hidden = false;
   toggleBlockSiteBtn.classList.toggle('is-blocked', blocked);
   toggleBlockSiteBtn.title = blocked
     ? isTr
-      ? `${hostname} üzerinde yeniden etkinleştir`
-      : `Re-enable on ${hostname}`
+      ? `Eklenti ${displayHost} sayfasında tekrar çalışsın`
+      : `Re-enable the extension on ${displayHost}`
     : isTr
-      ? `${hostname} üzerinde çalıştırma`
-      : `Disable on ${hostname}`;
+      ? `Eklenti artık ${displayHost} sayfasında çalışmasın`
+      : `Stop running the extension on ${displayHost}`;
 }
 
 function renderStatus(status: StatusSnapshot): void {
   currentStatus = status;
-  enabledToggle.checked = status.settings.enabled;
   const langMode = status.settings.uiLanguage ?? 'auto';
   popupLangSelect.value = langMode;
   const ui = getUiStrings(langMode);
   const isTr = isTurkishUi(status);
+  const themeMode = normalizeThemeMode(status.settings.themeMode);
+  applyDocumentTheme(themeMode);
+  syncPopupThemeButton(themeMode, isTr);
 
   triggerNowLabel.textContent = isTr ? 'Şimdi Sor' : 'Quick Quiz';
   pageQuizLabel.textContent = 'Challenge';
-  listeningQuizLabel.textContent = isTr ? 'Dinle & Yaz' : 'Listen & Type';
+  openOptionsLabel.textContent = isTr ? 'Ayarlar' : 'Settings';
 
   const cefr = ratingToCefrProgress(status.skillProfile.rating);
   rankChip.textContent = `${cefr.level} · ${status.skillProfile.rating}`;
   rankChip.title = isTr
     ? `20dk & Canlı Kart Recall ELO Seviyeniz: ${cefr.level} (${status.skillProfile.rating} ELO) · Seri: ${status.skillProfile.currentStreak}`
     : `20m & Live Prompt Recall Elo: ${cefr.level} (${status.skillProfile.rating} ELO) · Streak: ${status.skillProfile.currentStreak}`;
-
-  miniTelemetry.textContent = `${status.dailyStats.correct}✓ · ${status.masteredCount}★`;
-  miniTelemetry.title = isTr
-    ? `Bugün ${status.dailyStats.correct} doğru, ${status.dailyStats.wrong} yanlış · ${status.retryQueueCount} tekrar kuyruğu · ${status.masteredCount} öğrenilen`
-    : `Today ${status.dailyStats.correct} correct, ${status.dailyStats.wrong} missed · ${status.retryQueueCount} retry queue · ${status.masteredCount} mastered`;
 
   const isMuted =
     status.settings.mutedUntil !== null && status.settings.mutedUntil > Date.now();
@@ -163,13 +185,27 @@ function renderStatus(status: StatusSnapshot): void {
   } else {
     muteHourBtn.title = ui.muteHourBtn;
     if (!status.settings.enabled) {
-      countdownText.textContent = isTr ? 'Manuel' : 'Manual';
+      countdownText.textContent = status.settings.pausedUntilManual
+        ? isTr
+          ? 'Duraklatıldı'
+          : 'Paused'
+        : isTr
+          ? 'Manuel'
+          : 'Manual';
+      countdownText.title = status.settings.pausedUntilManual
+        ? isTr
+          ? `"Şimdi Sor"a basana kadar duraklatıldı (açılınca her ${status.settings.intervalMinutes} dk'da bir devam eder)`
+          : `Paused until you click Quick Quiz (resumes every ${status.settings.intervalMinutes}m)`
+        : '';
     } else if (status.hasPendingPrompt) {
       countdownText.textContent = isTr ? 'Hazır' : 'Ready';
+      countdownText.title = '';
     } else if (status.nextAlarmAt) {
       countdownText.textContent = formatRemaining(status.nextAlarmAt - Date.now(), isTr);
+      countdownText.title = '';
     } else {
       countdownText.textContent = `${status.settings.intervalMinutes}m`;
+      countdownText.title = '';
     }
   }
 
@@ -230,16 +266,6 @@ async function fetchStatus(): Promise<void> {
     renderStatus(res.status);
   }
 }
-
-enabledToggle.addEventListener('change', async () => {
-  await saveSettings({ enabled: enabledToggle.checked });
-  const res = (await chrome.runtime.sendMessage({
-    type: 'SETTINGS_UPDATED',
-  } satisfies ExtensionMessage)) as { ok: boolean; status?: StatusSnapshot };
-  if (res?.ok && res.status) {
-    renderStatus(res.status);
-  }
-});
 
 popupLangSelect.addEventListener('change', async () => {
   const mode = (popupLangSelect.value || 'auto') as FeedbackLanguageMode;
@@ -307,34 +333,28 @@ async function triggerPageQuizOnPage(): Promise<void> {
   }
 }
 
-async function triggerListeningQuizOnPage(): Promise<void> {
-  listeningQuizBtn.disabled = true;
-  popupFeedback.hidden = true;
-  const res = (await chrome.runtime.sendMessage({
-    type: 'START_LISTENING_QUIZ',
-    tabId: currentActiveTab?.id,
-  } satisfies ExtensionMessage)) as { ok: boolean; delivered?: boolean; reason?: string };
-
-  listeningQuizBtn.disabled = false;
-  if (res?.delivered) {
-    window.close();
-  } else {
-    const isTr = isTurkishUi(currentStatus);
-    popupFeedback.hidden = false;
-    popupFeedback.textContent =
-      res?.reason === 'blocked_site'
-        ? isTr
-          ? 'Bu sitede dinleme modu kapalı.'
-          : 'Listening mode is disabled on this site.'
-        : isTr
-          ? 'Normal bir web sayfası sekmesi açın.'
-          : 'Open a regular webpage tab first.';
-  }
-}
-
 triggerNowBtn.addEventListener('click', () => void triggerCardOnPage());
 pageQuizBtn.addEventListener('click', () => void triggerPageQuizOnPage());
-listeningQuizBtn.addEventListener('click', () => void triggerListeningQuizOnPage());
+
+themeToggleBtn.addEventListener('click', async () => {
+  const currentMode = normalizeThemeMode(
+    currentStatus?.settings.themeMode ?? document.documentElement.dataset.theme
+  );
+  const nextMode: UiThemeMode = currentMode === 'dark' ? 'light' : 'dark';
+  applyDocumentTheme(nextMode);
+  syncPopupThemeButton(nextMode, isTurkishUi(currentStatus));
+  if (currentStatus) {
+    currentStatus.settings.themeMode = nextMode;
+  }
+  await saveSettings({ themeMode: nextMode });
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'local' || !changes.settings?.newValue) return;
+  const nextMode = normalizeThemeMode((changes.settings.newValue as { themeMode?: unknown }).themeMode);
+  applyDocumentTheme(nextMode);
+  syncPopupThemeButton(nextMode, isTurkishUi(currentStatus));
+});
 
 muteHourBtn.addEventListener('click', async () => {
   const isMuted =

@@ -76,6 +76,8 @@ export interface CoachPlaybackProgress {
   ended?: boolean;
 }
 
+export type UiThemeMode = 'light' | 'dark';
+
 export interface ExtensionSettings {
   enabled: boolean;
   /** Periodic trigger interval in minutes (default 20). */
@@ -99,10 +101,17 @@ export interface ExtensionSettings {
   blockedDomains: string[];
   /** Timestamp until which periodic/pending prompts are muted (e.g. 1-hour mute). */
   mutedUntil: number | null;
+  /**
+   * True when the learner paused automatic popups from the floating card until
+   * they manually trigger "Şimdi Sor" (which restores `enabled: true` at the last `intervalMinutes`).
+   */
+  pausedUntilManual?: boolean;
   /** Weight card selection toward the user's estimated skill rating. */
   adaptiveDifficulty: boolean;
   /** Preferred native / UI / AI explanation language ('auto' matches browser language). */
   uiLanguage?: FeedbackLanguageMode;
+  /** Visual appearance mode ('light' warm champagne-ivory & gold, or 'dark' night mode). */
+  themeMode?: UiThemeMode;
 }
 
 export type TopicDomain =
@@ -658,6 +667,13 @@ export type ExtensionMessage =
   | { type: 'SNOOZE_PROMPT'; minutes: number }
   | { type: 'MUTE_FOR_HOURS'; hours: number }
   | { type: 'CLEAR_MUTE' }
+  | {
+      type: 'UPDATE_PROMPT_SCHEDULE';
+      intervalMinutes?: number;
+      enabled?: boolean;
+      pausedUntilManual?: boolean;
+      clearMute?: boolean;
+    }
   | { type: 'DISMISS_PROMPT'; cardId: string }
   | { type: 'TRIGGER_NOW'; tabId?: number }
   | { type: 'START_PAGE_QUIZ'; tabId?: number }

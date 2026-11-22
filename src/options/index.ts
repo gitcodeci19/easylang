@@ -61,6 +61,11 @@ import {
   upsertUserCard,
 } from '../shared/storage';
 import {
+  applyDocumentTheme,
+  buildThemeToggleSvg,
+  normalizeThemeMode,
+} from '../shared/theme';
+import {
   exportCardsAsJson,
   exportCardsAsTsv,
   parseImportedCards,
@@ -1075,6 +1080,7 @@ settingsForm.addEventListener('submit', async (e) => {
     quietHoursEnd: parseHour(quietEndInput.value),
     blockedDomains: parseBlockedListText(blockedDomainsInput.value),
     enabled: enabledInput.checked,
+    pausedUntilManual: false,
     adaptiveDifficulty: adaptiveDifficultyInput.checked,
     includeUserCards: includeUserCardsInput.checked,
     skipFullscreen: skipFullscreenInput.checked,
@@ -1919,6 +1925,51 @@ installWordHoverTooltip({
   root: document,
   delayMs: 1500,
   lookupWord: lookupOptionsOfflineWord,
+});
+
+const optionsThemeToggleBtn = document.getElementById('options-theme-toggle-btn') as HTMLButtonElement | null;
+const optionsThemeIconEl = document.getElementById('options-theme-icon') as HTMLElement | null;
+const optionsThemeLabelEl = document.getElementById('options-theme-label') as HTMLElement | null;
+
+function syncOptionsThemeButton(mode: 'light' | 'dark'): void {
+  const isTr = resolveSupportedLanguage((topbarLangSelect?.value || 'auto') as FeedbackLanguageMode) === 'tr';
+  if (optionsThemeIconEl) {
+    optionsThemeIconEl.replaceChildren(buildThemeToggleSvg(mode, 14));
+  }
+  if (optionsThemeLabelEl) {
+    optionsThemeLabelEl.textContent =
+      mode === 'dark'
+        ? isTr
+          ? 'Gündüz Modu'
+          : 'Light Mode'
+        : isTr
+          ? 'Gece Modu'
+          : 'Dark Mode';
+  }
+  if (optionsThemeToggleBtn) {
+    optionsThemeToggleBtn.classList.toggle('is-dark', mode === 'dark');
+  }
+}
+
+void getSettings().then((s) => {
+  const mode = normalizeThemeMode(s.themeMode);
+  applyDocumentTheme(mode);
+  syncOptionsThemeButton(mode);
+});
+
+optionsThemeToggleBtn?.addEventListener('click', async () => {
+  const current = normalizeThemeMode(document.documentElement.dataset.theme);
+  const next = current === 'dark' ? 'light' : 'dark';
+  applyDocumentTheme(next);
+  syncOptionsThemeButton(next);
+  await saveSettings({ themeMode: next });
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'local' || !changes.settings?.newValue) return;
+  const next = normalizeThemeMode((changes.settings.newValue as { themeMode?: unknown }).themeMode);
+  applyDocumentTheme(next);
+  syncOptionsThemeButton(next);
 });
 
 void initDashboard();

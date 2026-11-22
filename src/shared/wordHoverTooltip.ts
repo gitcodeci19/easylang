@@ -541,98 +541,118 @@ const TOOLTIP_CSS = `
   font-weight: 500;
 }
 
-/* Ice White & Modern Cobalt Light Tooltip Override */
-.${PROBE_CLASS}.is-active {
-  background: rgba(37, 99, 235, 0.14);
-  border-color: rgba(37, 99, 235, 0.65);
-  box-shadow: 0 0 12px rgba(37, 99, 235, 0.18);
+/* Warm Champagne-Ivory & Brushed Gold Light Tooltip Override (automatically disabled in Dark Mode) */
+:root:not([data-theme="dark"]) .${PROBE_CLASS}.is-active,
+:host(:not([data-theme="dark"])) .${PROBE_CLASS}.is-active {
+  background: rgba(199, 130, 20, 0.16);
+  border-color: rgba(199, 130, 20, 0.7);
+  box-shadow: 0 0 12px rgba(199, 130, 20, 0.2);
 }
 
-.${TOOLTIP_CLASS} {
-  background: #ffffff;
-  color: #0f172a;
-  border: 2px solid #cbd5e1;
-  border-bottom: 4px solid #94a3b8;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS},
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS} {
+  background: #fffdf7;
+  color: #1f1a12;
+  border: 2px solid #e5d7b3;
+  border-bottom: 4px solid #cfb882;
   border-radius: 14px;
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 14px 36px rgba(41, 30, 12, 0.16);
 }
 
-.${TOOLTIP_CLASS}::before {
-  background: linear-gradient(90deg, #2563eb 0%, #3b82f6 55%, #0ea5e9 100%);
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}::before,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}::before {
+  background: linear-gradient(90deg, #c78214 0%, #eab308 55%, #d9921d 100%);
 }
 
-.${TOOLTIP_CLASS}-word {
-  color: #0f172a;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-word,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-word {
+  color: #1f1a12;
 }
 
-.${TOOLTIP_CLASS}-phonetic,
-.${TOOLTIP_CLASS}-ipa,
-.${TOOLTIP_CLASS}-lemma,
-.${TOOLTIP_CLASS}-ensyn-lbl {
-  color: #64748b;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-phonetic,
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-ipa,
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-lemma,
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-ensyn-lbl,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-phonetic,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-ipa,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-lemma,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-ensyn-lbl {
+  color: #6e604b;
 }
 
-.${TOOLTIP_CLASS}-badge {
-  background: #f1f5f9;
-  color: #334155;
-  border-color: #cbd5e1;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-badge,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-badge {
+  background: #f4ecd4;
+  color: #3d3427;
+  border-color: #decb99;
 }
 
-.${TOOLTIP_CLASS}-badge.is-level {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border-color: #bfdbfe;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-badge.is-level,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-badge.is-level {
+  background: #fef7de;
+  color: #854d0e;
+  border-color: #e6c674;
 }
 
-.${TOOLTIP_CLASS}-spk {
-  background: #eff6ff;
-  border-color: #bfdbfe;
-  color: #2563eb;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-spk,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-spk {
+  background: #fef7de;
+  border-color: #e6c674;
+  color: #965e08;
 }
 
-.${TOOLTIP_CLASS}-spk:hover {
-  background: #2563eb;
-  border-color: #2563eb;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-spk:hover,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-spk:hover {
+  background: #c78214;
+  border-color: #c78214;
   color: #ffffff;
 }
 
-.${TOOLTIP_CLASS}-tr-box {
-  background: #fffbeb;
-  border: 1.5px solid #fde68a;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-tr-box,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-tr-box {
+  background: #faf3dc;
+  border: 1.5px solid #e6cb82;
 }
 
-.${TOOLTIP_CLASS}-tr-lbl {
-  color: #b45309;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-tr-lbl,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-tr-lbl {
+  color: #965e08;
   font-weight: 800;
 }
 
-.${TOOLTIP_CLASS}-pill {
-  background: #ffffff;
-  border: 1.5px solid #fcd34d;
-  color: #78350f;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-pill,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-pill {
+  background: #fffdf7;
+  border: 1.5px solid #e6c674;
+  color: #5c3a09;
   font-weight: 600;
 }
 
-.${TOOLTIP_CLASS}-pill.is-primary {
-  background: #fef3c7;
-  border: 1.5px solid #f59e0b;
-  color: #78350f;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-pill.is-primary,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-pill.is-primary {
+  background: #fef2c5;
+  border: 1.5px solid #d9921d;
+  color: #5c3a09;
   font-weight: 800;
-  box-shadow: 0 2px 0 #fde68a;
+  box-shadow: 0 2px 0 #e8cb7e;
 }
 
-.${TOOLTIP_CLASS}-meaning {
-  color: #0f172a;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-meaning,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-meaning {
+  color: #1f1a12;
 }
 
-.${TOOLTIP_CLASS}-alt,
-.${TOOLTIP_CLASS}-ensyn-val {
-  color: #1d4ed8;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-alt,
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-ensyn-val,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-alt,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-ensyn-val {
+  color: #854d0e;
   font-weight: 600;
 }
 
-.${TOOLTIP_CLASS}-ensyn {
-  border-top-color: #e2e8f0;
+:root:not([data-theme="dark"]) .${TOOLTIP_CLASS}-ensyn,
+:host(:not([data-theme="dark"])) .${TOOLTIP_CLASS}-ensyn {
+  border-top-color: #e8ddc0;
 }
 `;
 

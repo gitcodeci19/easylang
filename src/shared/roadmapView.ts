@@ -395,6 +395,7 @@ export class RoadmapController {
   private aiDiagnosticOverlay: AiDiagnosedOverlayItem[] = [];
   private activeMode: 'path' | 'remedial' = 'path';
   private coachInsight: RoadmapCoachInsight | null = null;
+  private isUnitHudExpanded: boolean = false;
 
   constructor(options: RoadmapViewOptions) {
     this.container = options.container;
@@ -661,9 +662,37 @@ export class RoadmapController {
       })
     );
 
-    // 1. Unified Full-Height Map Surface with Integrated Frosted-Glass HUD
+    // 1. Unified Full-Height Map Surface with Collapsible Overlay Unit HUD
     const mapSurface = document.createElement('div');
     mapSurface.className = 'duo-map-surface';
+
+    const buildBoldChevronSvg = (flipUp: boolean): SVGSVGElement => {
+      const svgNs = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(svgNs, 'svg');
+      svg.setAttribute('width', '22');
+      svg.setAttribute('height', '13');
+      svg.setAttribute('viewBox', '0 0 24 14');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('aria-hidden', 'true');
+      const path = document.createElementNS(svgNs, 'path');
+      path.setAttribute('d', flipUp ? 'M4 10.5L12 3.5L20 10.5' : 'M4 3.5L12 10.5L20 3.5');
+      path.setAttribute('stroke', 'currentColor');
+      path.setAttribute('stroke-width', '3.1');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      svg.appendChild(path);
+      return svg;
+    };
+
+    const hudPullBtn = document.createElement('button');
+    hudPullBtn.type = 'button';
+    hudPullBtn.className = 'duo-hud-pull-btn';
+    const activeUnitTitle = isTr ? activeUnit.titleTr : activeUnit.titleEn;
+    hudPullBtn.title = isTr
+      ? `${L.unitPrefix(activeUnit.unitNumber)} · ${activeUnitTitle} — Ünite menüsünü aç`
+      : `${L.unitPrefix(activeUnit.unitNumber)} · ${activeUnitTitle} — Expand unit menu`;
+    hudPullBtn.setAttribute('aria-label', hudPullBtn.title);
+    hudPullBtn.appendChild(buildBoldChevronSvg(false));
 
     const mapHud = document.createElement('div');
     mapHud.className = 'duo-map-hud';
@@ -786,7 +815,34 @@ export class RoadmapController {
 
     progressWrap.append(subMeta, miniTrack);
     hudMeta.append(progressWrap);
-    mapHud.append(hudTop, hudMeta);
+
+    const hudCollapseBtn = document.createElement('button');
+    hudCollapseBtn.type = 'button';
+    hudCollapseBtn.className = 'duo-hud-collapse-btn';
+    hudCollapseBtn.title = isTr ? 'Ünite menüsünü daralt' : 'Collapse unit menu';
+    hudCollapseBtn.setAttribute('aria-label', hudCollapseBtn.title);
+    hudCollapseBtn.appendChild(buildBoldChevronSvg(true));
+
+    mapHud.append(hudTop, hudMeta, hudCollapseBtn);
+
+    const syncHudExpandedState = (): void => {
+      mapHud.hidden = !this.isUnitHudExpanded;
+      mapHud.classList.toggle('is-expanded', this.isUnitHudExpanded);
+      hudPullBtn.hidden = this.isUnitHudExpanded;
+      hudPullBtn.setAttribute('aria-expanded', String(this.isUnitHudExpanded));
+    };
+    syncHudExpandedState();
+
+    hudPullBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.isUnitHudExpanded = true;
+      syncHudExpandedState();
+    });
+    hudCollapseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.isUnitHudExpanded = false;
+      syncHudExpandedState();
+    });
 
     // 2. Full-bleed Scrollable S-Curve Roadmap Canvas gliding smoothly underneath the HUD
     const pathScroll = document.createElement('div');
@@ -893,6 +949,7 @@ export class RoadmapController {
 
     unitSelect.addEventListener('change', async () => {
       const nextId = unitSelect.value;
+      this.isUnitHudExpanded = false;
       this.state = await saveRoadmapState({ activeUnitId: nextId });
       this.onStateUpdated?.(this.state);
       this.renderPathView('unit_top');
@@ -902,13 +959,19 @@ export class RoadmapController {
       mapHud.classList.toggle('is-scrolled', pathScroll.scrollTop > 8);
     };
     pathScroll.addEventListener('scroll', syncHudScrollState, { passive: true });
+    pathScroll.addEventListener('click', () => {
+      if (this.isUnitHudExpanded) {
+        this.isUnitHudExpanded = false;
+        syncHudExpandedState();
+      }
+    });
 
-    mapSurface.append(mapHud, pathScroll);
+    mapSurface.append(hudPullBtn, mapHud, pathScroll);
     root.appendChild(mapSurface);
     this.container.appendChild(root);
 
     requestAnimationFrame(() => {
-      const hudH = mapHud.offsetHeight || 62;
+      const hudH = this.isUnitHudExpanded ? (mapHud.offsetHeight || 68) : 26;
       if (scrollMode === 'unit_top') {
         const targetEl = pathScroll.querySelector<HTMLElement>(
           `[data-unit-section="${activeUnit.id}"]`
@@ -1007,19 +1070,19 @@ export class RoadmapController {
       row.className = `duo-node-row ${nodeState.status === 'active' ? 'is-active' : ''}`;
       row.style.transform = `translateX(${offsetPx}px)`;
 
-      // Vertical connector line to next node
+      // Smooth cubic Bezier S-curve trail positioned below caption pill (never cuts across text)
       if (i < up.nodes.length - 1) {
         const nextOffset = WINDING_OFFSETS_PX[(i + 1) % WINDING_OFFSETS_PX.length] ?? 0;
         const dx = nextOffset - offsetPx;
         const connSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         connSvg.setAttribute('class', 'duo-node-connector');
-        connSvg.setAttribute('viewBox', '-80 0 160 44');
+        connSvg.setAttribute('viewBox', '-80 0 160 52');
         const isDone = nodeState.status === 'completed';
-        connSvg.innerHTML = `
-          <line x1="0" y1="0" x2="${dx}" y2="44"
-            stroke="${isDone ? '#F59E0B' : '#CBD5E1'}"
-            stroke-width="3" stroke-linecap="round" stroke-dasharray="${isDone ? 'none' : '5 5'}" />
-        `;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M 0 0 C 0 26, ${dx} 24, ${dx} 52`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('class', `duo-conn-path ${isDone ? 'is-done' : 'is-pending'}`);
+        connSvg.appendChild(path);
         row.appendChild(connSvg);
       }
 
@@ -1044,15 +1107,16 @@ export class RoadmapController {
           nodeState.completedSteps === 0
             ? 14
             : Math.round((nodeState.completedSteps / nodeState.totalSteps) * 100);
-        const dashOffset = 226 - (226 * stepPct) / 100;
+        const circ = 2 * Math.PI * 36;
+        const dashOffset = circ - (circ * stepPct) / 100;
         const ringSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         ringSvg.setAttribute('class', 'duo-progress-ring');
-        ringSvg.setAttribute('viewBox', '0 0 84 84');
+        ringSvg.setAttribute('viewBox', '0 0 80 80');
         ringSvg.innerHTML = `
-          <circle cx="42" cy="42" r="36" fill="none" stroke="#DBEAFE" stroke-width="5"/>
-          <circle cx="42" cy="42" r="36" fill="none" stroke="#2563EB" stroke-width="5"
-            stroke-linecap="round" stroke-dasharray="226" stroke-dashoffset="${dashOffset}"
-            transform="rotate(-90 42 42)"/>
+          <circle class="duo-ring-track" cx="40" cy="40" r="36" fill="none" stroke-width="4.5"/>
+          <circle class="duo-ring-fill" cx="40" cy="40" r="36" fill="none" stroke-width="4.5"
+            stroke-linecap="round" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${dashOffset.toFixed(1)}"
+            transform="rotate(-90 40 40)"/>
         `;
         ringWrap.appendChild(ringSvg);
       }
@@ -1082,10 +1146,15 @@ export class RoadmapController {
 
       const cap = document.createElement('div');
       cap.className = `duo-node-caption ${nodeState.status}`;
-      cap.textContent =
-        nodeState.status === 'active'
-          ? `${L.nodeLabels[nodeState.node.kind]} (${nodeState.completedSteps}/${nodeState.totalSteps})`
-          : L.nodeLabels[nodeState.node.kind];
+      const capLabel = document.createElement('span');
+      capLabel.textContent = L.nodeLabels[nodeState.node.kind];
+      cap.appendChild(capLabel);
+      if (nodeState.status === 'active') {
+        const stepBadge = document.createElement('span');
+        stepBadge.className = 'duo-node-step-chip';
+        stepBadge.textContent = `${nodeState.completedSteps}/${nodeState.totalSteps}`;
+        cap.appendChild(stepBadge);
+      }
       row.appendChild(cap);
 
       nodesTrack.appendChild(row);

@@ -79,7 +79,9 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   autoTranslateContextMenu: true,
   blockedDomains: [],
   mutedUntil: null,
+  pausedUntilManual: false,
   adaptiveDifficulty: true,
+  themeMode: 'light',
 };
 
 const STORAGE_KEYS = {

@@ -197,58 +197,51 @@ export function renderRemedialHub(ctx: RemedialViewContext): void {
     })
   );
 
-  // Crimson Hero Header
+  // Compact Single-Row Header
   const hero = document.createElement('div');
-  hero.className = 'rem-hero';
+  hero.className = 'rem-hero is-compact';
 
   const heroLeft = document.createElement('div');
   heroLeft.className = 'rem-hero-left';
 
-  const heroTitle = document.createElement('div');
-  heroTitle.className = 'rem-hero-title';
-  heroTitle.textContent = isTr ? 'AI Zayıf Nokta Atölyesi' : 'AI Weak-Spot Studio';
-
-  const criticalCount = ctx.diagnosedWeaknesses.filter((w) => w.severity === 'critical').length;
-  const focusCount = ctx.diagnosedWeaknesses.filter((w) => w.severity === 'focus').length;
   const activeIds = new Set(ctx.diagnosedWeaknesses.map((w) => w.skillId));
   const resolvedCount = Object.values(ctx.remedialProgress).filter(
     (m) => m.lastAccuracyPct >= 80 && !activeIds.has(m.skillId)
   ).length;
-  const resolvedSuffix =
-    resolvedCount > 0
-      ? isTr
-        ? ` · ✓ ${resolvedCount} konu kapatıldı`
-        : ` · ✓ ${resolvedCount} resolved`
-      : '';
-  const heroSub = document.createElement('div');
-  heroSub.className = 'rem-hero-sub';
-  heroSub.textContent =
+
+  const heroTitle = document.createElement('div');
+  heroTitle.className = 'rem-hero-title';
+  heroTitle.textContent = isTr ? 'Zayıf Noktalar' : 'Focus Areas';
+
+  const heroCountPill = document.createElement('span');
+  heroCountPill.className = 'rem-hero-count';
+  heroCountPill.textContent =
     ctx.diagnosedWeaknesses.length > 0
       ? isTr
-        ? `${criticalCount} kritik · ${focusCount} odak${resolvedSuffix}`
-        : `${criticalCount} critical · ${focusCount} focus${resolvedSuffix}`
+        ? `${ctx.diagnosedWeaknesses.length} konu`
+        : `${ctx.diagnosedWeaknesses.length} topics`
       : resolvedCount > 0
         ? isTr
-          ? `Harika! Tespit edilen tüm eksiklerini kapattın (✓ ${resolvedCount} konu). Yeni hata olursa burada otomatik çıkar.`
-          : `Awesome! You cleared all diagnosed weak spots (✓ ${resolvedCount} resolved). New slips appear here automatically.`
+          ? `✓ ${resolvedCount} tamamlandı`
+          : `✓ ${resolvedCount} cleared`
         : isTr
-          ? 'Tüm geçmişin temiz görünüyor! Alttan istediğin özel konuyu hemen çalışabilirsin.'
-          : 'Your error log looks clean! Pick any targeted workshop below to sharpen your edge.';
+          ? 'Temiz'
+          : 'All clear';
 
-  heroLeft.append(heroTitle, heroSub);
+  heroLeft.append(heroTitle, heroCountPill);
 
   const scanBtn = document.createElement('button');
   scanBtn.type = 'button';
   scanBtn.className = 'rem-ai-scan-btn';
-  setIconLabel(scanBtn, 'sparkles', isTr ? 'AI Derin Tara' : 'AI Deep Scan', 13);
+  setIconLabel(scanBtn, 'sparkles', isTr ? 'AI Tara' : 'AI Scan', 12);
   scanBtn.disabled = !ctx.aiActive;
   scanBtn.title = ctx.aiActive
     ? isTr
-      ? 'Son hatalarını yapay zekâ ile derinlemesine analiz et'
-      : 'Run an AI deep scan across your recent error history'
+      ? 'Son hatalarını yapay zekâ ile tara'
+      : 'Run an AI scan across your recent error history'
     : isTr
-      ? 'Ayarlar → AI Değerlendirme bölümünden API anahtarı ekleyin'
-      : 'Enable AI in Settings → AI Evaluation first';
+      ? 'Ayarlar → Yapay Zekâ bölümünden API anahtarı ekleyin'
+      : 'Enable AI in Settings → AI first';
 
   const scanStatus = document.createElement('div');
   scanStatus.className = 'rem-scan-status';
@@ -256,11 +249,11 @@ export function renderRemedialHub(ctx: RemedialViewContext): void {
 
   scanBtn.addEventListener('click', async () => {
     scanBtn.disabled = true;
-    setIconLabel(scanBtn, 'sparkles', isTr ? 'Taranıyor...' : 'Scanning...', 13);
+    setIconLabel(scanBtn, 'sparkles', isTr ? 'Taranıyor...' : 'Scanning...', 12);
     scanStatus.hidden = false;
     scanStatus.textContent = isTr
-      ? 'Yapay zekâ son hatalarındaki gizli kalıpları tarıyor...'
-      : 'AI is scanning your recent mistakes for hidden patterns...';
+      ? 'Hatalarındaki kalıplar taranıyor...'
+      : 'Scanning recent mistakes...';
     try {
       const res = (await chrome.runtime.sendMessage({
         type: 'DIAGNOSE_WEAKNESSES_AI',
@@ -276,16 +269,12 @@ export function renderRemedialHub(ctx: RemedialViewContext): void {
       }
       scanStatus.textContent =
         res?.error ||
-        (isTr
-          ? 'AI taraması tamamlanamadı. Yerel teşhis aktif.'
-          : 'AI scan unavailable. Local diagnosis remains active.');
+        (isTr ? 'AI taraması yapılamadı.' : 'AI scan unavailable.');
     } catch {
-      scanStatus.textContent = isTr
-        ? 'AI bağlantısı kurulamadı. Yerel teşhis aktif.'
-        : 'Could not reach AI. Local diagnosis remains active.';
+      scanStatus.textContent = isTr ? 'AI bağlantısı kurulamadı.' : 'Could not reach AI.';
     } finally {
       scanBtn.disabled = !ctx.aiActive;
-      setIconLabel(scanBtn, 'sparkles', isTr ? 'AI Derin Tara' : 'AI Deep Scan', 13);
+      setIconLabel(scanBtn, 'sparkles', isTr ? 'AI Tara' : 'AI Scan', 12);
     }
   });
 
@@ -309,109 +298,84 @@ export function renderRemedialHub(ctx: RemedialViewContext): void {
   };
 
   if (ctx.diagnosedWeaknesses.length > 0) {
-    const secLabel = document.createElement('div');
-    secLabel.className = 'rem-section-label';
-    secLabel.textContent = isTr
-      ? `SANA ÖZEL TESPİT EDİLEN DERSLER (${ctx.diagnosedWeaknesses.length})`
-      : `PERSONALIZED WEAKNESS LESSONS (${ctx.diagnosedWeaknesses.length})`;
-    scrollWrap.appendChild(secLabel);
-
     const listEl = document.createElement('div');
-    listEl.className = 'rem-card-list';
+    listEl.className = 'rem-card-list is-compact';
 
     for (const w of ctx.diagnosedWeaknesses) {
       const mastery = ctx.remedialProgress[w.skillId];
 
       const card = document.createElement('div');
-      card.className = `rem-card sev-${w.severity}`;
+      card.className = `rem-card is-compact sev-${w.severity}`;
 
-      const topRow = document.createElement('div');
-      topRow.className = 'rem-card-top';
-
-      const titleWrap = document.createElement('div');
-      titleWrap.className = 'rem-card-title-wrap';
+      // Keep detailed evidence cleanly inside hover tooltip instead of cluttering the card
+      const tipParts: string[] = [isTr ? w.subtitleTr : w.subtitleEn];
+      if (w.aiReason) {
+        tipParts.push(w.aiReason);
+      } else if (w.evidenceExamples.length > 0) {
+        const ev = w.evidenceExamples[0]!;
+        const ans =
+          ev.userAnswer && ev.userAnswer !== '(skipped)'
+            ? isTr
+              ? ` · Cevabın: "${ev.userAnswer}"`
+              : ` · You wrote: "${ev.userAnswer}"`
+            : '';
+        tipParts.push(isTr ? `Örnek: "${ev.en}"${ans}` : `Example: "${ev.en}"${ans}`);
+      }
+      if (mastery) {
+        tipParts.push(isTr ? `En iyi: %${mastery.bestAccuracyPct}` : `Best: ${mastery.bestAccuracyPct}%`);
+      }
+      card.title = tipParts.join('\n');
 
       const iconEl = document.createElement('span');
       iconEl.className = 'rem-card-icon';
       setIconOnly(iconEl, getRemedialSkillIconName(w.skillId), 14);
 
-      const titleCol = document.createElement('div');
-      titleCol.className = 'rem-card-title-col';
-      const titleEl = document.createElement('div');
+      const mainCol = document.createElement('div');
+      mainCol.className = 'rem-card-title-col';
+
+      const headLine = document.createElement('div');
+      headLine.className = 'rem-card-headline';
+
+      const titleEl = document.createElement('span');
       titleEl.className = 'rem-card-title';
       titleEl.textContent = isTr ? w.titleTr : w.titleEn;
+      headLine.appendChild(titleEl);
+
+      if (mastery && mastery.bestAccuracyPct > 0) {
+        const bestBadge = document.createElement('span');
+        bestBadge.className = 'rem-mini-stat';
+        bestBadge.textContent = `%${mastery.bestAccuracyPct}`;
+        headLine.appendChild(bestBadge);
+      }
 
       const subEl = document.createElement('div');
       subEl.className = 'rem-card-sub';
       subEl.textContent = isTr ? w.subtitleTr : w.subtitleEn;
-      titleCol.append(titleEl, subEl);
-      titleWrap.append(iconEl, titleCol);
 
-      const sevPill = document.createElement('span');
-      sevPill.className = `rem-sev-pill sev-${w.severity}`;
-      sevPill.textContent =
-        w.severity === 'critical'
-          ? isTr
-            ? 'Öncelikli'
-            : 'Priority'
-          : w.severity === 'focus'
-            ? isTr
-              ? 'Odak'
-              : 'Focus'
-            : isTr
-              ? 'Pekiştir'
-              : 'Polish';
-
-      topRow.append(titleWrap, sevPill);
-      card.appendChild(topRow);
-
-      // Personal evidence or AI diagnostic reason
-      if (w.aiReason) {
-        const aiBox = document.createElement('div');
-        aiBox.className = 'rem-evidence-box is-ai';
-        aiBox.textContent = w.aiReason;
-        card.appendChild(aiBox);
-      } else if (w.evidenceExamples.length > 0) {
-        const ev = w.evidenceExamples[0]!;
-        const evBox = document.createElement('div');
-        evBox.className = 'rem-evidence-box';
-        const userSnippet =
-          ev.userAnswer && ev.userAnswer !== '(skipped)'
-            ? isTr
-              ? ` · Cevabın: "${ev.userAnswer.slice(0, 42)}"`
-              : ` · You wrote: "${ev.userAnswer.slice(0, 42)}"`
-            : '';
-        evBox.textContent = isTr
-          ? `Takıldığın örnek: "${ev.en.slice(0, 56)}"${userSnippet}`
-          : `Missed example: "${ev.en.slice(0, 56)}"${userSnippet}`;
-        card.appendChild(evBox);
-      }
-
-      const bottomRow = document.createElement('div');
-      bottomRow.className = 'rem-card-bottom';
-
-      const metaEl = document.createElement('div');
-      metaEl.className = 'rem-card-meta';
-      const errTxt = isTr ? `${w.errorCount} sinyal` : `${w.errorCount} signals`;
-      const mastTxt = mastery
-        ? isTr
-          ? ` · ✓ En iyi %${mastery.bestAccuracyPct}`
-          : ` · ✓ Best ${mastery.bestAccuracyPct}%`
-        : '';
-      metaEl.textContent = `${errTxt}${mastTxt}`;
+      mainCol.append(headLine, subEl);
 
       const enterBtn = document.createElement('button');
       enterBtn.type = 'button';
-      enterBtn.className = 'rem-enter-btn';
-      enterBtn.textContent = isTr ? 'Derse Gir →' : 'Start Lesson →';
-      enterBtn.addEventListener('click', () => launchSkill(w.skillId, w));
+      enterBtn.className = 'rem-enter-btn is-compact';
+      enterBtn.textContent = isTr ? 'Başla →' : 'Start →';
+      enterBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        launchSkill(w.skillId, w);
+      });
 
-      bottomRow.append(metaEl, enterBtn);
-      card.appendChild(bottomRow);
+      card.addEventListener('click', () => launchSkill(w.skillId, w));
+      card.append(iconEl, mainCol, enterBtn);
       listEl.appendChild(card);
     }
 
     scrollWrap.appendChild(listEl);
+  } else {
+    const cleanNote = document.createElement('div');
+    cleanNote.className = 'rem-empty-compact';
+    cleanNote.textContent = isTr
+      ? 'Tespit edilen açık hata yok. Aşağıdan istediğin konuyu çalışabilirsin.'
+      : 'No open weak spots detected. Pick any topic below to practice.';
+    scrollWrap.appendChild(cleanNote);
   }
 
   // Collapsible full catalog so user can manually study ANY of the 18 topics

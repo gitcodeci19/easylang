@@ -6,6 +6,8 @@
     <title>LingoEx</title>
     <link rel="icon" type="image/png" href="icons/icon48.png" />
     <link rel="stylesheet" href="popup.css" />
+    <link id="theme-light-css" rel="stylesheet" href="popup-light.css" />
+    <script src="theme-init.js"></script>
   </head>
   <body>
     <main class="popup">
@@ -14,7 +16,6 @@
         <div class="topbar-left">
           <img src="icons/icon32.png" class="brand-icon" alt="LingoEx" />
           <span class="rank-chip" id="rank-chip" title="CEFR Seviyesi &amp; Elo Puanı">B1 · 1200</span>
-          <span class="mini-telemetry" id="mini-telemetry" title="Bugün Doğru / Öğrenilen">0✓ · 0★</span>
           <span class="timer-pill" id="countdown-text">...</span>
         </div>
 
@@ -34,6 +35,11 @@
             <option value="zh">ZH</option>
             <option value="ar">AR</option>
           </select>
+          <button id="theme-toggle-btn" class="icon-btn" type="button" title="Gece Modu">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+            </svg>
+          </button>
           <button id="mute-hour-btn" class="icon-btn" type="button" title="1 Saat Sustur">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
               <path d="M8 2.5a3.5 3.5 0 00-3.5 3.5v2.6L3.2 10.5h9.6l-1.3-1.9V6A3.5 3.5 0 008 2.5zM6.6 12.5a1.5 1.5 0 002.8 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
@@ -42,26 +48,6 @@
           <button id="toggle-block-site-btn" class="icon-btn" type="button" title="Bu sitede kapat" hidden>
             <span class="site-dot" id="site-dot"></span>
           </button>
-          <button id="open-options-btn" class="icon-btn" type="button" title="Ayarlar &amp; Panel">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"
-                stroke="currentColor"
-                stroke-width="1.9"
-              />
-              <path
-                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.78 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </button>
-          <label class="switch" title="Otomatik kartları aç/kapat">
-            <input type="checkbox" id="enabled-toggle" />
-            <span class="slider"></span>
-          </label>
         </div>
       </header>
 
@@ -135,9 +121,22 @@
         </div>
 
         <div class="act-slot">
-          <button id="listening-quiz-btn" class="act-btn" type="button" title="İngilizce sesli cümleyi dinle ve yaz">
-            <span class="dot emerald"></span>
-            <span id="listening-quiz-label">Dinle &amp; Yaz</span>
+          <button id="open-options-btn" class="act-btn act-settings" type="button" title="Ayarlar &amp; Panel">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"
+                stroke="currentColor"
+                stroke-width="2"
+              />
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.78 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+                stroke="currentColor"
+                stroke-width="1.9"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span id="open-options-label">Ayarlar</span>
           </button>
         </div>
       </footer>

@@ -5,6 +5,10 @@ import {
 } from '../shared/offlineDictionary';
 import { shouldShowB1ReadinessPrompt } from '../shared/onboarding';
 import {
+  applyManualTriggerResume,
+  applyPromptScheduleUpdate,
+} from '../shared/promptSchedule';
+import {
   mergePendingTutorReplyIntoHistory,
   mergeRemedialBriefingAiIntoSession,
 } from '../shared/roadmapCoach';
@@ -172,6 +176,23 @@ async function scheduleSnoozeAlarm(minutes: number): Promise<void> {
     delayInMinutes: safeMinutes,
   });
   await setNextAlarmAt(Date.now() + safeMinutes * 60_000);
+}
+
+/**
+ * If auto-prompts were paused via "Pause until I turn it back on" from the floating widget,
+ * resume them at the learner's last saved interval when they manually click "Şimdi Sor".
+ */
+async function resumeAutoPromptsIfPausedUntilManual(): Promise<boolean> {
+  const current = await getSettings();
+  const { next, resumed } = applyManualTriggerResume(current);
+  if (!resumed) return false;
+  await saveSettings({
+    enabled: next.enabled,
+    pausedUntilManual: next.pausedUntilManual,
+    mutedUntil: next.mutedUntil,
+  });
+  await syncPeriodicAlarm();
+  return true;
 }
 
 function registerContextMenu(): void {
@@ -371,7 +392,10 @@ async function triggerListeningQuiz(
 
 chrome.commands.onCommand.addListener((command) => {
   if (command === TRIGGER_COMMAND) {
-    void triggerScheduledQuiz(true);
+    void (async () => {
+      await resumeAutoPromptsIfPausedUntilManual();
+      await triggerScheduledQuiz(true);
+    })();
   } else if (command === TRIGGER_PAGE_QUIZ_COMMAND) {
     void triggerPageQuiz();
   } else if (command === TRIGGER_LISTENING_QUIZ_COMMAND) {
@@ -647,6 +671,30 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage & { target?: str
         sendResponse({ ok: true, status });
         break;
       }
+      case 'UPDATE_PROMPT_SCHEDULE': {
+        const current = await getSettings();
+        const next = applyPromptScheduleUpdate(current, {
+          intervalMinutes: message.intervalMinutes,
+          enabled: message.enabled,
+          pausedUntilManual: message.pausedUntilManual,
+          clearMute: message.clearMute,
+        });
+        const updated = await saveSettings({
+          intervalMinutes: next.intervalMinutes,
+          enabled: next.enabled,
+          pausedUntilManual: next.pausedUntilManual,
+          mutedUntil: next.mutedUntil,
+        });
+        await chrome.alarms.clear(SNOOZE_ALARM_NAME);
+        if (!updated.enabled) {
+          await setCurrentPrompt(null);
+          await setPendingPrompt(null);
+        }
+        await syncPeriodicAlarm();
+        const status = await getStatusSnapshot();
+        sendResponse({ ok: true, settings: updated, status });
+        break;
+      }
       case 'TEST_AI_CONNECTION': {
         const aiConfig = await getAiConfig();
         const result = await testProviderConnection(aiConfig, 1);
@@ -843,8 +891,9 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage & { target?: str
       }
       case 'TRIGGER_NOW': {
         const targetTabId = message.tabId ?? sender.tab?.id;
+        const resumedAuto = await resumeAutoPromptsIfPausedUntilManual();
         const res = await triggerScheduledQuiz(true, targetTabId);
-        sendResponse({ ok: true, ...res });
+        sendResponse({ ok: true, resumedAuto, ...res });
         break;
       }
       case 'START_PAGE_QUIZ': {

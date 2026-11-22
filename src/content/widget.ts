@@ -4,6 +4,7 @@ import { renderHighlightedPhrase, renderHighlightedSentence } from '../shared/gr
 import { getUiStrings, resolveSupportedLanguage } from '../shared/i18n';
 import { extractDisplayMeanings } from '../shared/meaningFormatter';
 import type { OfflineWordEntry } from '../shared/offlineDictionary';
+import { QUICK_INTERVAL_PRESETS } from '../shared/promptSchedule';
 import { playCorrectSfx, playWrongSfx } from '../shared/sfx';
 import { speakEnglishText as speakEnglish } from '../shared/speech';
 import { isAiApiConfigured } from '../shared/storage';
@@ -20,8 +21,9 @@ import type {
   ConceptNote,
   ExtensionMessage,
   ExtensionSettings,
+  UiThemeMode,
 } from '../shared/types';
-import { WIDGET_CSS } from './widgetStyles';
+import { getWidgetCss } from './widgetStyles';
 
 const HOST_ID = 'en-tr-recall-shadow-host';
 const TOAST_HOST_ID = 'en-tr-recall-toast-host';
@@ -111,6 +113,53 @@ function createCloseIconBtn(title: string): HTMLButtonElement {
   return btn;
 }
 
+function buildMiniSvg(paths: string[], size: number = 13): SVGSVGElement {
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNs, 'svg');
+  svg.setAttribute('width', String(size));
+  svg.setAttribute('height', String(size));
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2.2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const d of paths) {
+    const p = document.createElementNS(svgNs, 'path');
+    p.setAttribute('d', d);
+    svg.appendChild(p);
+  }
+  return svg;
+}
+
+function buildClockMiniSvg(size: number = 12): SVGSVGElement {
+  return buildMiniSvg(['M12 6v6l4 2', 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z'], size);
+}
+
+function buildChevronDownSvg(size: number = 11): SVGSVGElement {
+  return buildMiniSvg(['M6 9l6 6 6-6'], size);
+}
+
+function buildBellOffMiniSvg(size: number = 16): SVGSVGElement {
+  return buildMiniSvg(
+    [
+      'M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5',
+      'M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7',
+      'M10.3 21a1.94 1.94 0 0 0 3.4 0',
+      'M2 2l20 20',
+    ],
+    size
+  );
+}
+
+function buildPauseCircleMiniSvg(size: number = 16): SVGSVGElement {
+  return buildMiniSvg(
+    ['M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z', 'M10 15V9', 'M14 15V9'],
+    size
+  );
+}
+
 function isolateKeyboardEvents(el: HTMLElement): void {
   const stop = (e: Event) => {
     e.stopPropagation();
@@ -120,14 +169,18 @@ function isolateKeyboardEvents(el: HTMLElement): void {
   el.addEventListener('keypress', stop);
 }
 
-export function renderToast(message: string): void {
+let lastToastThemeMode: UiThemeMode = 'light';
+
+export function renderToast(message: string, themeMode?: UiThemeMode): void {
+  const mode: UiThemeMode = themeMode ?? lastToastThemeMode;
   document.getElementById(TOAST_HOST_ID)?.remove();
   const host = document.createElement('div');
   host.id = TOAST_HOST_ID;
+  host.dataset.theme = mode;
   const shadow = host.attachShadow({ mode: 'closed' });
 
   const style = document.createElement('style');
-  style.textContent = WIDGET_CSS;
+  style.textContent = getWidgetCss(mode);
   const toast = createEl('div', 'etr-toast', message);
 
   shadow.append(style, toast);
@@ -145,14 +198,23 @@ export function renderRecallWidget(
   removeRecallWidget();
 
   const { card, isRetry, retryAttempt, targetConcept } = prompt;
+  let activeSettings: ExtensionSettings = { ...settings };
+  const themeMode: UiThemeMode = settings.themeMode === 'dark' ? 'dark' : 'light';
+  lastToastThemeMode = themeMode;
+  let promptDismissed = false;
+  const currentHost = window.location.hostname.replace(/^www\./i, '');
+  const displayHost = currentHost
+    ? currentHost.charAt(0).toUpperCase() + currentHost.slice(1)
+    : '';
   const ui = getUiStrings(settings.uiLanguage);
   const isTr = resolveSupportedLanguage(settings.uiLanguage) === 'tr';
   const host = document.createElement('div');
   host.id = HOST_ID;
+  host.dataset.theme = themeMode;
   const shadow = host.attachShadow({ mode: 'closed' });
 
   const style = document.createElement('style');
-  style.textContent = WIDGET_CSS;
+  style.textContent = getWidgetCss(themeMode);
 
   const wrap = createEl('div', 'etr-wrap');
   const cardEl = createEl('div', 'etr-card');
@@ -161,6 +223,206 @@ export function renderRecallWidget(
     cardType: card.type,
   });
   const shouldGlowTeach = hasRichTeachMeSkills(detectedCardSkills);
+
+  const applyScheduleChange = async (
+    patch: {
+      intervalMinutes?: number;
+      enabled?: boolean;
+      pausedUntilManual?: boolean;
+      clearMute?: boolean;
+    },
+    closeAfter: boolean,
+    toastMessage: string
+  ): Promise<boolean> => {
+    try {
+      const res = await sendBgMessage<{ ok?: boolean; settings?: ExtensionSettings }>({
+        type: 'UPDATE_PROMPT_SCHEDULE',
+        ...patch,
+      });
+      if (res?.settings) {
+        activeSettings = res.settings;
+      } else {
+        activeSettings = {
+          ...activeSettings,
+          ...(patch.intervalMinutes !== undefined ? { intervalMinutes: patch.intervalMinutes } : {}),
+          ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+          ...(patch.pausedUntilManual !== undefined ? { pausedUntilManual: patch.pausedUntilManual } : {}),
+          ...(patch.clearMute ? { mutedUntil: null } : {}),
+        };
+      }
+      if (closeAfter) {
+        removeRecallWidget();
+      }
+      renderToast(toastMessage);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const renderDismissScheduleView = (): void => {
+    activeTeachCleanup?.();
+    activeTeachCleanup = null;
+    stopActiveRuleAudio();
+    stopGuideAssistant();
+
+    const mins = activeSettings.intervalMinutes;
+    cardEl.className = 'etr-card is-dismiss-prompt';
+    cardEl.replaceChildren();
+
+    const header = createEl('div', 'etr-header etr-dismiss-header');
+    const badge = createEl('span', 'etr-badge etr-dismiss-cadence-badge');
+    badge.append(
+      buildClockMiniSvg(11),
+      document.createTextNode(isTr ? ` Şu an: Her ${mins} dk’da bir` : ` Active: Every ${mins}m`)
+    );
+    const closeNowBtn = createCloseIconBtn(isTr ? 'Kapat' : 'Close');
+    closeNowBtn.addEventListener('click', removeRecallWidget);
+    header.append(badge, closeNowBtn);
+
+    const body = createEl('div', 'etr-dismiss-box');
+    const title = createEl(
+      'div',
+      'etr-dismiss-title',
+      isTr ? 'Sorular çok mu sık geliyor?' : 'Are questions popping up too often?'
+    );
+    const sub = createEl(
+      'div',
+      'etr-dismiss-sub',
+      isTr
+        ? 'Ayarlara girmeden sıklığı hemen değiştirebilir ya da otomatik soruları durdurabilirsin.'
+        : 'Adjust how often cards appear, or pause automatic popups right here.'
+    );
+
+    const intervalBlock = createEl('div', 'etr-dismiss-section');
+    const intervalLabel = createEl(
+      'div',
+      'etr-dismiss-section-label',
+      isTr ? 'Soru aralığını değiştir' : 'Change interval'
+    );
+    const intervalGrid = createEl('div', 'etr-dismiss-intervals');
+    for (const preset of QUICK_INTERVAL_PRESETS) {
+      const isCurrent = preset === mins;
+      const chip = createEl(
+        'button',
+        `etr-cadence-chip${isCurrent ? ' is-active' : ''}`,
+        isTr
+          ? `${preset} dk${isCurrent ? ' ✓' : ''}`
+          : `${preset}m${isCurrent ? ' ✓' : ''}`
+      );
+      chip.type = 'button';
+      if (isCurrent) {
+        chip.title = isTr ? 'Şu an seçili süre' : 'Currently active interval';
+      }
+      chip.addEventListener('click', async () => {
+        if (isCurrent) {
+          removeRecallWidget();
+          return;
+        }
+        await applyScheduleChange(
+          { intervalMinutes: preset, enabled: true, pausedUntilManual: false, clearMute: true },
+          true,
+          isTr
+            ? `Soru aralığı ${preset} dk olarak güncellendi.`
+            : `Question interval updated to ${preset}m.`
+        );
+      });
+      intervalGrid.appendChild(chip);
+    }
+    intervalBlock.append(intervalLabel, intervalGrid);
+
+    const actionsStack = createEl('div', 'etr-dismiss-actions');
+
+    const muteActionBtn = createEl('button', 'etr-dismiss-action is-mute');
+    muteActionBtn.type = 'button';
+    const muteIconWrap = createEl('span', 'etr-dismiss-action-icon');
+    muteIconWrap.appendChild(buildBellOffMiniSvg(16));
+    const muteTextWrap = createEl('span', 'etr-dismiss-action-text');
+    muteTextWrap.append(
+      createEl('span', 'etr-dismiss-action-title', isTr ? '1 saat sessize al' : 'Mute for 1 hour'),
+      createEl(
+        'span',
+        'etr-dismiss-action-desc',
+        isTr
+          ? `1 saat soru çıkmaz, sonra tekrar her ${mins} dk’da bir devam eder.`
+          : `Quiet for 1 hour, then automatically resumes every ${mins}m.`
+      )
+    );
+    muteActionBtn.append(muteIconWrap, muteTextWrap);
+    muteActionBtn.addEventListener('click', async () => {
+      await sendBgMessage({ type: 'MUTE_FOR_HOURS', hours: 1 });
+      removeRecallWidget();
+      renderToast(isTr ? 'Otomatik sorular 1 saat sessize alındı.' : 'Auto-prompts muted for 1 hour.');
+    });
+
+    const pauseActionBtn = createEl('button', 'etr-dismiss-action is-pause');
+    pauseActionBtn.type = 'button';
+    const pauseIconWrap = createEl('span', 'etr-dismiss-action-icon');
+    pauseIconWrap.appendChild(buildPauseCircleMiniSvg(16));
+    const pauseTextWrap = createEl('span', 'etr-dismiss-action-text');
+    pauseTextWrap.append(
+      createEl(
+        'span',
+        'etr-dismiss-action-title',
+        isTr ? 'Ben tekrar açana kadar otomatik soru sorma' : 'Pause auto-prompts until I reopen'
+      ),
+      createEl(
+        'span',
+        'etr-dismiss-action-desc',
+        isTr
+          ? `“Şimdi Sor” butonuna basana kadar durur; basınca tekrar ${mins} dk’da bir devam eder.`
+          : `Stays off until you click Quick Quiz, then resumes every ${mins}m.`
+      )
+    );
+    pauseActionBtn.append(pauseIconWrap, pauseTextWrap);
+    pauseActionBtn.addEventListener('click', async () => {
+      await applyScheduleChange(
+        { enabled: false, pausedUntilManual: true, clearMute: true },
+        true,
+        isTr
+          ? `Otomatik sorular durduruldu. “Şimdi Sor”a basınca ${mins} dk aralıkla devam eder.`
+          : `Auto-prompts paused. Click Quick Quiz anytime to resume every ${mins}m.`
+      );
+    });
+
+    actionsStack.append(muteActionBtn, pauseActionBtn);
+
+    const footerRow = createEl('div', 'etr-dismiss-footer');
+    if (currentHost) {
+      const blockSiteBtn = createEl(
+        'button',
+        'etr-dismiss-link is-danger',
+        isTr ? 'Bu sitede gösterme' : 'Disable on this site'
+      );
+      blockSiteBtn.type = 'button';
+      blockSiteBtn.title = isTr
+        ? `Eklenti artık ${displayHost} sayfasında çalışmasın`
+        : `Stop running the extension on ${displayHost}`;
+      blockSiteBtn.addEventListener('click', async () => {
+        await sendBgMessage({ type: 'TOGGLE_BLOCK_HOST', host: currentHost });
+        removeRecallWidget();
+        renderToast(
+          isTr
+            ? `Eklenti artık ${displayHost} sayfasında çalışmayacak.`
+            : `Disabled LingoEx on ${displayHost}.`,
+          themeMode
+        );
+      });
+      footerRow.appendChild(blockSiteBtn);
+    }
+
+    const keepCloseBtn = createEl(
+      'button',
+      'etr-dismiss-link',
+      isTr ? 'Değiştirme, kapat' : 'Keep as is, close'
+    );
+    keepCloseBtn.type = 'button';
+    keepCloseBtn.addEventListener('click', removeRecallWidget);
+    footerRow.appendChild(keepCloseBtn);
+
+    body.append(title, sub, intervalBlock, actionsStack, footerRow);
+    cardEl.append(header, body);
+  };
 
   const renderQuestionView = (): void => {
     cardEl.className = 'etr-card';
@@ -192,29 +454,156 @@ export function renderRecallWidget(
     }
 
     const headerActions = createEl('div', 'etr-header-actions');
-    const snoozeBtn = createEl('button', 'etr-icon-btn', '5m');
-    snoozeBtn.type = 'button';
-    snoozeBtn.title = isTr ? '5 dakika ertele' : 'Snooze for 5 minutes';
-    snoozeBtn.addEventListener('click', async () => {
-      await sendBgMessage({ type: 'SNOOZE_PROMPT', minutes: 5 });
-      removeRecallWidget();
-    });
 
-    const muteBtn = createEl('button', 'etr-icon-btn', '1h');
-    muteBtn.type = 'button';
-    muteBtn.title = isTr ? '1 saat sessize al' : 'Mute for 1 hour';
-    muteBtn.addEventListener('click', async () => {
-      await sendBgMessage({ type: 'MUTE_FOR_HOURS', hours: 1 });
-      removeRecallWidget();
+    const cadenceBtn = createEl('button', 'etr-icon-btn etr-cadence-btn');
+    cadenceBtn.type = 'button';
+    const cadenceTextEl = createEl('span', 'etr-cadence-btn-label');
+    const syncCadenceButton = (): void => {
+      cadenceTextEl.textContent = activeSettings.enabled
+        ? isTr
+          ? `${activeSettings.intervalMinutes} dk`
+          : `${activeSettings.intervalMinutes}m`
+        : isTr
+          ? 'Kapalı'
+          : 'Off';
+      cadenceBtn.title = isTr
+        ? 'Soru sıklığını değiştir, ertele veya durdur'
+        : 'Change question frequency, snooze, or pause';
+    };
+    syncCadenceButton();
+    cadenceBtn.append(buildClockMiniSvg(12), cadenceTextEl, buildChevronDownSvg(11));
+
+    const cadencePanel = createEl('div', 'etr-cadence-panel');
+    cadencePanel.hidden = true;
+
+    const renderCadencePanel = (): void => {
+      cadencePanel.replaceChildren();
+      const freqLabel = createEl(
+        'div',
+        'etr-cadence-label',
+        isTr ? 'Otomatik soru sıklığı' : 'Auto-question interval'
+      );
+      const chipRow = createEl('div', 'etr-cadence-chips');
+      for (const preset of QUICK_INTERVAL_PRESETS) {
+        const isActive = activeSettings.enabled && activeSettings.intervalMinutes === preset;
+        const chip = createEl(
+          'button',
+          `etr-cadence-chip${isActive ? ' is-active' : ''}`,
+          isTr ? `${preset} dk` : `${preset}m`
+        );
+        chip.type = 'button';
+        chip.addEventListener('click', async () => {
+          const ok = await applyScheduleChange(
+            { intervalMinutes: preset, enabled: true, pausedUntilManual: false, clearMute: true },
+            false,
+            isTr
+              ? `Soru sıklığı ${preset} dk olarak ayarlandı.`
+              : `Question interval set to ${preset}m.`
+          );
+          if (ok) {
+            syncCadenceButton();
+            cadencePanel.hidden = true;
+            cadenceBtn.classList.remove('is-open');
+          }
+        });
+        chipRow.appendChild(chip);
+      }
+
+      const pauseChip = createEl(
+        'button',
+        `etr-cadence-chip is-off${!activeSettings.enabled ? ' is-active' : ''}`,
+        isTr ? 'Durdur' : 'Pause'
+      );
+      pauseChip.type = 'button';
+      pauseChip.title = isTr
+        ? '“Şimdi Sor”a basana kadar otomatik soru sorma'
+        : 'Pause until you click Quick Quiz';
+      pauseChip.addEventListener('click', async () => {
+        const savedMins = activeSettings.intervalMinutes;
+        await applyScheduleChange(
+          { enabled: false, pausedUntilManual: true, clearMute: true },
+          true,
+          isTr
+            ? `Otomatik sorular durduruldu. “Şimdi Sor”a basınca ${savedMins} dk aralıkla devam eder.`
+            : `Auto-prompts paused. Click Quick Quiz to resume every ${savedMins}m.`
+        );
+      });
+      chipRow.appendChild(pauseChip);
+
+      const quickRow = createEl('div', 'etr-cadence-quick-row');
+      const snooze5Btn = createEl(
+        'button',
+        'etr-cadence-quick-btn',
+        isTr ? '5 dk ertele' : 'Snooze 5m'
+      );
+      snooze5Btn.type = 'button';
+      snooze5Btn.addEventListener('click', async () => {
+        await sendBgMessage({ type: 'SNOOZE_PROMPT', minutes: 5 });
+        removeRecallWidget();
+        renderToast(isTr ? '5 dakika ertelendi.' : 'Snoozed for 5 minutes.');
+      });
+
+      const mute1hBtn = createEl(
+        'button',
+        'etr-cadence-quick-btn',
+        isTr ? '1 saat sessiz' : 'Mute 1h'
+      );
+      mute1hBtn.type = 'button';
+      mute1hBtn.addEventListener('click', async () => {
+        await sendBgMessage({ type: 'MUTE_FOR_HOURS', hours: 1 });
+        removeRecallWidget();
+        renderToast(isTr ? '1 saat sessize alındı.' : 'Muted for 1 hour.');
+      });
+
+      quickRow.append(snooze5Btn, mute1hBtn);
+
+      if (currentHost) {
+        const blockBtn = createEl(
+          'button',
+          'etr-cadence-quick-btn is-danger',
+          isTr ? 'Bu sitede kapat' : 'Block site'
+        );
+        blockBtn.type = 'button';
+        blockBtn.title = isTr
+          ? `Eklenti artık ${displayHost} sayfasında çalışmasın`
+          : `Stop running the extension on ${displayHost}`;
+        blockBtn.addEventListener('click', async () => {
+          await sendBgMessage({ type: 'TOGGLE_BLOCK_HOST', host: currentHost });
+          removeRecallWidget();
+          renderToast(
+            isTr
+              ? `Eklenti artık ${displayHost} sayfasında çalışmayacak.`
+              : `Disabled LingoEx on ${displayHost}.`,
+            themeMode
+          );
+        });
+        quickRow.appendChild(blockBtn);
+      }
+
+      cadencePanel.append(freqLabel, chipRow, quickRow);
+    };
+
+    cadenceBtn.addEventListener('click', () => {
+      const opening = cadencePanel.hidden;
+      if (opening) {
+        renderCadencePanel();
+      }
+      cadencePanel.hidden = !opening;
+      cadenceBtn.classList.toggle('is-open', opening);
     });
 
     const closeBtn = createCloseIconBtn(isTr ? 'Kapat' : 'Dismiss');
     closeBtn.addEventListener('click', async () => {
+      promptDismissed = true;
       await sendBgMessage({ type: 'DISMISS_PROMPT', cardId: card.id });
-      removeRecallWidget();
+      if (activeSettings.enabled) {
+        renderDismissScheduleView();
+      } else {
+        removeRecallWidget();
+      }
     });
 
-    headerActions.append(snoozeBtn, muteBtn, closeBtn);
+    headerActions.append(cadenceBtn, closeBtn);
     header.append(badges, headerActions);
 
     const promptRow = createEl('div', 'etr-prompt-row');
@@ -230,7 +619,7 @@ export function renderRecallWidget(
     speakBtn.addEventListener('click', () => speakEnglish(card.en));
     promptRow.append(enEl, speakBtn);
 
-    cardEl.append(header, promptRow);
+    cardEl.append(header, cadencePanel, promptRow);
 
     if (card.phonetic) {
       cardEl.appendChild(createEl('div', 'etr-phonetic', card.phonetic));
@@ -859,7 +1248,10 @@ export function renderRecallWidget(
   renderQuestionView();
   escapeKeyHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
-      void sendBgMessage({ type: 'DISMISS_PROMPT', cardId: card.id });
+      if (!promptDismissed) {
+        promptDismissed = true;
+        void sendBgMessage({ type: 'DISMISS_PROMPT', cardId: card.id });
+      }
       removeRecallWidget();
     }
   };
